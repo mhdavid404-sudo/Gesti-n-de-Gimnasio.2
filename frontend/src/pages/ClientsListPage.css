@@ -1,0 +1,142 @@
+.clients-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.clients-page__toast {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-success-soft);
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.clients-page__toast-dismiss {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 var(--space-1);
+  transition: color 0.15s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .clients-page__toast-dismiss:hover {
+    color: var(--color-text);
+  }
+}
+
+.clients-page__toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.clients-page__search {
+  max-width: 320px;
+}
+
+.clients-page__count {
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.clients-page__toolbar-spacer {
+  flex: 1;
+}
+
+.clients-page__table-wrap {
+  padding: 0;
+  overflow-x: auto;
+}
+
+.clients-page__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+  min-width: 720px;
+}
+
+.clients-page__table th {
+  text-align: left;
+  padding: var(--space-3) var(--space-4);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-dim);
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.clients-page__table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border-soft);
+  vertical-align: middle;
+}
+
+.clients-page__table tr:last-child td {
+  border-bottom: none;
+}
+
+/* Fila de uso muy frecuente (se escanea/hover decenas de veces por turno):
+   el único tratamiento es un cambio de fondo suavizado con `ease`, sin
+   transform ni lift — no hace falta más para comunicar "esta fila tiene
+   una acción" (ver CLAUDE.md tarea 1, pregunta 1: frecuencia alta ->
+   animación mínima). El link "Ver detalle" adentro (.btn.btn-ghost) ya
+   trae su propio hover + feedback de presión real. */
+.clients-page__table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .clients-page__table tbody tr:hover {
+    background: var(--color-surface-2);
+  }
+}
+
+/* Stagger de carga — ver CLAUDE.md tarea 3. Anima solo cuando React monta
+   la fila por primera vez (carga inicial o cuando un filtro nuevo revela
+   una fila que no existía en el DOM); las filas que ya estaban montadas
+   conservan su key y no vuelven a animarse en cada tecla del buscador. */
+.clients-page__table tbody tr {
+  animation: clients-row-in 0.28s var(--ease-out) both;
+}
+
+@keyframes clients-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.clients-page__name {
+  font-weight: 600;
+}
+
+.clients-page__contact {
+  display: flex;
+  flex-direction: column;
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+}
+
+.clients-page__phone {
+  font-size: 12.5px;
+  color: var(--color-text-dim);
+}
+
+.clients-page__view {
+  padding: var(--space-1) var(--space-3);
+  font-size: 13px;
+}

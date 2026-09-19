@@ -1,0 +1,47 @@
+# .gitignore raiz — SmartGym v2
+
+# Variables de entorno (contiene credenciales de dev; nunca versionar)
+.env
+.env.*
+!.env.example
+
+# Python (backend)
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.pyc
+backend/.venv/
+backend/venv/
+backend/.pytest_cache/
+
+# Node (frontend) -- frontend/.gitignore ya cubre node_modules/dist,
+# se repite aqui por si algun comando corre desde la raiz.
+frontend/node_modules/
+frontend/dist/
+
+# Python — entornos virtuales (incluye los venv temporales de QA), caches y builds
+.venv/
+.venv*/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+
+# Node — a cualquier profundidad
+node_modules/
+dist/
+
+# Artefactos de analisis/herramientas locales (no son parte del proyecto)
+.playwright-mcp/
+ufcgym.mx-*.jpeg
+ufcgym.mx.md
+ufcgym.mx.json
+backend;C/
+
+# Editores / SO
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db

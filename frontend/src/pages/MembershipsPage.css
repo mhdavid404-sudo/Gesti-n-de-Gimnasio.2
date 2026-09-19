@@ -1,0 +1,145 @@
+.memberships-page {
+  display: flex;
+  flex-direction: column;
+  gap: 36px;
+}
+
+.memberships-page__section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.memberships-page__plans {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+
+.plan-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 3px solid var(--color-border);
+  /* Lift sutil en hover: comunica "esto es contenido para comparar", no un
+     botón — por eso NO lleva :active/scale (no hay click real que
+     confirmar, ver CLAUDE.md tarea 1, pregunta 1). Reutiliza la sombra
+     "poster" del sistema (--shadow-card) en vez de inventar una nueva. */
+  transition: transform 0.18s var(--ease-in-out), box-shadow 0.18s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .plan-card:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-card);
+  }
+}
+
+.plan-card[data-plan='Básica'] {
+  border-top-color: var(--color-neutral);
+}
+.plan-card[data-plan='VIP'] {
+  border-top-color: var(--color-warning);
+}
+.plan-card[data-plan='Premium'] {
+  /* Blanco en vez de verde: es un borde decorativo de jerarquía entre
+     planes, no un CTA (ver theme.css, nota de adaptación punto 1). */
+  border-top-color: var(--color-text);
+}
+
+.plan-card__name {
+  font-family: var(--font-display);
+  font-size: 21px;
+  letter-spacing: 0.02em;
+}
+
+.plan-card__price {
+  /* Precio = número protagonista, mismo tratamiento tipográfico que
+     StatNumber: el trazo de marcador + el tamaño cargan la jerarquía. */
+  font-family: var(--font-display-brush);
+  font-size: 40px;
+  font-weight: 400;
+  color: var(--color-text);
+}
+
+.plan-card__price span {
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  margin-left: 4px;
+}
+
+.plan-card__description {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.plan-card__benefits {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.plan-card__benefits li {
+  font-size: 13.5px;
+  padding-left: 16px;
+  position: relative;
+}
+
+.plan-card__benefits li::before {
+  /* Viñeta decorativa, no un CTA: neutro en vez de verde de marca. */
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-text-dim);
+}
+
+.memberships-page__table-wrap {
+  padding: 0;
+  overflow-x: auto;
+}
+
+.memberships-page__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 15px;
+  min-width: 640px;
+}
+
+.memberships-page__table th {
+  text-align: left;
+  padding: var(--space-3) var(--space-4);
+  font-size: 12.5px;
+  color: var(--color-text-dim);
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.memberships-page__table td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.memberships-page__table tr:last-child td {
+  border-bottom: none;
+}
+
+.memberships-page__view {
+  padding: 6px 12px;
+  font-size: 12.5px;
+}
+
+@media (max-width: 900px) {
+  .memberships-page__plans {
+    grid-template-columns: 1fr;
+  }
+}

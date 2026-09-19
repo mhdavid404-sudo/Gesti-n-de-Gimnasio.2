@@ -1,0 +1,861 @@
+/* =============================================================================
+   Landing pública — Stronger Aragón (ruta "/")
+   Concepto visual: "el logo tomó la pared entera".
+
+   Paleta extraída pixel a pixel del degradado real del logo
+   (src/assets/logo-stronger.jpg), NO inventada:
+     --lp-green-bright  #206020  zona más clara del degradado
+     --lp-green-brighter#177016  extremo más luminoso
+     --lp-green-avg     #1E581B  promedio de toda la zona de degradado
+     --lp-green-mid     #204020  tono dominante (bucket más común)
+     --lp-green-dark    #004400  extremo oscuro / viñeta del logo
+
+   Fondo negro casi puro (#0A0A0A) — lo opuesto al blanco corporativo
+   genérico. Todo vive bajo `.landing`, ninguna variable toca :root ni
+   src/styles/theme.css (que sigue intacto para el panel interno).
+
+   Tipografía: Anton para el titular del hero (máximo impacto, trazo muy
+   grueso — más peso visual que Bebas Neue para una sola línea de golpe).
+   Bebas Neue (ya cargada globalmente) para el resto de títulos de
+   sección, manteniendo un hilo de familia tipográfica con el panel
+   interno sin compartir su paleta. Inter para todo el texto de lectura.
+
+   Radios de esquina mínimos (2-3px) + esquina cortada (clip-path) como
+   firma geométrica repetida = el "protagonista visual" de esta pieza,
+   junto con el verde en degradado sobre negro.
+============================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Anton&display=swap');
+
+.landing {
+  --lp-bg: #0a0a0a;
+  --lp-bg-alt: #111111;
+  --lp-surface: #151515;
+  --lp-surface-2: #1c1c1c;
+  --lp-border: #2a2a2a;
+
+  --lp-text: #f5f5f0;
+  --lp-text-muted: #a8a8a2;
+  --lp-text-dim: #6f6f6a;
+
+  --lp-green-brighter: #177016;
+  --lp-green-bright: #206020;
+  --lp-green-avg: #1e581b;
+  --lp-green-mid: #204020;
+  --lp-green-dark: #004400;
+
+  --lp-gradient-brand: linear-gradient(135deg, var(--lp-green-brighter) 0%, var(--lp-green-mid) 55%, var(--lp-green-dark) 100%);
+  --lp-gradient-radial: radial-gradient(circle at 28% 22%, var(--lp-green-bright) 0%, var(--lp-green-avg) 40%, var(--lp-green-dark) 88%);
+
+  --lp-font-display: 'Bebas Neue', 'Arial Narrow', sans-serif;
+  --lp-font-hero: 'Anton', var(--lp-font-display);
+  --lp-font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  --lp-radius: 3px;
+  --lp-header-h: 76px;
+
+  /* Fotos reales (Unsplash, licencia gratuita) — reemplazan los placeholders
+     gráficos originales. Créditos completos en DECISIONES.md.
+     --value-image se queda como gradiente: no se pidió foto para esa sección. */
+  --hero-image: url('../assets/photos/hero-training.jpg');
+  --value-image: var(--lp-gradient-brand);
+  --facility-image-pesas: url('../assets/photos/facility-pesas.jpg');
+  --facility-image-box: url('../assets/photos/facility-box.jpg');
+  --facility-image-funcional: url('../assets/photos/facility-funcional.jpg');
+
+  background: var(--lp-bg);
+  color: var(--lp-text);
+  font-family: var(--lp-font-body);
+  min-height: 100vh;
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+.landing * {
+  box-sizing: border-box;
+}
+
+.landing a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.landing :focus-visible {
+  outline: 2px solid var(--lp-green-brighter);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.landing ::selection {
+  background: rgba(32, 96, 32, 0.4);
+  color: var(--lp-text);
+}
+
+/* ---------------------------------------------------------------------------
+   Botones — esquinas rectas/mínimas, opuesto al pill del panel interno
+--------------------------------------------------------------------------- */
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 22px;
+  border-radius: var(--lp-radius);
+  border: 1px solid transparent;
+  font-family: var(--lp-font-display);
+  font-size: 16px;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  transition: transform 0.08s ease, background-color 0.15s ease, border-color 0.15s ease;
+  white-space: nowrap;
+}
+
+.lp-btn:active {
+  /* Feedback de presión real, consistente con el resto del sistema (ver
+     theme.css / CLAUDE.md tarea 1). Transición CSS, no keyframe: un botón
+     se puede presionar rápido y seguido. */
+  transform: scale(0.97);
+  transition: transform 0.12s var(--ease-out);
+}
+
+.lp-btn--brand {
+  background: var(--lp-gradient-brand);
+  color: var(--lp-text);
+  border-color: var(--lp-green-brighter);
+}
+
+.lp-btn--ghost {
+  background: transparent;
+  border-color: var(--lp-border);
+  color: var(--lp-text);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lp-btn--brand:hover {
+    filter: brightness(1.15);
+  }
+
+  .lp-btn--ghost:hover {
+    border-color: var(--lp-green-brighter);
+    background: rgba(32, 96, 32, 0.12);
+  }
+}
+
+.lp-btn--lg {
+  padding: 16px 30px;
+  font-size: 19px;
+}
+
+/* ---------------------------------------------------------------------------
+   Títulos de sección compartidos
+--------------------------------------------------------------------------- */
+.lp-section-title {
+  font-family: var(--lp-font-display);
+  font-size: clamp(30px, 4vw, 42px);
+  letter-spacing: 0.01em;
+  margin: 0 0 16px;
+  color: var(--lp-text);
+}
+
+/* ---------------------------------------------------------------------------
+   Scroll-reveal editorial — ver CLAUDE.md tarea 2 / src/hooks/useScrollReveal.ts.
+   Fade + translateY sutil (14px, nunca scale ni saltos grandes), 420ms con
+   ease-out fuerte: más pausado que la UI operativa a propósito, porque esto
+   es contenido de "primera vista" que se recorre una sola vez, no una
+   acción repetida (ver framework de las 4 preguntas). El hero queda fuera:
+   ya es lo primero visible, no hay nada que "revelar".
+--------------------------------------------------------------------------- */
+.lp-value,
+.lp-plans,
+.lp-classes,
+.lp-facilities,
+.landing-footer {
+  transition: opacity 0.42s var(--ease-out), transform 0.42s var(--ease-out);
+}
+
+.lp-value[data-reveal='hidden'],
+.lp-plans[data-reveal='hidden'],
+.lp-classes[data-reveal='hidden'],
+.lp-facilities[data-reveal='hidden'],
+.landing-footer[data-reveal='hidden'] {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+/* ---------------------------------------------------------------------------
+   Header fijo
+--------------------------------------------------------------------------- */
+.landing-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  background: rgba(10, 10, 10, 0.88);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--lp-border);
+}
+
+.landing-header__inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  height: var(--lp-header-h);
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.landing-header__brand {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.landing-header__logo {
+  height: 52px;
+  width: 52px;
+  object-fit: cover;
+  border-radius: var(--lp-radius);
+  display: block;
+}
+
+.landing-header__nav--desktop {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  margin: 0 auto;
+}
+
+.landing-header__link {
+  font-family: var(--lp-font-display);
+  font-size: 16px;
+  letter-spacing: 0.03em;
+  color: var(--lp-text-muted);
+  padding: 6px 2px;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .landing-header__link:hover {
+    color: var(--lp-text);
+    border-color: var(--lp-green-brighter);
+  }
+}
+
+.landing-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.landing-header__cta {
+  padding: 10px 18px;
+  font-size: 14px;
+}
+
+.landing-header__toggle {
+  display: none;
+  background: transparent;
+  border: 1px solid var(--lp-border);
+  border-radius: var(--lp-radius);
+  color: var(--lp-text);
+  padding: 8px;
+  line-height: 0;
+}
+
+.landing-header__nav--mobile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 24px 20px;
+  border-top: 1px solid var(--lp-border);
+}
+
+.landing-header__nav--mobile .landing-header__link {
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--lp-border);
+}
+
+@media (max-width: 860px) {
+  .landing-header__nav--desktop {
+    display: none;
+  }
+  .landing-header__toggle {
+    display: inline-flex;
+  }
+  .landing-header__cta {
+    display: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Hero
+--------------------------------------------------------------------------- */
+.lp-hero {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  padding: calc(var(--lp-header-h) + 40px) 24px 80px;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.lp-hero__backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  background: var(--hero-image);
+  background-size: cover;
+  background-position: center;
+  /* Alto contraste, blanco y negro — foto real desaturada a propósito para
+     que combine con el negro/verde de marca (ver DECISIONES.md). */
+  filter: grayscale(1) contrast(1.15);
+}
+
+.lp-hero__backdrop::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(10, 10, 10, 0.35) 0%, rgba(10, 10, 10, 0.55) 55%, var(--lp-bg) 100%),
+    linear-gradient(115deg, rgba(10, 10, 10, 0.9) 10%, transparent 55%);
+}
+
+/* Textura de ruido sutil vía CSS — deliberada y única, no repetida en cada sección */
+.lp-hero__grain {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.5;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+}
+
+.lp-hero__content {
+  max-width: 720px;
+}
+
+.lp-hero__title {
+  font-family: var(--lp-font-hero);
+  font-size: clamp(2.75rem, 8vw, 6.25rem);
+  line-height: 0.94;
+  letter-spacing: 0.005em;
+  margin: 0 0 24px;
+  color: var(--lp-text);
+  text-shadow: 0 6px 40px rgba(0, 0, 0, 0.6);
+}
+
+.lp-hero__copy {
+  font-size: 19px;
+  line-height: 1.6;
+  color: var(--lp-text-muted);
+  max-width: 520px;
+  margin: 0 0 36px;
+}
+
+.lp-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+/* ---------------------------------------------------------------------------
+   Propuesta de valor
+--------------------------------------------------------------------------- */
+.lp-value {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 96px 24px;
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: 56px;
+  align-items: center;
+}
+
+.lp-value__graphic {
+  position: relative;
+  aspect-ratio: 4 / 5;
+  border-radius: var(--lp-radius);
+  clip-path: polygon(0 0, 100% 0, 100% 88%, 86% 100%, 0 100%);
+  background: var(--value-image);
+  background-size: cover;
+  background-position: center;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 32px;
+  border: 1px solid var(--lp-green-brighter);
+}
+
+.lp-value__graphic-figure {
+  font-family: var(--lp-font-hero);
+  font-size: clamp(48px, 6vw, 72px);
+  line-height: 1;
+  color: var(--lp-text);
+}
+
+.lp-value__graphic-label {
+  font-family: var(--lp-font-display);
+  font-size: 16px;
+  letter-spacing: 0.04em;
+  color: rgba(245, 245, 240, 0.85);
+  margin-top: 6px;
+}
+
+.lp-value__lead {
+  font-size: 18px;
+  line-height: 1.65;
+  color: var(--lp-text-muted);
+  margin: 0 0 24px;
+  max-width: 560px;
+}
+
+.lp-value__list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.lp-value__list li {
+  position: relative;
+  padding-left: 20px;
+  font-size: 16px;
+  color: var(--lp-text);
+}
+
+.lp-value__list li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 8px;
+  height: 8px;
+  background: var(--lp-gradient-brand);
+}
+
+@media (max-width: 860px) {
+  .lp-value {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Planes
+--------------------------------------------------------------------------- */
+.lp-plans {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 40px 24px 100px;
+}
+
+.lp-plans__title {
+  margin-bottom: 8px;
+}
+
+.lp-plans__subtitle {
+  color: var(--lp-text-muted);
+  font-size: 16px;
+  margin: 0 0 44px;
+  max-width: 520px;
+}
+
+.lp-plans__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.lp-plan-card {
+  position: relative;
+  background: var(--lp-surface);
+  border: 1px solid var(--lp-border);
+  border-radius: var(--lp-radius);
+  clip-path: polygon(0 0, 100% 0, 100% 92%, 92% 100%, 0 100%);
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+}
+
+.lp-plan-card--featured {
+  background: linear-gradient(180deg, var(--lp-surface-2) 0%, var(--lp-surface) 60%);
+  border: 1px solid var(--lp-green-brighter);
+  box-shadow: 0 0 0 1px var(--lp-green-brighter), 0 24px 60px -20px rgba(23, 112, 22, 0.45);
+  transform: translateY(-8px);
+}
+
+.lp-plan-card__badge {
+  position: absolute;
+  top: -1px;
+  right: 24px;
+  background: var(--lp-gradient-brand);
+  color: var(--lp-text);
+  font-family: var(--lp-font-display);
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  padding: 6px 14px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 8px 100%);
+}
+
+.lp-plan-card__name {
+  font-family: var(--lp-font-display);
+  font-size: 22px;
+  letter-spacing: 0.02em;
+  color: var(--lp-text-muted);
+}
+
+.lp-plan-card--featured .lp-plan-card__name {
+  color: var(--lp-text);
+}
+
+.lp-plan-card__price {
+  font-family: var(--lp-font-hero);
+  font-size: 44px;
+  color: var(--lp-text);
+  margin: 8px 0 16px;
+  line-height: 1;
+}
+
+.lp-plan-card__price span {
+  font-family: var(--lp-font-body);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--lp-text-muted);
+  margin-left: 4px;
+}
+
+.lp-plan-card__description {
+  font-size: 14.5px;
+  color: var(--lp-text-muted);
+  line-height: 1.5;
+  margin: 0 0 20px;
+}
+
+.lp-plan-card__benefits {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.lp-plan-card__benefits li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 14.5px;
+  color: var(--lp-text);
+}
+
+.lp-plan-card__benefits li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 6px;
+  width: 6px;
+  height: 6px;
+  background: var(--lp-green-brighter);
+}
+
+.lp-plan-card__cta {
+  width: 100%;
+}
+
+@media (max-width: 980px) {
+  .lp-plans__grid {
+    grid-template-columns: 1fr;
+  }
+  .lp-plan-card--featured {
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Clases de Box
+--------------------------------------------------------------------------- */
+.lp-classes {
+  background: var(--lp-bg-alt);
+  border-top: 1px solid var(--lp-border);
+  border-bottom: 1px solid var(--lp-border);
+}
+
+.lp-classes__inner {
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: 48px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 88px 24px;
+  align-items: center;
+}
+
+.lp-classes__intro p {
+  color: var(--lp-text-muted);
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 420px;
+}
+
+.lp-classes__table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--lp-border);
+}
+
+.lp-classes__caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.lp-classes__table th,
+.lp-classes__table td {
+  text-align: left;
+  padding: 16px 20px;
+  font-size: 16px;
+  border-bottom: 1px solid var(--lp-border);
+}
+
+.lp-classes__table thead th {
+  font-family: var(--lp-font-display);
+  font-size: 14px;
+  letter-spacing: 0.03em;
+  color: var(--lp-text);
+  background: var(--lp-gradient-brand);
+}
+
+.lp-classes__table tbody td:first-child {
+  color: var(--lp-text);
+  font-weight: 600;
+}
+
+.lp-classes__table tbody td:last-child {
+  color: var(--lp-text-muted);
+}
+
+.lp-classes__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+@media (max-width: 860px) {
+  .lp-classes__inner {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Instalaciones
+--------------------------------------------------------------------------- */
+.lp-facilities {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 96px 24px;
+}
+
+.lp-facilities__title {
+  margin-bottom: 44px;
+}
+
+.lp-facilities__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.lp-facility-card {
+  margin: 0;
+}
+
+.lp-facility-card__graphic {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--lp-radius);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 12% 100%, 0 84%);
+  border: 1px solid var(--lp-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.lp-facility-card__graphic--pesas {
+  background: var(--facility-image-pesas);
+  background-size: cover;
+  background-position: center;
+}
+.lp-facility-card__graphic--box {
+  background: var(--facility-image-box);
+  background-size: cover;
+  background-position: center;
+}
+.lp-facility-card__graphic--funcional {
+  background: var(--facility-image-funcional);
+  background-size: cover;
+  background-position: center;
+}
+
+.lp-facility-card__icon {
+  /* Las 3 tarjetas ya usan foto real de fondo (ver DECISIONES.md) — el ícono
+     de línea era el placeholder para cuando no había fotografía; con la foto
+     presente, mostrarlo encima sería redundante y se ve como debris de UI. */
+  display: none;
+}
+
+.lp-facility-card__graphic {
+  /* Oscurece levemente la foto para que el título/caption de abajo (fuera
+     del graphic) mantenga suficiente separación tonal con la imagen. */
+  filter: grayscale(0.3) contrast(1.05);
+  /* Lift en hover con sombra dura de un solo trazo, pura y negra — mismo
+     lenguaje que el Design Taste pide para fotografía sobre fondo oscuro
+     (nunca sombra suave/multi-capa). Sin :active/scale: la tarjeta no
+     navega a nada, es contenido editorial, no un botón (ver CLAUDE.md
+     tarea 1, pregunta 1). */
+  transition: transform 0.2s var(--ease-in-out), box-shadow 0.2s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .lp-facility-card__graphic:hover {
+    transform: translateY(-4px);
+    box-shadow: rgba(0, 0, 0, 0.6) -0.6px 3px 10px 0px;
+  }
+}
+
+.lp-facility-card__title {
+  display: block;
+  font-family: var(--lp-font-display);
+  font-size: 20px;
+  letter-spacing: 0.02em;
+  margin-bottom: 6px;
+}
+
+.lp-facility-card figcaption p {
+  font-size: 14px;
+  color: var(--lp-text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+@media (max-width: 860px) {
+  .lp-facilities__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Footer
+--------------------------------------------------------------------------- */
+.landing-footer {
+  background: var(--lp-bg-alt);
+  border-top: 1px solid var(--lp-border);
+}
+
+.landing-footer__inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 64px 24px 40px;
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  gap: 40px;
+}
+
+.landing-footer__logo {
+  height: 56px;
+  width: 56px;
+  object-fit: cover;
+  border-radius: var(--lp-radius);
+  margin-bottom: 14px;
+}
+
+.landing-footer__brand p {
+  color: var(--lp-text-muted);
+  font-size: 14px;
+  line-height: 1.5;
+  max-width: 260px;
+}
+
+.landing-footer__heading {
+  display: block;
+  font-family: var(--lp-font-display);
+  font-size: 16px;
+  letter-spacing: 0.02em;
+  margin-bottom: 14px;
+  color: var(--lp-text);
+}
+
+.landing-footer__contact p {
+  font-size: 14px;
+  color: var(--lp-text-muted);
+  margin: 0 0 6px;
+}
+
+.landing-footer__social-links {
+  display: flex;
+  gap: 12px;
+}
+
+.landing-footer__social-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--lp-border);
+  border-radius: var(--lp-radius);
+  color: var(--lp-text-muted);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .landing-footer__social-link:hover {
+    color: var(--lp-text);
+    border-color: var(--lp-green-brighter);
+  }
+}
+
+.landing-footer__social-link svg {
+  width: 20px;
+  height: 20px;
+}
+
+.landing-footer__bottom {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 20px 24px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  font-size: 13px;
+  color: var(--lp-text-muted);
+  border-top: 1px solid var(--lp-border);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .landing-footer__bottom a:hover {
+    color: var(--lp-text);
+  }
+}
+
+@media (max-width: 700px) {
+  .landing-footer__inner {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  .landing-footer__bottom {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

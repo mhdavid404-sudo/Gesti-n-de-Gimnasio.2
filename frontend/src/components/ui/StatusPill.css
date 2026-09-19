@@ -1,0 +1,37 @@
+.status-pill {
+  /* Geometría de esquina mínima, igual criterio que la landing: nunca
+     "pill" totalmente redondeado. */
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.status-pill__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-pill[data-tone='success'] {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+.status-pill[data-tone='warning'] {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+.status-pill[data-tone='danger'] {
+  background: var(--color-danger-soft);
+  color: var(--color-danger);
+}
+.status-pill[data-tone='neutral'] {
+  background: var(--color-neutral-soft);
+  color: var(--color-neutral);
+}

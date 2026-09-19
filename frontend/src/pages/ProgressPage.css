@@ -1,0 +1,70 @@
+.progress-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.progress-page__controls {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.progress-page__controls > div:first-child {
+  min-width: 240px;
+}
+
+.progress-page__metric-toggle {
+  display: flex;
+  gap: 6px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-sm);
+  padding: 4px;
+}
+
+.progress-page__metric-btn {
+  background: transparent;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.progress-page__metric-btn[data-active='true'] {
+  /* Control de selección, no un CTA: invierte a blanco/negro en vez de
+     usar el verde de marca (ver theme.css, nota de adaptación punto 1),
+     mismo criterio que las tabs activas. */
+  background: var(--color-text);
+  color: var(--color-bg);
+}
+
+.progress-page__grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.progress-page__chart-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.progress-page__side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+@media (max-width: 900px) {
+  .progress-page__grid {
+    grid-template-columns: 1fr;
+  }
+}

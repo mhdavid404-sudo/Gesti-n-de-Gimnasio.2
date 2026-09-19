@@ -1,0 +1,124 @@
+.sidebar {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  background: var(--color-bg);
+  border-right: 1px solid var(--color-border-soft);
+  display: flex;
+  flex-direction: column;
+  padding: 20px 14px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 24px;
+}
+
+.sidebar__brand-mark {
+  /* Chip de marca en superficie neutra, no en verde de acento: la marca
+     del sidebar no es una acción, es identidad — el verde queda en
+     reserva para botones/links reales (ver theme.css, nota de
+     adaptación punto 1). */
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 16px;
+  letter-spacing: 0.03em;
+  flex-shrink: 0;
+}
+
+.sidebar__brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  min-width: 0;
+}
+
+.sidebar__brand-text strong {
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sidebar__brand-text span {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.sidebar__link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  border-left: 2px solid transparent;
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sidebar__link:hover {
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
+}
+
+.sidebar__link--active {
+  /* Estado de navegación actual, no un CTA: el borde indicador se
+     comunica en blanco/neutro (mismo criterio que las tabs activas), el
+     fondo se queda en el wash suave (--color-accent-soft) porque es un
+     tinte de apoyo casi imperceptible, no un uso "protagonista" del verde
+     de marca (ver theme.css, nota de adaptación punto 1). El verde de
+     acento sobre el fondo casi negro del sidebar tampoco alcanza contraste
+     AA como texto pequeño (ver DECISIONES.md) — el texto se queda en
+     blanco cálido, siempre legible. */
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+  border-left-color: var(--color-text);
+  font-weight: 600;
+}
+
+.sidebar__icon {
+  flex-shrink: 0;
+}
+
+.sidebar__logout {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  color: var(--color-text-dim);
+  text-decoration: none;
+  border-top: 1px solid var(--color-border-soft);
+  margin-top: 8px;
+  padding-top: 16px;
+  transition: color 0.15s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sidebar__logout:hover {
+    color: var(--color-danger);
+  }
+}

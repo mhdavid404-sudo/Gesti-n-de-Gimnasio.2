@@ -1,0 +1,193 @@
+.login {
+  position: relative;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  background: var(--color-bg);
+}
+
+.login__back-link {
+  position: absolute;
+  top: 24px;
+  left: 28px;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .login__back-link:hover {
+    color: var(--color-accent);
+    background: var(--color-accent-soft);
+  }
+}
+
+.login__hero {
+  padding: 64px 56px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(34, 150, 32, 0.10), transparent 45%),
+    var(--color-bg);
+  border-right: 1px solid var(--color-border-soft);
+}
+
+.login__hero-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: var(--font-display);
+  font-size: 20px;
+  letter-spacing: 0.03em;
+  margin-bottom: 48px;
+}
+
+.login__hero-mark {
+  width: 40px;
+  height: 40px;
+  font-size: 17px;
+}
+
+.login__hero-stat {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 28px;
+}
+
+.login__hero-stat-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.login__hero-stat-tag {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-dim);
+  text-transform: lowercase;
+}
+
+.login__hero-stat-value {
+  /* Número protagonista del hero de login, mismo tratamiento que
+     StatNumber: trazo de marcador + tamaño cargan la jerarquía, siempre en
+     blanco (ver theme.css, nota de adaptación punto 1 y 2). */
+  font-family: var(--font-display-brush);
+  font-size: 44px;
+  font-weight: 400;
+  color: var(--color-text);
+  line-height: 1;
+}
+
+.login__hero-stat-divider {
+  width: 1px;
+  height: 48px;
+  background: var(--color-border);
+}
+
+.login__hero-copy {
+  max-width: 440px;
+  color: var(--color-text-muted);
+  font-size: 15.5px;
+  line-height: 1.6;
+  margin-bottom: 28px;
+}
+
+.login__hero-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  max-width: 420px;
+}
+
+.login__hero-list li {
+  position: relative;
+  padding-left: 18px;
+  font-size: 14.5px;
+  color: var(--color-text);
+}
+
+.login__hero-list li::before {
+  /* Viñeta decorativa, no un CTA: neutro en vez de verde de marca. */
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 6px;
+  height: 6px;
+  background: var(--color-text-dim);
+  border-radius: 50%;
+}
+
+.login__panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+.login__card {
+  width: 100%;
+  max-width: 380px;
+  padding: 36px 32px;
+  display: flex;
+  flex-direction: column;
+}
+
+.login__title {
+  font-family: var(--font-display-brush);
+  font-weight: 400;
+  font-size: 34px;
+  letter-spacing: 0;
+  margin-top: 6px;
+  margin-bottom: 10px;
+}
+
+.login__helper {
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  margin-bottom: 24px;
+}
+
+.login__field {
+  margin-bottom: 16px;
+}
+
+.login__submit {
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px;
+  font-size: 15px;
+}
+
+.login__footnote {
+  margin-top: 18px;
+  font-size: 12.5px;
+  color: var(--color-text-dim);
+  line-height: 1.5;
+}
+
+@media (max-width: 860px) {
+  .login {
+    grid-template-columns: 1fr;
+  }
+
+  .login__hero {
+    padding: 40px 28px;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border-soft);
+  }
+}

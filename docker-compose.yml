@@ -1,0 +1,67 @@
+# docker-compose.yml — SmartGym v2, Entrega 1
+#
+# Contrato de convenciones: COORDINACION-ENTREGA1.md, seccion 3.
+# Prioriza developer experience (hot-reload/HMR) sobre imagenes de
+# produccion, tal como pide la nota para Royer en ese documento.
+# NO corre migraciones de Alembic automaticamente (se corren a mano,
+# ver backend/README.md).
+
+name: smartgym
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    ports:
+      - "8000:8000"
+    volumes:
+      # Hot-reload: uvicorn --reload detecta cambios del host. Las
+      # dependencias de pip quedan instaladas fuera de /app (site-packages
+      # del interprete), asi que este bind mount no las borra.
+      - ./backend:/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      # HMR de Vite: bind mount del codigo del host.
+      - ./frontend:/app
+      # Volumen anonimo para que node_modules del contenedor (instalado
+      # con binarios nativos de Linux) no sea pisado por el
+      # node_modules del host (Windows). Sin esto, paquetes con binarios
+      # nativos (ej. lightningcss, rolldown, oxlint) rompen dentro del
+      # contenedor.
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  db_data:

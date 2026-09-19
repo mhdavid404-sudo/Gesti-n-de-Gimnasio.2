@@ -1,0 +1,52 @@
+.stat-number__value {
+  /* El protagonismo ya no lo carga el verde de marca: lo carga la
+     tipografía de marcador a mayor tamaño, siempre en blanco cálido (ver
+     theme.css, nota de adaptación punto 1 y 2). Los tonos semánticos
+     (warning/danger) siguen coloreados a propósito: comunican un estado
+     real (membresías vencidas/por vencer), no son decoración de marca. */
+  font-family: var(--font-display-brush);
+  /* Permanent Marker es un trazo mucho más ancho por caracter que Bebas
+     Neue: se calibra a clamp() en vez de un tamaño fijo para que montos
+     largos (ej. "$45,230") sigan cabiendo en las 4 columnas del Dashboard
+     sin desbordar la tarjeta, y crezca en pantallas más anchas donde sí
+     hay espacio de sobra. */
+  font-size: clamp(34px, 4vw, 48px);
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: 0;
+  color: var(--color-text);
+  overflow-wrap: break-word;
+}
+
+.stat-number[data-tone='success'] .stat-number__value {
+  color: var(--color-success);
+}
+.stat-number[data-tone='warning'] .stat-number__value {
+  color: var(--color-warning);
+}
+.stat-number[data-tone='danger'] .stat-number__value {
+  color: var(--color-danger);
+}
+
+.stat-number__suffix {
+  font-family: var(--font-body);
+  font-size: 21px;
+  margin-left: 4px;
+  color: var(--color-text-muted);
+}
+
+.stat-number__label {
+  margin-top: 6px;
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+@media (max-width: 560px) {
+  .stat-number__value {
+    /* Mismo margen de seguridad que antes (min/max separados ~10px) para
+       que montos largos como "$45,230" no se desborden en pantallas
+       angostas — ver nota de calibración arriba. */
+    font-size: clamp(31px, 9vw, 41px);
+  }
+}

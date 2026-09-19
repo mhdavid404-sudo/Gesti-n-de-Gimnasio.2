@@ -1,0 +1,175 @@
+.client-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.client-detail__header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.client-detail__avatar {
+  /* Chip de iniciales en superficie neutra (mismo tratamiento que
+     .sidebar__brand-mark / .topbar__avatar): un avatar identifica, no
+     ejecuta una acción, así que no lleva el verde de marca — ver
+     theme.css, nota de adaptación punto 1. */
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.client-detail__identity {
+  flex: 1;
+  min-width: 180px;
+}
+
+.client-detail__email {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  margin-top: 2px;
+}
+
+.client-detail__header-meta {
+  display: flex;
+  gap: 32px;
+}
+
+.client-detail__header-meta > div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.client-detail__header-meta p {
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.client-detail__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px 32px;
+  margin: 0;
+}
+
+.client-detail__grid-full {
+  grid-column: 1 / -1;
+}
+
+.client-detail__grid dt {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-dim);
+  margin-bottom: 4px;
+}
+
+.client-detail__grid dd {
+  margin: 0;
+  font-size: 15px;
+}
+
+.client-detail__benefits {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.client-detail__empty {
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.client-detail__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.client-detail__table th {
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 11.5px;
+  color: var(--color-text-dim);
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.client-detail__table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.client-detail__capitalize {
+  text-transform: capitalize;
+}
+
+.client-detail__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.client-detail__sub-card {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+}
+
+.client-detail__sub-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.client-detail__sub-card-header h3 {
+  font-size: 15.5px;
+  font-weight: 700;
+}
+
+.client-detail__sub-card-header p {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.client-detail__diet-meta {
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+}
+
+.client-detail__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.client-detail__progress-chart {
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-sm);
+  padding: 20px;
+}
+
+.client-detail__footnote {
+  font-size: 12px;
+  color: var(--color-text-dim);
+}
+
+@media (max-width: 700px) {
+  .client-detail__grid {
+    grid-template-columns: 1fr;
+  }
+}

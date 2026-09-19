@@ -1,0 +1,454 @@
+/* =============================================================================
+   SmartGym v2 — Stronger Aragón
+   Concepto visual: "el tablero detrás del mostrador".
+
+   Todo el sistema (landing pública, panel interno detrás de /login —
+   Dashboard, Clientes, Detalle de cliente, Membresías, Rutinas, Dietas,
+   Progreso— y Login) comparte la MISMA identidad real de marca ya extraída
+   pixel a pixel del logo (ver src/pages/LandingPage.css y DECISIONES.md,
+   entrada "Identidad visual real de marca en la landing pública"): negro
+   casi puro, el verde del degradado del logo, y geometría de esquina
+   mínima. La paleta vive directamente en `:root`, así que no hace falta
+   ninguna capa de scoping adicional — cualquier `.card`, `.btn-primary`,
+   `.input`, etc. en cualquier pantalla (incluida /login) hereda estos
+   valores por defecto.
+
+   ---------------------------------------------------------------------------
+   Adaptación de patrones — Design Taste (UFC Gym, ver CLAUDE.md § Design
+   Taste), aplicada al panel interno (Entrega 1, 2026-09-13):
+   ---------------------------------------------------------------------------
+
+   1) "Monochrome discipline, un acento en reserva": el verde de marca dejó
+      de usarse como color de TEXTO/borde/ícono decorativo (números
+      protagonistas, precios, avatares, tabs activos, bullets). Ahora
+      `--color-accent` está reservado EXCLUSIVAMENTE para elementos
+      accionables: `.btn-primary`, links de acción real (navegan a algo:
+      "Ver membresías", fila de cliente, "Volver al inicio"), el foco de
+      teclado (`:focus-visible`) y el borde de foco de `.input`. Todo lo que
+      antes usaba el verde solo para "verse importante" (StatNumber,
+      avatares de iniciales, tabs, viñetas, precios) pasa a blanco/neutro —
+      el protagonismo ahora lo da la tipografía (punto 2), no el color.
+
+   2) "Typeface does the shouting, weight never does": se agrega
+      `--font-display-brush` (Permanent Marker) como la tipografía más
+      ruidosa del sistema — trazo de marcador real, coherente con la
+      identidad "marcador de gimnasio" que el proyecto ya tenía con Bebas
+      Neue, pero llevada un paso más lejos para reemplazar el color como
+      fuente de jerarquía. Se usa en `.section-title`, los títulos de
+      página (`.topbar__title`) y los números protagonistas (`StatNumber`,
+      precios de membresía) — todos ahora en blanco/neutro, más grandes que
+      antes, porque el tamaño+tipografía cargan el peso visual que antes
+      cargaba el verde. Bebas Neue NO se retira: se degrada a tipografía
+      secundaria para insignias pequeñas y nombres de tarjeta (marca del
+      sidebar, avatares, nombre de plan/rutina/dieta) — un tercer nivel de
+      jerarquía entre el marcador grande y el texto funcional.
+
+   3) Helvetica Neue para todo lo funcional (tablas, formularios, texto de
+      datos): `--font-body` cambia de Inter a un system-font-stack
+      encabezado por 'Helvetica Neue'. Es una fuente del sistema en
+      macOS/iOS y NO se puede auto-hostear por licencia, así que aquí se
+      declara como stack, nunca como @font-face ni webfont sustituto. En
+      Windows (sin Helvetica Neue instalada) el navegador cae a Arial —
+      es el comportamiento ESPERADO y correcto de este stack, no un bug.
+
+   4) Espaciado sistemático SOLO en UI operativa (Dashboard, tablas,
+      formularios) — a diferencia del sitio editorial de UFC Gym (gaps
+      arbitrarios por sección, correctos ahí), esto es una interfaz de
+      gestión de datos: se define una escala base-8 real (`--space-1` a
+      `--space-6`) y se aplica en Dashboard, tabla de clientes/membresías y
+      el formulario de alta de cliente.
+
+   5) Sombra dura tipo "poster" (`--shadow-card`, una sola capa, negro
+      puro, sin blur suave) SOLO en las tarjetas de resumen del Dashboard
+      (`.dashboard__stat-card`) — nunca en `.input`. Los inputs mantienen
+      su propio lenguaje de affordance: borde visible + fondo elevado +
+      anillo de foco reforzado con `box-shadow`, para que un contenedor de
+      datos (tarjeta) y un control interactivo (input) no compartan la
+      misma señal visual.
+
+   Paleta de marca (idéntica a la usada en la landing, no derivada de nuevo):
+     --color-bg          #0A0A0A  negro casi puro
+     --color-surface     #151515  superficie de tarjeta
+     --color-surface-2   #1C1C1C  superficie elevada / hover / chips neutros
+     --color-border      #2A2A2A  bordes sutiles
+     --color-text        #F5F5F0  blanco cálido — ahora también el color de
+                          los números y títulos protagonistas
+     --color-text-muted  #A8A8A2  gris piedra
+     --color-accent      #229620  verde de marca — reservado a CTA/foco/links
+                          de acción (ver punto 1 arriba). Aclarado sobre el
+                          extremo "brighter" del degradado real del logo
+                          (#177016) para dar contraste real (~4.7:1) sobre
+                          --color-surface cuando se usa en fondos sólidos de
+                          botón.
+     --color-success     #3FB6AD  verde-azulado (teal), deliberadamente
+                          alejado del hue del acento — ver nota de
+                          contraste más abajo sobre por qué NO se reutiliza
+                          el verde de marca para "membresía al día".
+     --color-warning     #E3B341  ámbar (por vencer) — sin cambios
+     --color-danger      #DD5B4F  rojo terracota apagado (vencida) — sin cambios
+
+   Nota de contraste — --color-success vs --color-accent:
+   Si "al día" (success) usara el mismo verde que los botones de acción
+   (accent), un usuario no podría distinguir a simple vista "esto es un
+   botón" de "esto es un estado positivo". Por eso --color-success se aleja
+   de hue (~119° verde → ~178° teal) en vez de solo variar brillo: quedan
+   inconfundibles incluso para quien no perciba bien la diferencia de
+   saturación/luminosidad entre dos verdes parecidos.
+
+   Tipografía (jerarquía de 3 niveles, ver punto 2 y 3 arriba):
+     Permanent Marker — el "grito": títulos de página/sección y números
+                         protagonistas. Siempre blanco/neutro, nunca color
+                         de marca directo — el tamaño y el trazo de
+                         marcador ya comunican jerarquía por sí solos.
+     Bebas Neue        — insignia secundaria: chips de iniciales, marca del
+                         sidebar, nombres de tarjeta (plan/rutina/dieta).
+                         Condensada, nunca para párrafos.
+     Helvetica Neue     — texto de lectura, UI, tablas, formularios (todo lo
+                         funcional). Cae a Arial en Windows: esperado.
+
+   Nota importante: /login usa esta misma paleta directamente desde `:root`
+   (no queda ninguna pantalla del sistema con una paleta distinta), así que
+   no hace falta ninguna capa de scoping para separarla.
+============================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Permanent+Marker&display=swap');
+
+:root {
+  color-scheme: dark;
+
+  --color-bg: #0a0a0a;
+  --color-bg-elevated: #111111;
+  --color-surface: #151515;
+  --color-surface-2: #1c1c1c;
+  --color-border: #2a2a2a;
+  --color-border-soft: #202020;
+
+  --color-text: #f5f5f0;
+  --color-text-muted: #a8a8a2;
+  --color-text-dim: #7a7a75;
+
+  /* Verde de marca — reservado a elementos accionables (botón primario,
+     foco de teclado, borde de foco de input, links de navegación real).
+     Ya NO se usa como color de texto/borde/ícono decorativo en ningún
+     otro punto del sistema (ver punto 1 de la nota de adaptación arriba).
+     El ink oscuro es el color de texto sobre rellenos sólidos de acento
+     (botón primario, botón de submit de login). */
+  --color-accent: #229620;
+  --color-accent-hover: #26a824;
+  --color-accent-soft: rgba(34, 150, 32, 0.16);
+  --color-accent-text: #0c1a0a;
+
+  --color-success: #3fb6ad;
+  --color-success-soft: rgba(63, 182, 173, 0.16);
+  --color-warning: #e3b341;
+  --color-warning-soft: rgba(227, 179, 65, 0.16);
+  --color-danger: #dd5b4f;
+  --color-danger-soft: rgba(221, 91, 79, 0.16);
+  --color-neutral: #7a8296;
+  --color-neutral-soft: rgba(122, 130, 150, 0.16);
+
+  /* Jerarquía tipográfica de 3 niveles — ver nota de adaptación arriba. */
+  --font-display-brush: 'Permanent Marker', 'Segoe Script', cursive;
+  --font-display: 'Bebas Neue', 'Arial Narrow', sans-serif;
+  /* Helvetica Neue es una fuente del sistema (macOS/iOS), no se auto-hostea
+     por licencia. En Windows cae a Arial — comportamiento esperado. */
+  --font-body: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+
+  --radius-sm: 3px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+
+  /* Escala de espaciado sistemática (base-8) — solo para UI operativa:
+     Dashboard, tablas de datos (Clientes/Membresías) y formularios. Las
+     pantallas editoriales (landing pública) NO usan esta escala a
+     propósito — ver punto 4 de la nota de adaptación arriba. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 32px;
+  --space-6: 48px;
+
+  /* Sombra "poster": una sola capa, negro puro, sin blur suave. Solo para
+     tarjetas de resumen (Dashboard stat cards) — nunca en inputs. */
+  --shadow-card: rgba(0, 0, 0, 0.6) -1px 2px 6px 0px;
+
+  /* -------------------------------------------------------------------------
+     Curvas de easing — Entrega 2, animación con propósito (ver CLAUDE.md
+     § "Marco obligatorio: las 4 preguntas antes de CADA animación").
+     Definidas una sola vez aquí y reutilizadas en todo el sistema:
+       --ease-out: entradas/salidas (elemento aparece, se revela, se monta).
+                   Curva fuerte, nunca el ease-out débil de CSS por defecto.
+       --ease-in-out: algo que se mueve/transforma en pantalla estando ya
+                      visible (lift de tarjeta en hover, por ejemplo).
+     Los cambios de color (hover de botón, foco) usan la palabra clave
+     `ease` nativa de CSS directamente — no necesitan una curva dedicada.
+  ------------------------------------------------------------------------- */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --sidebar-width: 232px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  /* 15px -> 16px: el sistema se sentía chico en tablas/formularios (ver
+     CLAUDE.md § "Aumento de tamaño de fuente"). 16px es el tamaño de
+     lectura de facto en la web — más presencia sin forzar reflow en
+     ninguna pantalla. */
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* Foco de teclado visible en todo el sistema — accesibilidad obligatoria */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+::selection {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+/* Scrollbar discreto, coherente con la paleta */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-2);
+  border-radius: 8px;
+  border: 2px solid var(--color-bg);
+}
+
+/* ---------------------------------------------------------------------------
+   Utilidades compartidas
+--------------------------------------------------------------------------- */
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  padding: 20px;
+}
+
+.section-title {
+  /* El "grito" tipográfico del sistema — ver punto 2 de la nota de
+     adaptación arriba. Siempre blanco/neutro: el tamaño + el trazo de
+     marcador ya cargan la jerarquía, no el color. */
+  font-family: var(--font-display-brush);
+  /* 22px -> 24px en el trabajo anterior, ahora 26px: el "grito" tipográfico
+     del sistema necesitaba un poco más de presencia (ver CLAUDE.md §
+     "Aumento de tamaño de fuente"). Sigue siendo peso 400 — la jerarquía la
+     sigue cargando el tamaño + la tipografía, nunca el weight. */
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: 0;
+  color: var(--color-text);
+}
+
+.eyebrow {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  letter-spacing: 0.02em;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 9px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  /* Feedback de botón: 150-160ms. Cambios de color -> `ease` (palabra
+     clave nativa, no necesita curva dedicada). El transform SOLO se usa
+     para el estado :active de abajo; en reposo no hay transform que
+     transicionar, pero se declara aquí para que la transición de vuelta
+     a la escala 1 (al soltar) sea igual de suave que la de apretar. */
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s var(--ease-out);
+}
+
+/* Feedback de presión real — "la interfaz escuchó al usuario" (ver
+   CLAUDE.md, tarea 1). Transición CSS (no @keyframes) porque un botón se
+   puede presionar rápido y repetidamente: la transición es interrumpible,
+   el keyframe reiniciaría desde cero en cada click seguido. */
+.btn:active {
+  transform: scale(0.97);
+  transition: transform 0.12s var(--ease-out);
+}
+
+.btn-primary {
+  /* Único uso "protagonista" de --color-accent que queda en el sistema:
+     el botón de acción primaria. */
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+/* Hovers dentro de (hover: hover) and (pointer: fine): un botón "click
+   fantasma" en touch (:hover pegado tras el tap) es peor que no tener
+   hover — ver CLAUDE.md, sección de rendimiento. */
+@media (hover: hover) and (pointer: fine) {
+  .btn-primary:hover {
+    background: var(--color-accent-hover);
+  }
+  .btn-ghost:hover {
+    background: var(--color-surface-2);
+    border-color: var(--color-text-dim);
+  }
+}
+
+.input {
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  font-size: 15px;
+  color: var(--color-text);
+  width: 100%;
+  /* Foco/validación son cambios de color -> `ease` a 150ms (nunca un salto
+     instantáneo a rojo/verde, ver CLAUDE.md tarea 4). */
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+.input::placeholder {
+  color: var(--color-text-dim);
+}
+.input:focus {
+  /* Affordance de interactividad reforzada — nunca la sombra dura de
+     .dashboard__stat-card (ver punto 5 de la nota de adaptación arriba):
+     un input es un control, no un contenedor de datos. */
+  border-color: var(--color-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+/* Estados de validación — mismo lenguaje de affordance que el foco (borde
+   + box-shadow), nunca un salto instantáneo (ver transition de .input
+   arriba). Se activan vía atributo, no clase, porque son ESTADO de dato,
+   no una variante de estilo fija (mismo criterio que data-tone/data-active
+   ya usado en el resto del sistema). */
+.input[data-invalid='true'] {
+  border-color: var(--color-danger);
+  background: rgba(221, 91, 79, 0.08);
+}
+.input[data-invalid='true']:focus {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 3px var(--color-danger-soft);
+}
+
+.field-label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+}
+
+/* Mensaje de error de campo: entra con fade + micro-desplazamiento, nunca
+   de golpe (ver CLAUDE.md tarea 4). Es un evento discreto por envío de
+   formulario (el nodo se monta de cero cada vez), no una interacción de
+   alta frecuencia tipo hover — por eso un keyframe corto es apropiado
+   aquí (mismo criterio que el stagger de filas de la tabla de clientes). */
+.field-error {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-danger);
+  animation: field-error-in 0.18s var(--ease-out) both;
+}
+
+@keyframes field-error-in {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   prefers-reduced-motion — aplica a TODA animación nueva del sistema
+   (botones, tarjetas, scroll-reveal de la landing, stagger de tabla,
+   mensajes de error). Se quita el movimiento/transform; los cambios de
+   color/opacidad pueden seguir siendo instantáneos porque no implican
+   desplazamiento en pantalla.
+--------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .btn,
+  .btn:active,
+  .lp-btn,
+  .lp-btn:active,
+  [data-reveal],
+  .plan-card,
+  .lp-facility-card__graphic,
+  .clients-page__table tbody tr,
+  .field-error {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    transform: none !important;
+  }
+}
