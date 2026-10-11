@@ -16,22 +16,31 @@ import {
   findRoutine,
   getBodyProgressForClient,
   getDietAssignmentsForClient,
-  getPaymentsForMembership,
   getRoutineAssignmentsForClient,
   getRoutineExercises,
 } from '../mocks/data'
-import type { ApiClientProfile, ApiMembership, ApiMembershipPlan, MembershipCreatePayload } from '../types/api'
-import { getMembershipDisplayStatus, pickCurrentMembership } from '../utils/membership'
+import type {
+  ApiClientProfile,
+  ApiMembership,
+  ApiMembershipPlan,
+  ApiPayment,
+  ApiPaymentMethod,
+  MembershipCreatePayload,
+  PaymentCreatePayload,
+} from '../types/api'
+import { addDaysIso, getMembershipDisplayStatus, pickCurrentMembership } from '../utils/membership'
 import './ClientDetailPage.css'
 
 const todayIso = () => new Date().toISOString().slice(0, 10)
 
-/** Suma `days` (días naturales) a una fecha ISO (YYYY-MM-DD) sin líos de zona horaria. */
-function addDaysIso(dateIso: string, days: number): string {
-  const date = new Date(`${dateIso}T00:00:00`)
-  date.setDate(date.getDate() + days)
-  return date.toISOString().slice(0, 10)
-}
+const PAYMENT_METHODS: { value: ApiPaymentMethod; label: string }[] = [
+  { value: 'efectivo', label: 'Efectivo' },
+  { value: 'tarjeta', label: 'Tarjeta' },
+  { value: 'transferencia', label: 'Transferencia' },
+]
+
+type PaymentFormField = 'amount' | 'paymentDate'
+type PaymentFormErrors = Partial<Record<PaymentFormField, string>>
 
 const TABS = [
   { id: 'perfil', label: 'Perfil' },
@@ -194,6 +203,125 @@ export function ClientDetailPage() {
     }
   }
 
+  // --- Pagos (RF005, módulo Pagos) -----------------------------------------
+  // Depende de la membresía resuelta arriba (comparte el mismo fetch, no se
+  // vuelve a llamar `GET /memberships` aquí) -- sin membresía no hay
+  // `membership_id` que filtrar, así que la pestaña ofrece un EmptyState que
+  // manda a la pestaña "Membresía" en vez de pedir uno.
+  const [payments, setPayments] = useState<ApiPayment[]>([])
+  const [paymentsLoading, setPaymentsLoading] = useState(true)
+  const [paymentsError, setPaymentsError] = useState<string | null>(null)
+
+  const loadPayments = (membershipId: number) => {
+    setPaymentsLoading(true)
+    setPaymentsError(null)
+    apiFetch<ApiPayment[]>(`/payments?membership_id=${membershipId}`)
+      .then(setPayments)
+      .catch((err: unknown) => {
+        if (err instanceof ApiError) {
+          if (err.isUnauthorized) {
+            logout()
+            navigate('/login', { replace: true })
+            return
+          }
+          if (err.status === 403) {
+            setPaymentsError('No tienes permiso para ver los pagos de este cliente.')
+            return
+          }
+          setPaymentsError(err.message)
+          return
+        }
+        setPaymentsError('Ocurrió un error inesperado. Intenta de nuevo.')
+      })
+      .finally(() => setPaymentsLoading(false))
+  }
+
+  useEffect(() => {
+    if (membershipLoading) return
+    if (!membership) {
+      setPayments([])
+      setPaymentsLoading(false)
+      return
+    }
+    loadPayments(membership.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [membership?.id, membershipLoading])
+
+  // --- Registrar pago (solo admin) -----------------------------------------
+  const [showPaymentForm, setShowPaymentForm] = useState(false)
+  const [paymentAmount, setPaymentAmount] = useState('')
+  const [paymentMethod, setPaymentMethod] = useState<ApiPaymentMethod>('efectivo')
+  const [paymentDate, setPaymentDate] = useState(todayIso)
+  const [paymentNotes, setPaymentNotes] = useState('')
+  const [paymentErrors, setPaymentErrors] = useState<PaymentFormErrors>({})
+  const [paymentServerError, setPaymentServerError] = useState<string | null>(null)
+  const [isRegisteringPayment, setIsRegisteringPayment] = useState(false)
+  const [paymentToast, setPaymentToast] = useState<string | null>(null)
+
+  const clearPaymentError = (field: PaymentFormField) => {
+    setPaymentErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev))
+  }
+
+  const resetPaymentForm = () => {
+    setPaymentAmount('')
+    setPaymentMethod('efectivo')
+    setPaymentDate(todayIso())
+    setPaymentNotes('')
+    setPaymentErrors({})
+    setPaymentServerError(null)
+  }
+
+  const handleRegisterPayment = async (event: FormEvent) => {
+    event.preventDefault()
+    setPaymentServerError(null)
+    if (!membership) return
+
+    const nextErrors: PaymentFormErrors = {}
+    const amountValue = Number(paymentAmount)
+    if (!paymentAmount || Number.isNaN(amountValue) || amountValue <= 0) {
+      nextErrors.amount = 'Ingresa un monto mayor a 0.'
+    }
+    if (!paymentDate) nextErrors.paymentDate = 'Selecciona una fecha de pago.'
+    if (Object.keys(nextErrors).length > 0) {
+      setPaymentErrors(nextErrors)
+      return
+    }
+
+    const payload: PaymentCreatePayload = {
+      membership_id: membership.id,
+      amount: amountValue,
+      payment_date: paymentDate,
+      method: paymentMethod,
+      notes: paymentNotes.trim() || null,
+    }
+
+    setIsRegisteringPayment(true)
+    try {
+      const created = await apiFetch<ApiPayment>('/payments', { method: 'POST', body: payload })
+      setPayments((prev) => [created, ...prev])
+      setPaymentToast('Pago registrado correctamente.')
+      setShowPaymentForm(false)
+      resetPaymentForm()
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.isUnauthorized) {
+          logout()
+          navigate('/login', { replace: true })
+          return
+        }
+        if (err.status === 403) {
+          setPaymentServerError('No tienes permiso para registrar pagos.')
+          return
+        }
+        setPaymentServerError(err.message)
+        return
+      }
+      setPaymentServerError('Ocurrió un error inesperado. Intenta de nuevo.')
+    } finally {
+      setIsRegisteringPayment(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="card">
@@ -217,15 +345,11 @@ export function ClientDetailPage() {
     )
   }
 
-  // TODO(módulos Pagos/Rutinas/Dietas/Progreso, todavía no construidos): el
-  // resto de pestañas sigue usando los mismos datos mock de Entrega 1,
-  // indexados por `clientProfileId` de ejemplo -- no corresponden
-  // necesariamente al cliente real de esta pantalla. Se reemplazan por
-  // llamadas reales cuando cada módulo exista. "Membresía" (arriba) ya usa
-  // la API real; `getPaymentsForMembership` sigue indexando por el id MOCK
-  // de membresía (900-905), así que con una membresía real casi siempre
-  // devuelve vacío -- comportamiento honesto hasta que exista el módulo Pagos.
-  const payments = membership ? getPaymentsForMembership(membership.id) : []
+  // TODO(módulos Rutinas/Dietas/Progreso, todavía no construidos): el resto
+  // de pestañas sigue usando los mismos datos mock de Entrega 1, indexados
+  // por `clientProfileId` de ejemplo -- no corresponden necesariamente al
+  // cliente real de esta pantalla. Se reemplazan por llamadas reales cuando
+  // cada módulo exista. "Membresía" y "Pagos" (arriba) ya usan la API real.
   const routineAssignments = getRoutineAssignmentsForClient(clientProfileId)
   const dietAssignments = getDietAssignmentsForClient(clientProfileId)
   const progress = getBodyProgressForClient(clientProfileId)
@@ -420,36 +544,183 @@ export function ClientDetailPage() {
             </div>
           )}
 
-          {/* TODO(módulo Pagos, todavía no construido): pestaña mock. */}
-          {activeTab === 'pagos' &&
-            (payments.length > 0 ? (
-              <table className="client-detail__table">
-                <thead>
-                  <tr>
-                    <th>Fecha</th>
-                    <th>Monto</th>
-                    <th>Método</th>
-                    <th>Estado</th>
-                    <th>Notas</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {payments.map((p) => (
-                    <tr key={p.id}>
-                      <td>{p.payment_date}</td>
-                      <td>${p.amount.toLocaleString('es-MX')}</td>
-                      <td className="client-detail__capitalize">{p.method}</td>
-                      <td>
-                        <StatusPill status={p.status} />
-                      </td>
-                      <td>{p.notes ?? '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <p className="client-detail__empty">No hay pagos registrados.</p>
-            ))}
+          {/* Conectado a la API real (RF005) -- comparte el fetch de membresía
+              hecho arriba, no vuelve a llamar GET /memberships. */}
+          {activeTab === 'pagos' && (
+            <div className="client-detail__payments-tab">
+              {paymentToast && <Toast message={paymentToast} onDismiss={() => setPaymentToast(null)} />}
+
+              {membershipLoading ? (
+                <LoadingState label="Cargando membresía…" variant="skeleton" rows={3} />
+              ) : membershipError ? (
+                <ErrorMessage message={membershipError} />
+              ) : !membership ? (
+                <EmptyState
+                  title="Este cliente todavía no tiene una membresía"
+                  description="Para registrar y consultar pagos primero necesita una membresía activa."
+                  actionLabel="Ir a Membresía"
+                  onAction={() => setActiveTab('membresia')}
+                />
+              ) : paymentsLoading ? (
+                <LoadingState label="Cargando pagos…" variant="skeleton" rows={3} />
+              ) : paymentsError ? (
+                <ErrorMessage message={paymentsError} onRetry={() => loadPayments(membership.id)} />
+              ) : (
+                <>
+                  {isAdmin && showPaymentForm && (
+                    <form className="client-detail__payment-form" onSubmit={handleRegisterPayment}>
+                      {paymentServerError && (
+                        <ErrorMessage title="No se pudo registrar el pago" message={paymentServerError} />
+                      )}
+
+                      <div className="client-detail__payment-row">
+                        <div className="client-detail__field">
+                          <label className="field-label" htmlFor="paymentAmount">
+                            Monto
+                          </label>
+                          <input
+                            id="paymentAmount"
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            className="input"
+                            value={paymentAmount}
+                            onChange={(e) => {
+                              setPaymentAmount(e.target.value)
+                              clearPaymentError('amount')
+                            }}
+                            placeholder="399.00"
+                            data-invalid={Boolean(paymentErrors.amount)}
+                            aria-invalid={Boolean(paymentErrors.amount)}
+                            aria-describedby={paymentErrors.amount ? 'paymentAmount-error' : undefined}
+                          />
+                          {paymentErrors.amount && (
+                            <p className="field-error" id="paymentAmount-error" role="alert">
+                              {paymentErrors.amount}
+                            </p>
+                          )}
+                        </div>
+                        <div className="client-detail__field">
+                          <label className="field-label" htmlFor="paymentMethodSelect">
+                            Método
+                          </label>
+                          <select
+                            id="paymentMethodSelect"
+                            className="input"
+                            value={paymentMethod}
+                            onChange={(e) => setPaymentMethod(e.target.value as ApiPaymentMethod)}
+                          >
+                            {PAYMENT_METHODS.map((m) => (
+                              <option key={m.value} value={m.value}>
+                                {m.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="client-detail__field">
+                          <label className="field-label" htmlFor="paymentDateInput">
+                            Fecha de pago
+                          </label>
+                          <input
+                            id="paymentDateInput"
+                            type="date"
+                            className="input"
+                            value={paymentDate}
+                            onChange={(e) => {
+                              setPaymentDate(e.target.value)
+                              clearPaymentError('paymentDate')
+                            }}
+                            data-invalid={Boolean(paymentErrors.paymentDate)}
+                            aria-invalid={Boolean(paymentErrors.paymentDate)}
+                            aria-describedby={paymentErrors.paymentDate ? 'paymentDate-error' : undefined}
+                          />
+                          {paymentErrors.paymentDate && (
+                            <p className="field-error" id="paymentDate-error" role="alert">
+                              {paymentErrors.paymentDate}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="client-detail__field">
+                        <label className="field-label" htmlFor="paymentNotes">
+                          Notas (opcional)
+                        </label>
+                        <input
+                          id="paymentNotes"
+                          className="input"
+                          value={paymentNotes}
+                          onChange={(e) => setPaymentNotes(e.target.value)}
+                          placeholder="Ej. pago de reinscripción"
+                        />
+                      </div>
+
+                      <div className="client-detail__assign-actions">
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => {
+                            setShowPaymentForm(false)
+                            resetPaymentForm()
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                        <button type="submit" className="btn btn-primary" disabled={isRegisteringPayment}>
+                          {isRegisteringPayment ? 'Registrando…' : 'Registrar pago'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {payments.length === 0 ? (
+                    !showPaymentForm && (
+                      <EmptyState
+                        title="No hay pagos registrados"
+                        description="Registra el primer pago para esta membresía."
+                        actionLabel={isAdmin ? 'Registrar pago' : undefined}
+                        onAction={isAdmin ? () => setShowPaymentForm(true) : undefined}
+                      />
+                    )
+                  ) : (
+                    <>
+                      {isAdmin && !showPaymentForm && (
+                        <div className="client-detail__payments-toolbar">
+                          <button type="button" className="btn btn-ghost" onClick={() => setShowPaymentForm(true)}>
+                            + Registrar pago
+                          </button>
+                        </div>
+                      )}
+                      <table className="client-detail__table">
+                        <thead>
+                          <tr>
+                            <th>Fecha</th>
+                            <th>Monto</th>
+                            <th>Método</th>
+                            <th>Estado</th>
+                            <th>Notas</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {payments.map((p) => (
+                            <tr key={p.id}>
+                              <td>{p.payment_date}</td>
+                              <td>${Number(p.amount).toLocaleString('es-MX')}</td>
+                              <td className="client-detail__capitalize">{p.method}</td>
+                              <td>
+                                <StatusPill status={p.status} />
+                              </td>
+                              <td>{p.notes ?? '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {/* TODO(módulo Rutinas, todavía no construido): pestaña mock. */}
           {activeTab === 'rutina' &&

@@ -65,3 +65,17 @@ export function pickCurrentMembership<T extends { status: string; end_date: stri
   if (activa) return activa
   return [...memberships].sort((a, b) => b.end_date.localeCompare(a.end_date))[0]
 }
+
+/**
+ * Suma `days` (días naturales) a una fecha ISO (YYYY-MM-DD) sin líos de zona
+ * horaria -- usado para calcular `end_date` a partir de `duration_days` del
+ * plan elegido. Centralizado aquí porque lo necesitan dos flujos distintos:
+ * asignar una membresía desde el detalle del cliente (`ClientDetailPage.tsx`)
+ * y darla de alta junto con el registro inicial del cliente
+ * (`ClientFormPage.tsx`) -- antes vivía duplicado solo en el primero.
+ */
+export function addDaysIso(dateIso: string, days: number): string {
+  const date = new Date(`${dateIso}T00:00:00`)
+  date.setDate(date.getDate() + days)
+  return date.toISOString().slice(0, 10)
+}

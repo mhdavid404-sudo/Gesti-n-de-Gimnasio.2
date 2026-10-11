@@ -95,3 +95,34 @@ export interface MembershipCreatePayload {
   end_date: string
   status?: ApiMembershipStatus
 }
+
+// ---------------------------------------------------------------------------
+// Payments (RF005) — ver backend/src/api/v1/routers/payments.py
+// ---------------------------------------------------------------------------
+
+export type ApiPaymentMethod = 'efectivo' | 'tarjeta' | 'transferencia'
+export type ApiPaymentStatus = 'completado' | 'pendiente' | 'rechazado'
+
+export interface ApiPayment {
+  id: number
+  membership_id: number
+  /** Decimal del backend serializado como string -- mismo criterio que `ApiMembershipPlan.price`. */
+  amount: string
+  payment_date: string
+  method: ApiPaymentMethod
+  status: ApiPaymentStatus
+  /** Id del admin autenticado que registró el pago -- el backend lo rellena solo, nunca se manda en el body. */
+  registered_by: number
+  notes: string | null
+  created_at: string
+}
+
+export interface PaymentCreatePayload {
+  membership_id: number
+  /** Se envía como number: FastAPI/Pydantic acepta int|float|str para un campo Decimal. */
+  amount: number
+  payment_date: string
+  method: ApiPaymentMethod
+  status?: ApiPaymentStatus
+  notes?: string | null
+}

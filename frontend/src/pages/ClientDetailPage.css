@@ -203,12 +203,39 @@
   gap: var(--space-3);
 }
 
+.client-detail__payments-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.client-detail__payment-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.client-detail__payment-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.client-detail__payments-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
 @media (max-width: 700px) {
   .client-detail__grid {
     grid-template-columns: 1fr;
   }
 
   .client-detail__assign-row {
+    grid-template-columns: 1fr;
+  }
+
+  .client-detail__payment-row {
     grid-template-columns: 1fr;
   }
 }

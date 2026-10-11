@@ -4,13 +4,21 @@ import { Link, useNavigate } from 'react-router-dom'
 import { apiFetch, ApiError } from '../api/client'
 import { ErrorMessage } from '../components/ui/ErrorMessage'
 import { useAuth } from '../hooks/useAuth'
-import { membershipPlans } from '../mocks/data'
 import type { AuthUser } from '../api/authStorage'
-import type { ClientRegisterPayload, ClientRegisterResponse } from '../types/api'
-import type { PaymentMethod } from '../types/models'
+import type {
+  ApiMembership,
+  ApiMembershipPlan,
+  ApiPayment,
+  ApiPaymentMethod,
+  ClientRegisterPayload,
+  ClientRegisterResponse,
+  MembershipCreatePayload,
+  PaymentCreatePayload,
+} from '../types/api'
+import { addDaysIso } from '../utils/membership'
 import './ClientFormPage.css'
 
-const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
+const PAYMENT_METHODS: { value: ApiPaymentMethod; label: string }[] = [
   { value: 'efectivo', label: 'Efectivo' },
   { value: 'tarjeta', label: 'Tarjeta' },
   { value: 'transferencia', label: 'Transferencia' },
@@ -18,16 +26,30 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
 
 const todayIso = () => new Date().toISOString().slice(0, 10)
 
-type FormField = 'fullName' | 'email' | 'phone' | 'birthDate' | 'address'
+type FormField = 'fullName' | 'email' | 'phone' | 'birthDate' | 'address' | 'amount'
 type FormErrors = Partial<Record<FormField, string>>
 
 /**
- * Alta de cliente — SOLO la sección "Datos del cliente" se conecta a
- * `POST /clients` real en esta tarea (DECISIONES.md, módulo Clientes,
- * Entrega 2). "Membresía y pago inicial" sigue siendo SOLO UI/mock: esos
- * módulos (Planes/Membresías, Pagos) no existen todavía, y el mensaje de
- * éxito tras guardar NO debe insinuar que el pago se registró (solo se
- * confirma lo que de verdad se persistió: el cliente).
+ * Alta de cliente -- ciclo completo conectado a la API real (DECISIONES.md,
+ * módulo Pagos / cierre del flujo de alta, Entrega 2):
+ *
+ *   1. `POST /clients` -- crea `User` + `ClientProfile`, devuelve el `id` del
+ *      cliente y una password temporal (ver docstring de más abajo).
+ *   2. Si el admin eligió un plan: `POST /memberships` (`client_id` del paso
+ *      1, `plan_id` elegido, `end_date` calculada con `duration_days`).
+ *   3. Si el paso 2 tuvo éxito: `POST /payments` con los datos ya capturados
+ *      en "Membresía y pago inicial".
+ *
+ * Criterio para "sin plan": el selector de plan incluye una opción explícita
+ * "Sin membresía por ahora", preseleccionada por default -- el alta de
+ * membresía/pago inicial es opcional, no se fuerza un plan por defecto. Si el
+ * admin la deja así, el cliente se registra solo (sin membresía ni pago) y
+ * puede asignársele una después desde su detalle.
+ *
+ * Manejo de fallos parciales: el paso 1, si tiene éxito, NO se revierte si
+ * fallan los pasos 2/3 (el cliente ya quedó creado en el sistema). El aviso
+ * de éxito/error es honesto sobre qué se completó realmente -- ver
+ * `handleSubmit` más abajo y DECISIONES.md.
  *
  * Password del cliente nuevo (DECISIONES.md): el formulario no pide
  * password -- el backend genera una temporal (`RegisterClientUseCase`) y
@@ -50,17 +72,22 @@ export function ClientFormPage() {
   const [trainers, setTrainers] = useState<AuthUser[]>([])
   const [trainersError, setTrainersError] = useState<string | null>(null)
 
-  // --- Membresía y pago inicial (SOLO UI/mock -- ver docstring arriba) ---
-  const [planId, setPlanId] = useState<number>(membershipPlans[0]?.id ?? 0)
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('efectivo')
-  const [amount, setAmount] = useState<number>(membershipPlans[0]?.price ?? 0)
+  // --- Membresía y pago inicial (conectado a POST /memberships + POST /payments) ---
+  // `planId === null` representa la opción explícita "Sin membresía por
+  // ahora" -- ver docstring de arriba.
+  const [plans, setPlans] = useState<ApiMembershipPlan[]>([])
+  const [plansLoading, setPlansLoading] = useState(true)
+  const [plansError, setPlansError] = useState<string | null>(null)
+  const [planId, setPlanId] = useState<number | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState<ApiPaymentMethod>('efectivo')
+  const [amount, setAmount] = useState('')
   const [paymentDate, setPaymentDate] = useState(todayIso)
 
   const [errors, setErrors] = useState<FormErrors>({})
   const [serverError, setServerError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const selectedPlan = useMemo(() => membershipPlans.find((p) => p.id === planId), [planId])
+  const selectedPlan = useMemo(() => plans.find((p) => p.id === planId), [plans, planId])
 
   useEffect(() => {
     apiFetch<AuthUser[]>('/users?role=entrenador')
@@ -68,17 +95,29 @@ export function ClientFormPage() {
       .catch(() => setTrainersError('No se pudo cargar la lista de entrenadores.'))
   }, [])
 
-  const handlePlanChange = (id: number) => {
-    setPlanId(id)
-    const plan = membershipPlans.find((p) => p.id === id)
-    if (plan) setAmount(plan.price)
-  }
+  useEffect(() => {
+    apiFetch<ApiMembershipPlan[]>('/membership-plans')
+      .then(setPlans)
+      .catch(() => setPlansError('No se pudo cargar el catálogo de planes.'))
+      .finally(() => setPlansLoading(false))
+  }, [])
 
   // Limpia el error de UN campo en cuanto el usuario vuelve a escribir en
   // él — es la señal de "la interfaz escuchó" (en vez de obligar a
   // re-enviar el formulario para ver si ya quedó bien).
   const clearError = (field: FormField) => {
     setErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev))
+  }
+
+  const handlePlanChange = (id: number | null) => {
+    setPlanId(id)
+    clearError('amount')
+    if (id === null) {
+      setAmount('')
+      return
+    }
+    const plan = plans.find((p) => p.id === id)
+    if (plan) setAmount(plan.price)
   }
 
   const validate = (): FormErrors => {
@@ -88,6 +127,12 @@ export function ClientFormPage() {
     if (phone.replace(/\D/g, '').length < 10) next.phone = 'El teléfono debe tener al menos 10 dígitos.'
     if (!birthDate) next.birthDate = 'Selecciona una fecha de nacimiento.'
     if (!address.trim()) next.address = 'Ingresa una dirección.'
+    if (planId !== null) {
+      const amountValue = Number(amount)
+      if (!amount || Number.isNaN(amountValue) || amountValue <= 0) {
+        next.amount = 'Ingresa un monto mayor a 0.'
+      }
+    }
     return next
   }
 
@@ -111,6 +156,9 @@ export function ClientFormPage() {
       emergency_contact: emergencyContact.trim() || null,
     }
 
+    const apiErrorText = (err: unknown): string =>
+      err instanceof ApiError ? err.message : 'ocurrió un error inesperado.'
+
     setIsSubmitting(true)
     try {
       const response = await apiFetch<ClientRegisterResponse>('/clients', {
@@ -118,14 +166,44 @@ export function ClientFormPage() {
         body: payload,
       })
 
-      // Mensaje honesto: solo se confirma lo que realmente se persistió (el
-      // cliente) -- la membresía/pago de la otra sección NO se registró,
-      // ningún módulo real existe todavía para eso (ver docstring arriba).
-      navigate('/clientes', {
-        state: {
-          toast: `Cliente "${response.client.full_name}" registrado. Contraseña temporal para su primer inicio de sesión: ${response.temporary_password} (cópiala y compártela con el cliente; no se mostrará de nuevo).`,
-        },
-      })
+      // El cliente (paso 1) YA quedó creado en este punto -- lo que sigue
+      // (pasos 2/3, membresía + pago inicial) no se deshace del lado del
+      // frontend si falla; el mensaje final es honesto sobre qué se
+      // completó realmente (ver docstring de arriba y DECISIONES.md).
+      let toastMessage = `Cliente "${response.client.full_name}" registrado. Contraseña temporal para su primer inicio de sesión: ${response.temporary_password} (cópiala y compártela con el cliente; no se mostrará de nuevo).`
+
+      if (planId !== null && selectedPlan) {
+        try {
+          const membershipPayload: MembershipCreatePayload = {
+            client_id: response.client.id,
+            plan_id: selectedPlan.id,
+            start_date: paymentDate,
+            end_date: addDaysIso(paymentDate, selectedPlan.duration_days),
+            status: 'activa',
+          }
+          const createdMembership = await apiFetch<ApiMembership>('/memberships', {
+            method: 'POST',
+            body: membershipPayload,
+          })
+
+          try {
+            const paymentPayload: PaymentCreatePayload = {
+              membership_id: createdMembership.id,
+              amount: Number(amount),
+              payment_date: paymentDate,
+              method: paymentMethod,
+            }
+            await apiFetch<ApiPayment>('/payments', { method: 'POST', body: paymentPayload })
+            toastMessage += ` Membresía "${selectedPlan.name}" asignada y pago de $${Number(amount).toLocaleString('es-MX')} registrado.`
+          } catch (paymentErr) {
+            toastMessage += ` Membresía "${selectedPlan.name}" asignada correctamente. No se pudo registrar el pago inicial: ${apiErrorText(paymentErr)} Puedes registrarlo desde la pestaña "Pagos" del detalle del cliente.`
+          }
+        } catch (membershipErr) {
+          toastMessage += ` No se pudo asignar la membresía: ${apiErrorText(membershipErr)} Puedes asignarla y registrar el pago desde el detalle del cliente.`
+        }
+      }
+
+      navigate('/clientes', { state: { toast: toastMessage } })
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.isUnauthorized) {
@@ -315,87 +393,111 @@ export function ClientFormPage() {
         <section className="card client-form__section">
           <h2 className="section-title">Membresía y pago inicial</h2>
           <p className="client-form__hint">
-            Alta de membresía y registro del primer pago (RF004 / RF005) — todavía no conectado a un
-            backend real; estos módulos se construyen en una tarea posterior.
+            Alta de membresía y registro del primer pago (RF004 / RF005) — opcional. Si no eliges un
+            plan, el cliente se registra sin membresía; puedes asignarle una después desde su detalle.
           </p>
+
+          {plansError && <p className="client-form__hint">{plansError}</p>}
 
           <div className="client-form__field">
             <span className="field-label">Plan</span>
             <div className="client-form__plans" role="radiogroup" aria-label="Plan de membresía">
-              {membershipPlans.map((plan) => (
-                <label key={plan.id} className="client-form__plan" data-selected={plan.id === planId}>
+              <label className="client-form__plan" data-selected={planId === null}>
+                <input type="radio" name="plan" checked={planId === null} onChange={() => handlePlanChange(null)} />
+                <span className="client-form__plan-name">Sin membresía por ahora</span>
+                <span className="client-form__plan-price">Asignar después</span>
+              </label>
+              {plansLoading ? (
+                <p className="client-form__hint">Cargando planes…</p>
+              ) : (
+                plans.map((plan) => (
+                  <label key={plan.id} className="client-form__plan" data-selected={plan.id === planId}>
+                    <input
+                      type="radio"
+                      name="plan"
+                      checked={plan.id === planId}
+                      onChange={() => handlePlanChange(plan.id)}
+                    />
+                    <span className="client-form__plan-name">{plan.name}</span>
+                    <span className="client-form__plan-price">${Number(plan.price).toLocaleString('es-MX')}/mes</span>
+                  </label>
+                ))
+              )}
+            </div>
+          </div>
+
+          {planId !== null && (
+            <>
+              <div className="client-form__row">
+                <div className="client-form__field">
+                  <label className="field-label" htmlFor="paymentMethod">
+                    Método de pago
+                  </label>
+                  <select
+                    id="paymentMethod"
+                    className="input"
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value as ApiPaymentMethod)}
+                  >
+                    {PAYMENT_METHODS.map((m) => (
+                      <option key={m.value} value={m.value}>
+                        {m.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="client-form__field">
+                  <label className="field-label" htmlFor="amount">
+                    Monto
+                  </label>
                   <input
-                    type="radio"
-                    name="plan"
-                    value={plan.id}
-                    checked={plan.id === planId}
-                    onChange={() => handlePlanChange(plan.id)}
+                    id="amount"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    className="input"
+                    value={amount}
+                    onChange={(e) => {
+                      setAmount(e.target.value)
+                      clearError('amount')
+                    }}
+                    data-invalid={Boolean(errors.amount)}
+                    aria-invalid={Boolean(errors.amount)}
+                    aria-describedby={errors.amount ? 'amount-error' : undefined}
                   />
-                  <span className="client-form__plan-name">{plan.name}</span>
-                  <span className="client-form__plan-price">${plan.price.toLocaleString('es-MX')}/mes</span>
+                  {errors.amount && (
+                    <p className="field-error" id="amount-error" role="alert">
+                      {errors.amount}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="client-form__field">
+                <label className="field-label" htmlFor="paymentDate">
+                  Fecha de pago
                 </label>
-              ))}
-            </div>
-          </div>
+                <input
+                  id="paymentDate"
+                  type="date"
+                  className="input"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  required
+                />
+              </div>
 
-          <div className="client-form__row">
-            <div className="client-form__field">
-              <label className="field-label" htmlFor="paymentMethod">
-                Método de pago
-              </label>
-              <select
-                id="paymentMethod"
-                className="input"
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-              >
-                {PAYMENT_METHODS.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="client-form__field">
-              <label className="field-label" htmlFor="amount">
-                Monto
-              </label>
-              <input
-                id="amount"
-                type="number"
-                min={0}
-                step="0.01"
-                className="input"
-                value={amount}
-                onChange={(e) => setAmount(Number(e.target.value))}
-                required
-              />
-            </div>
-          </div>
-
-          <div className="client-form__field">
-            <label className="field-label" htmlFor="paymentDate">
-              Fecha de pago
-            </label>
-            <input
-              id="paymentDate"
-              type="date"
-              className="input"
-              value={paymentDate}
-              onChange={(e) => setPaymentDate(e.target.value)}
-              required
-            />
-          </div>
-
-          {selectedPlan && (
-            <div className="client-form__benefits-block">
-              <span className="field-label">Beneficios incluidos</span>
-              <ul className="client-form__benefits">
-                {selectedPlan.benefits.map((b) => (
-                  <li key={b}>{b}</li>
-                ))}
-              </ul>
-            </div>
+              {selectedPlan && (
+                <div className="client-form__benefits-block">
+                  <span className="field-label">Beneficios incluidos</span>
+                  <ul className="client-form__benefits">
+                    {selectedPlan.benefits.map((b) => (
+                      <li key={b}>{b}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
           )}
         </section>
       </div>
