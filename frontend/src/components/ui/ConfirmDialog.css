@@ -1,0 +1,73 @@
+.confirm-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.confirm-dialog__scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--color-scrim);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.confirm-dialog__panel {
+  position: relative;
+  width: min(420px, 90vw);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* Sombra suave de elevación, no la sombra "poster" — ver nota en ConfirmDialog.tsx. */
+  box-shadow: var(--shadow-dialog);
+  animation: confirm-dialog-in 0.16s var(--ease-out) both;
+}
+
+@keyframes confirm-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.confirm-dialog__title {
+  font-family: var(--font-display-brush);
+  font-size: 22px;
+  font-weight: 400;
+  color: var(--color-text);
+}
+
+.confirm-dialog__description {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.confirm-dialog__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: 8px;
+}
+
+.confirm-dialog__confirm[data-tone='danger'] {
+  background: var(--color-danger);
+  color: var(--color-text);
+}
+
+.confirm-dialog__confirm[data-tone='neutral'] {
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+}

@@ -2,113 +2,117 @@
    SmartGym v2 — Stronger Aragón
    Concepto visual: "el tablero detrás del mostrador".
 
-   Todo el sistema (landing pública, panel interno detrás de /login —
+   Todo el sistema que consume `:root` (panel interno detrás de /login —
    Dashboard, Clientes, Detalle de cliente, Membresías, Rutinas, Dietas,
-   Progreso— y Login) comparte la MISMA identidad real de marca ya extraída
-   pixel a pixel del logo (ver src/pages/LandingPage.css y DECISIONES.md,
-   entrada "Identidad visual real de marca en la landing pública"): negro
-   casi puro, el verde del degradado del logo, y geometría de esquina
-   mínima. La paleta vive directamente en `:root`, así que no hace falta
-   ninguna capa de scoping adicional — cualquier `.card`, `.btn-primary`,
-   `.input`, etc. en cualquier pantalla (incluida /login) hereda estos
-   valores por defecto.
+   Progreso— y la propia pantalla de Login) comparte un único sistema de
+   tokens de color. La landing pública (`/`, `src/pages/LandingPage.css`,
+   scope `.landing`) tiene su PROPIA paleta de marca real (verde bosque
+   extraído a mano del logo) y NO toca `:root` — ver DECISIONES.md, entrada
+   "Identidad visual real de marca en la landing pública". Esa separación
+   sigue vigente: el verde oliva de aquí abajo es un sistema de diseño de
+   UI operativa (panel administrativo), no la identidad de marca pública.
+
+   ---------------------------------------------------------------------------
+   Entrega 2, Parte A (rediseño UX/UI) — verde oliva como color PRIMARIO:
+   ---------------------------------------------------------------------------
+
+   El feedback de la profesora ("no tiene buen UI/UX") y la instrucción
+   explícita del dueño del proyecto (ver DECISIONES.md, "2026-10-10 —
+   Arranque de Entrega 2", punto 4) sustituyen el principio histórico de
+   "acento en reserva" (adaptado de UFC Gym, ver CLAUDE.md § Design Taste y
+   la entrada "Taste DNA de UFC Gym" de abajo, que queda como registro
+   histórico de por qué se llegó al verde/negro, no como regla vigente) por
+   un sistema de diseño CONVENCIONAL Y COMPLETO: un color primario con
+   variantes claras/oscuras, una escala de neutros, y estados semánticos
+   separados por HUE (no solo por brillo) del primario.
+
+   Variables nuevas, canónicas de aquí en adelante:
+     --color-primary       #7C8B3A  oliva base
+     --color-primary-light #9AAC4E  hover / estados claros
+     --color-primary-dark  #5C6B28  active / pressed
+     --color-primary-soft  wash translúcido para fondos de estado "activo"
+     --color-primary-text  #10140A  ink oscuro para texto sobre fondos de
+                            --color-primary sólido (ver contraste abajo)
+     --color-info / --color-info-soft   azul — estado informativo nuevo,
+                            no existía en el sistema anterior (solo
+                            éxito/alerta/error).
+
+   `--color-accent*` se CONSERVA como alias de `--color-primary*` (ver
+   bloque de variables abajo) únicamente para no romper los archivos fuera
+   del alcance de esta tarea que todavía leen `--color-accent` (StatusPill,
+   StatNumber, Tabs, ClientFormPage, páginas de Clientes/Membresías/Rutinas/
+   Dietas/Progreso, etc. — ninguno de esos archivos se tocó en este cambio).
+   El nombre canónico para código nuevo es `--color-primary`, no
+   `--color-accent`.
+
+   Contraste verificado a mano (luminancia relativa WCAG, no solo lectura
+   visual) contra `--color-bg` (#0B0C09, L≈0.0036) salvo donde se indica:
+     --color-primary   (#7C8B3A) como TEXTO sobre --color-bg: ratio ≈ 5.24:1 (AA texto normal)
+     --color-primary-text (#10140A) como texto sobre --color-primary sólido: ratio ≈ 4.99:1 (AA texto normal)
+     --color-text       (#F2F3EC) sobre --color-bg: ratio ≈ 17.6:1
+     --color-text-muted (#ABB09C) sobre --color-bg: ratio ≈ 8.8:1
+     --color-text-dim   (#7C816F) sobre --color-bg: ratio ≈ 4.9:1 (AA texto normal, el mínimo del sistema)
+     --color-success (#3FB6A0) sobre --color-bg: ratio ≈ 7.9:1
+     --color-warning (#E08D3C) sobre --color-bg: ratio ≈ 7.5:1
+     --color-danger  (#D65A4A) sobre --color-bg: ratio ≈ 5.1:1
+     --color-info    (#4C8FD1) sobre --color-bg: ratio ≈ 5.8:1
+   Todas por encima del mínimo AA de 4.5:1 para texto normal (y muy por
+   encima del 3:1 de AA-large). El ink oscuro (#10140A) se sigue usando
+   SOLO como texto sobre fondos sólidos de color (botón primario), nunca al
+   revés (color sobre ink), igual que el criterio ya documentado en la
+   entrada "Extensión de la identidad visual..." de DECISIONES.md.
+
+   Separación de HUE de los estados (no solo brillo) — mismo criterio ya
+   documentado para --color-success vs --color-accent, extendido a los 4
+   estados contra el primario oliva (~71° de hue):
+     primario (oliva)   ~71°
+     éxito (verde-teal)  ~169°
+     alerta (naranja)    ~30°
+     error (rojo)        ~7°
+     info (azul)         ~210°
+   Ningún estado comparte hue con el primario ni entre sí (separación
+   mínima de ~24°, la mayoría muy por encima) — "botón de acción" y
+   "membresía al día"/"por vencer"/"vencida"/informativo siguen siendo
+   inconfundibles entre sí, igual que exigía el criterio histórico.
 
    ---------------------------------------------------------------------------
    Adaptación de patrones — Design Taste (UFC Gym, ver CLAUDE.md § Design
-   Taste), aplicada al panel interno (Entrega 1, 2026-09-13):
+   Taste), aplicada al panel interno (Entrega 1, 2026-09-13) — HISTÓRICO,
+   el punto 1 (acento en reserva) ya NO aplica desde Entrega 2 Parte A, ver
+   bloque de arriba. Los puntos 2-5 (tipografía, espaciado, sombra dura)
+   SÍ siguen vigentes, no se tocaron en este cambio:
    ---------------------------------------------------------------------------
 
-   1) "Monochrome discipline, un acento en reserva": el verde de marca dejó
-      de usarse como color de TEXTO/borde/ícono decorativo (números
-      protagonistas, precios, avatares, tabs activos, bullets). Ahora
-      `--color-accent` está reservado EXCLUSIVAMENTE para elementos
-      accionables: `.btn-primary`, links de acción real (navegan a algo:
-      "Ver membresías", fila de cliente, "Volver al inicio"), el foco de
-      teclado (`:focus-visible`) y el borde de foco de `.input`. Todo lo que
-      antes usaba el verde solo para "verse importante" (StatNumber,
-      avatares de iniciales, tabs, viñetas, precios) pasa a blanco/neutro —
-      el protagonismo ahora lo da la tipografía (punto 2), no el color.
+   2) "Typeface does the shouting, weight never does": `--font-display-brush`
+      (Permanent Marker) sigue siendo la tipografía más ruidosa del sistema,
+      usada en `.section-title`, títulos de página y números protagonistas.
+      Bebas Neue sigue como insignia secundaria (chips, nombres de tarjeta).
 
-   2) "Typeface does the shouting, weight never does": se agrega
-      `--font-display-brush` (Permanent Marker) como la tipografía más
-      ruidosa del sistema — trazo de marcador real, coherente con la
-      identidad "marcador de gimnasio" que el proyecto ya tenía con Bebas
-      Neue, pero llevada un paso más lejos para reemplazar el color como
-      fuente de jerarquía. Se usa en `.section-title`, los títulos de
-      página (`.topbar__title`) y los números protagonistas (`StatNumber`,
-      precios de membresía) — todos ahora en blanco/neutro, más grandes que
-      antes, porque el tamaño+tipografía cargan el peso visual que antes
-      cargaba el verde. Bebas Neue NO se retira: se degrada a tipografía
-      secundaria para insignias pequeñas y nombres de tarjeta (marca del
-      sidebar, avatares, nombre de plan/rutina/dieta) — un tercer nivel de
-      jerarquía entre el marcador grande y el texto funcional.
+   3) Helvetica Neue sigue siendo `--font-body` para todo lo funcional
+      (tablas, formularios). Cae a Arial en Windows: esperado.
 
-   3) Helvetica Neue para todo lo funcional (tablas, formularios, texto de
-      datos): `--font-body` cambia de Inter a un system-font-stack
-      encabezado por 'Helvetica Neue'. Es una fuente del sistema en
-      macOS/iOS y NO se puede auto-hostear por licencia, así que aquí se
-      declara como stack, nunca como @font-face ni webfont sustituto. En
-      Windows (sin Helvetica Neue instalada) el navegador cae a Arial —
-      es el comportamiento ESPERADO y correcto de este stack, no un bug.
+   4) Escala de espaciado base-8 (`--space-1`...`--space-6`) sigue aplicando
+      a la UI operativa (Dashboard, tablas, formularios, y ahora también el
+      layout de 3 zonas del panel).
 
-   4) Espaciado sistemático SOLO en UI operativa (Dashboard, tablas,
-      formularios) — a diferencia del sitio editorial de UFC Gym (gaps
-      arbitrarios por sección, correctos ahí), esto es una interfaz de
-      gestión de datos: se define una escala base-8 real (`--space-1` a
-      `--space-6`) y se aplica en Dashboard, tabla de clientes/membresías y
-      el formulario de alta de cliente.
+   5) Sombra dura tipo "poster" (`--shadow-card`) sigue reservada a tarjetas
+      de resumen tipo "objeto físico" (stat cards) — nunca en `.input` ni en
+      diálogos modales flotantes (un modal es un objeto que literalmente
+      flota sobre la interfaz, no un recorte físico sobre una superficie;
+      usa una sombra suave de elevación en `ConfirmDialog`, ver
+      `components/ui/ConfirmDialog.css`).
 
-   5) Sombra dura tipo "poster" (`--shadow-card`, una sola capa, negro
-      puro, sin blur suave) SOLO en las tarjetas de resumen del Dashboard
-      (`.dashboard__stat-card`) — nunca en `.input`. Los inputs mantienen
-      su propio lenguaje de affordance: borde visible + fondo elevado +
-      anillo de foco reforzado con `box-shadow`, para que un contenedor de
-      datos (tarjeta) y un control interactivo (input) no compartan la
-      misma señal visual.
-
-   Paleta de marca (idéntica a la usada en la landing, no derivada de nuevo):
-     --color-bg          #0A0A0A  negro casi puro
-     --color-surface     #151515  superficie de tarjeta
-     --color-surface-2   #1C1C1C  superficie elevada / hover / chips neutros
-     --color-border      #2A2A2A  bordes sutiles
-     --color-text        #F5F5F0  blanco cálido — ahora también el color de
-                          los números y títulos protagonistas
-     --color-text-muted  #A8A8A2  gris piedra
-     --color-accent      #229620  verde de marca — reservado a CTA/foco/links
-                          de acción (ver punto 1 arriba). Aclarado sobre el
-                          extremo "brighter" del degradado real del logo
-                          (#177016) para dar contraste real (~4.7:1) sobre
-                          --color-surface cuando se usa en fondos sólidos de
-                          botón.
-     --color-success     #3FB6AD  verde-azulado (teal), deliberadamente
-                          alejado del hue del acento — ver nota de
-                          contraste más abajo sobre por qué NO se reutiliza
-                          el verde de marca para "membresía al día".
-     --color-warning     #E3B341  ámbar (por vencer) — sin cambios
-     --color-danger      #DD5B4F  rojo terracota apagado (vencida) — sin cambios
-
-   Nota de contraste — --color-success vs --color-accent:
-   Si "al día" (success) usara el mismo verde que los botones de acción
-   (accent), un usuario no podría distinguir a simple vista "esto es un
-   botón" de "esto es un estado positivo". Por eso --color-success se aleja
-   de hue (~119° verde → ~178° teal) en vez de solo variar brillo: quedan
-   inconfundibles incluso para quien no perciba bien la diferencia de
-   saturación/luminosidad entre dos verdes parecidos.
-
-   Tipografía (jerarquía de 3 niveles, ver punto 2 y 3 arriba):
+   Tipografía (jerarquía de 3 niveles, sin cambios):
      Permanent Marker — el "grito": títulos de página/sección y números
-                         protagonistas. Siempre blanco/neutro, nunca color
-                         de marca directo — el tamaño y el trazo de
-                         marcador ya comunican jerarquía por sí solos.
+                         protagonistas.
      Bebas Neue        — insignia secundaria: chips de iniciales, marca del
-                         sidebar, nombres de tarjeta (plan/rutina/dieta).
-                         Condensada, nunca para párrafos.
-     Helvetica Neue     — texto de lectura, UI, tablas, formularios (todo lo
-                         funcional). Cae a Arial en Windows: esperado.
+                         sidebar, nombres de tarjeta.
+     Helvetica Neue     — texto de lectura, UI, tablas, formularios.
 
    Nota importante: /login usa esta misma paleta directamente desde `:root`
-   (no queda ninguna pantalla del sistema con una paleta distinta), así que
-   no hace falta ninguna capa de scoping para separarla.
+   (no queda ninguna pantalla del panel con una paleta distinta). La landing
+   pública (`/`) permanece completamente fuera de este sistema — ver nota al
+   inicio de este bloque.
 ============================================================================= */
 
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Permanent+Marker&display=swap');
@@ -116,34 +120,47 @@
 :root {
   color-scheme: dark;
 
-  --color-bg: #0a0a0a;
-  --color-bg-elevated: #111111;
-  --color-surface: #151515;
-  --color-surface-2: #1c1c1c;
-  --color-border: #2a2a2a;
-  --color-border-soft: #202020;
+  --color-bg: #0b0c09;
+  --color-bg-elevated: #121409;
+  --color-surface: #181a13;
+  --color-surface-2: #21241a;
+  --color-border: #2e3224;
+  --color-border-soft: #1f2217;
 
-  --color-text: #f5f5f0;
-  --color-text-muted: #a8a8a2;
-  --color-text-dim: #7a7a75;
+  --color-text: #f2f3ec;
+  --color-text-muted: #abb09c;
+  --color-text-dim: #7c816f;
 
-  /* Verde de marca — reservado a elementos accionables (botón primario,
-     foco de teclado, borde de foco de input, links de navegación real).
-     Ya NO se usa como color de texto/borde/ícono decorativo en ningún
-     otro punto del sistema (ver punto 1 de la nota de adaptación arriba).
-     El ink oscuro es el color de texto sobre rellenos sólidos de acento
-     (botón primario, botón de submit de login). */
-  --color-accent: #229620;
-  --color-accent-hover: #26a824;
-  --color-accent-soft: rgba(34, 150, 32, 0.16);
-  --color-accent-text: #0c1a0a;
+  /* Oliva primario del sistema de diseño (Entrega 2, Parte A) — variantes
+     claras/oscuras para hover/active, un ink oscuro para texto sobre
+     rellenos sólidos, y un wash translúcido para fondos "activo/seleccionado"
+     (nav activo del sidebar, chips de estado). Ver nota de contraste y de
+     hue en el bloque de comentarios de arriba. */
+  --color-primary: #7c8b3a;
+  --color-primary-light: #9aac4e;
+  --color-primary-dark: #5c6b28;
+  --color-primary-soft: rgba(124, 139, 58, 0.18);
+  --color-primary-text: #10140a;
 
-  --color-success: #3fb6ad;
-  --color-success-soft: rgba(63, 182, 173, 0.16);
-  --color-warning: #e3b341;
-  --color-warning-soft: rgba(227, 179, 65, 0.16);
-  --color-danger: #dd5b4f;
-  --color-danger-soft: rgba(221, 91, 79, 0.16);
+  /* Alias de compatibilidad: el resto del árbol de archivos (fuera del
+     alcance de esta tarea) todavía lee --color-accent*. No se renombra ahí
+     para no arriesgar romper esas pantallas sin tocarlas; el nombre
+     canónico para código nuevo es --color-primary*. */
+  --color-accent: var(--color-primary);
+  --color-accent-hover: var(--color-primary-light);
+  --color-accent-soft: var(--color-primary-soft);
+  --color-accent-text: var(--color-primary-text);
+
+  /* Estados semánticos — separados por HUE del primario oliva (~71°), no
+     solo por brillo (ver nota de contraste/hue arriba). */
+  --color-success: #3fb6a0;
+  --color-success-soft: rgba(63, 182, 160, 0.16);
+  --color-warning: #e08d3c;
+  --color-warning-soft: rgba(224, 141, 60, 0.16);
+  --color-danger: #d65a4a;
+  --color-danger-soft: rgba(214, 90, 74, 0.16);
+  --color-info: #4c8fd1;
+  --color-info-soft: rgba(76, 143, 209, 0.16);
   --color-neutral: #7a8296;
   --color-neutral-soft: rgba(122, 130, 150, 0.16);
 
@@ -172,6 +189,24 @@
   /* Sombra "poster": una sola capa, negro puro, sin blur suave. Solo para
      tarjetas de resumen (Dashboard stat cards) — nunca en inputs. */
   --shadow-card: rgba(0, 0, 0, 0.6) -1px 2px 6px 0px;
+
+  /* Elevación/overlay reutilizables — Entrega 2, Parte A (layout de 3
+     zonas y componentes nuevos). Centralizados aquí para que ningún
+     archivo de componente declare un rgba(0,0,0,...) suelto:
+       --color-scrim    fondo semitransparente detrás de un drawer/diálogo.
+       --shadow-drawer   borde con sombra del sidebar al abrirse como drawer
+                         en móvil (ver Sidebar.css).
+       --shadow-floating  elevación chica para chrome flotante no-modal
+                         (RoleSwitcher, herramienta de desarrollo).
+       --shadow-dialog   elevación de un diálogo modal flotante (ConfirmDialog)
+                         — sombra suave de verdad (no la "poster" de arriba):
+                         un modal flota sobre toda la interfaz, no es un
+                         recorte físico sobre una superficie (ver theme.css,
+                         nota de adaptación punto 5 y ConfirmDialog.tsx). */
+  --color-scrim: rgba(0, 0, 0, 0.6);
+  --shadow-drawer: 4px 0 20px rgba(0, 0, 0, 0.5);
+  --shadow-floating: 0 4px 16px rgba(0, 0, 0, 0.45);
+  --shadow-dialog: 0 16px 48px rgba(0, 0, 0, 0.5);
 
   /* -------------------------------------------------------------------------
      Curvas de easing — Entrega 2, animación con propósito (ver CLAUDE.md
@@ -445,7 +480,14 @@ button {
   .plan-card,
   .lp-facility-card__graphic,
   .clients-page__table tbody tr,
-  .field-error {
+  .field-error,
+  .quick-action-card,
+  .quick-action-card:active,
+  .sidebar,
+  .app-shell__results,
+  .app-shell__scrim,
+  .confirm-dialog__panel,
+  .toast {
     animation-duration: 0.01ms !important;
     animation-delay: 0ms !important;
     transition-duration: 0.01ms !important;

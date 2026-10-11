@@ -79,3 +79,29 @@ export const IconLogout = ({ className }: IconProps) => (
     <line x1="15.4" y1="9" x2="6.6" y2="9" />
   </svg>
 )
+
+/** Abre el menú/drawer lateral en pantallas angostas (ver AppShell/Sidebar). */
+export const IconMenu = ({ className }: IconProps) => (
+  <svg {...base} className={className}>
+    <line x1="2.2" y1="4.8" x2="15.8" y2="4.8" />
+    <line x1="2.2" y1="9" x2="15.8" y2="9" />
+    <line x1="2.2" y1="13.2" x2="15.8" y2="13.2" />
+  </svg>
+)
+
+/** Cierra un drawer/diálogo (sidebar móvil, zona de Resultados, ConfirmDialog). */
+export const IconClose = ({ className }: IconProps) => (
+  <svg {...base} className={className}>
+    <line x1="3.6" y1="3.6" x2="14.4" y2="14.4" />
+    <line x1="14.4" y1="3.6" x2="3.6" y2="14.4" />
+  </svg>
+)
+
+/** Alerta/resultados — campanita llena para distinguir del estado "vacío". */
+export const IconResults = ({ className }: IconProps) => (
+  <svg {...base} className={className}>
+    <path d="M2.4 13.4 9 2.6l6.6 10.8Z" />
+    <line x1="9" y1="6.8" x2="9" y2="10.2" />
+    <circle cx="9" cy="12.4" r="0.9" fill="currentColor" stroke="none" />
+  </svg>
+)

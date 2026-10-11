@@ -19,10 +19,7 @@
 }
 
 .sidebar__brand-mark {
-  /* Chip de marca en superficie neutra, no en verde de acento: la marca
-     del sidebar no es una acción, es identidad — el verde queda en
-     reserva para botones/links reales (ver theme.css, nota de
-     adaptación punto 1). */
+  /* Chip de marca en superficie neutra: identidad, no una acción. */
   width: 36px;
   height: 36px;
   border-radius: 8px;
@@ -55,6 +52,20 @@
   color: var(--color-text-muted);
 }
 
+.sidebar__close {
+  display: none;
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
 .sidebar__nav {
   display: flex;
   flex-direction: column;
@@ -73,7 +84,7 @@
   color: var(--color-text-muted);
   border-left: 2px solid transparent;
   text-decoration: none;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -84,17 +95,15 @@
 }
 
 .sidebar__link--active {
-  /* Estado de navegación actual, no un CTA: el borde indicador se
-     comunica en blanco/neutro (mismo criterio que las tabs activas), el
-     fondo se queda en el wash suave (--color-accent-soft) porque es un
-     tinte de apoyo casi imperceptible, no un uso "protagonista" del verde
-     de marca (ver theme.css, nota de adaptación punto 1). El verde de
-     acento sobre el fondo casi negro del sidebar tampoco alcanza contraste
-     AA como texto pequeño (ver DECISIONES.md) — el texto se queda en
-     blanco cálido, siempre legible. */
-  background: var(--color-accent-soft);
-  color: var(--color-text);
-  border-left-color: var(--color-text);
+  /* El oliva ya es el color PRIMARIO del sistema (Entrega 2, Parte A), no
+     solo un acento en reserva — a diferencia del criterio histórico (ver
+     theme.css), aquí se usa directamente como señal de "sección activa":
+     texto, ícono y borde izquierdo en --color-primary sobre el wash
+     translúcido. El ícono usa --color-primary (no el ink oscuro), que ya
+     se verificó con ratio ≈5.24:1 sobre fondos casi negros (ver theme.css). */
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  border-left-color: var(--color-primary);
   font-weight: 600;
 }
 
@@ -120,5 +129,33 @@
 @media (hover: hover) and (pointer: fine) {
   .sidebar__logout:hover {
     color: var(--color-danger);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Drawer móvil (<=900px) — el sidebar deja de reflow horizontal y pasa a
+   ser un panel fuera de flujo que entra desde la izquierda. Se abre con el
+   botón hamburguesa del Topbar y se cierra con el scrim compartido o el
+   botón de cerrar de aquí mismo.
+--------------------------------------------------------------------------- */
+@media (max-width: 900px) {
+  .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: min(280px, 82vw);
+    height: 100vh;
+    z-index: 40;
+    transform: translateX(-100%);
+    transition: transform 0.22s var(--ease-in-out);
+    box-shadow: var(--shadow-drawer);
+  }
+
+  .sidebar[data-open='true'] {
+    transform: translateX(0);
+  }
+
+  .sidebar__close {
+    display: flex;
   }
 }
