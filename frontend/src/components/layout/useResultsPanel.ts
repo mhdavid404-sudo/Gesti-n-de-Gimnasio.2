@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import type { ReactNode } from 'react'
+import type { DependencyList, ReactNode } from 'react'
 import { useAppShell } from './AppShellContext'
 
 /**
@@ -10,17 +10,24 @@ import { useAppShell } from './AppShellContext'
  * automáticamente, así esas pantallas simplemente no la muestran en vez de
  * quedarse con contenido obsoleto de la pantalla anterior.
  *
+ * Firma igual a `useEffect`/`useMemo` (fábrica + `deps` explícito) a
+ * propósito: un `ReactNode` ya construido es una referencia nueva en CADA
+ * render, así que usarlo directo como dependencia de un efecto reinscribe el
+ * contenido en cada render → el estado sube a `AppShell` → `AppShell`
+ * re-renderiza su árbol → esta pantalla vuelve a renderizar → nueva
+ * referencia → loop infinito ("Maximum update depth exceeded"). Exigir
+ * `deps` en la llamada (valores primitivos o referencias ya estables, no el
+ * JSX en sí) es lo que rompe el ciclo.
+ *
  * No vive en `src/hooks/` a propósito: esa carpeta está reservada para el
- * trabajo paralelo de autenticación (`useAuth.tsx`).
+ * trabajo de autenticación (`useAuth.tsx`).
  */
-export function useResultsPanel(content: ReactNode): void {
+export function useResultsPanel(factory: () => ReactNode, deps: DependencyList): void {
   const { setResultsPanel } = useAppShell()
 
   useEffect(() => {
-    setResultsPanel(content)
+    setResultsPanel(factory())
     return () => setResultsPanel(null)
-    // El setter de useState es estable entre renders; solo nos interesa
-    // reaccionar a cambios del contenido que la pantalla quiere mostrar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [content])
+  }, deps)
 }

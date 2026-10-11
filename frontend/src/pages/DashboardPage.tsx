@@ -28,6 +28,12 @@ import './DashboardPage.css'
 
 const CURRENT_MONTH_PREFIX = '2026-09'
 
+// `memberships`/`MOCK_TODAY` son constantes de módulo (nunca cambian de
+// referencia): calcular esto una sola vez aquí, en vez de en cada render de
+// DashboardPage, mantiene estable el array que llega a `useResultsPanel`.
+const EXPIRING_MEMBERSHIPS = memberships.filter((m) => isMembershipExpiringSoon(m, MOCK_TODAY))
+const EXPIRED_MEMBERSHIPS = memberships.filter((m) => m.status === 'vencida')
+
 /**
  * No existe todavía sesión real de cliente (la construye el proceso de
  * autenticación en paralelo) — para demostrar "resumen del cliente actual"
@@ -133,10 +139,13 @@ export function DashboardPage() {
     .reduce((sum, p) => sum + p.amount, 0)
   // "Por vencer" se calcula sobre end_date, no es un status persistido
   // (ver DECISIONES.md, arbitraje del 2026-09-12).
-  const expiring = memberships.filter((m) => isMembershipExpiringSoon(m, MOCK_TODAY))
-  const expired = memberships.filter((m) => m.status === 'vencida')
+  const expiring = EXPIRING_MEMBERSHIPS
+  const expired = EXPIRED_MEMBERSHIPS
 
-  useResultsPanel(<ResultsContent role={mockRole} expiring={expiring} expired={expired} />)
+  useResultsPanel(
+    () => <ResultsContent role={mockRole} expiring={expiring} expired={expired} />,
+    [mockRole, expiring, expired],
+  )
 
   const actions = ACTIONS_BY_ROLE[mockRole]
 

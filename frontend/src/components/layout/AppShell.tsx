@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
+import { useAuth } from '../../hooks/useAuth'
 import type { UserRole } from '../../types/models'
 import { AppShellContext } from './AppShellContext'
 import { IconClose, IconResults } from './icons'
@@ -46,7 +47,13 @@ function readStoredMockRole(): UserRole {
  */
 export function AppShell() {
   const location = useLocation()
-  const [mockRole, setMockRole] = useState<UserRole>(readStoredMockRole)
+  const { user } = useAuth()
+  // Punto de integración documentado en RoleSwitcher.tsx: con sesión real
+  // activa, el rol autenticado manda (no la anulación mock guardada de una
+  // sesión anterior, que podría ser de otra cuenta) — el switch sigue
+  // disponible para cambiar la vista dentro de esta sesión, solo para
+  // demostrar las 3 variantes sin crear tres cuentas.
+  const [mockRole, setMockRole] = useState<UserRole>(() => user?.role ?? readStoredMockRole())
   const [resultsPanel, setResultsPanel] = useState<ReactNode>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [resultsOpen, setResultsOpen] = useState(false)
