@@ -12,6 +12,13 @@
   margin-bottom: 16px;
 }
 
+.routines-page__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-bottom: 14px;
+}
+
 .routines-page__catalog {
   display: flex;
   flex-direction: column;
@@ -47,6 +54,12 @@
   color: var(--color-text-muted);
 }
 
+.routines-page__note {
+  color: var(--color-text-muted);
+  font-size: 13.5px;
+  margin-top: 10px;
+}
+
 .routines-page__table {
   width: 100%;
   border-collapse: collapse;
@@ -73,21 +86,64 @@
   gap: 16px;
 }
 
-.routines-page__assign-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.routines-page__assign-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
 .routines-page__table-wrap {
   padding: 8px 20px 4px;
   overflow-x: auto;
+}
+
+/* ---------------------------------------------------------------------------
+   Formularios inline (alta de ejercicio/rutina, agregar ejercicio a una
+   rutina, nueva asignación) -- mismo lenguaje de validación en línea que
+   ClientFormPage/MembershipsPage (.input, .field-error).
+--------------------------------------------------------------------------- */
+.routines-page__inline-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: 14px;
+}
+
+.routines-page__inline-form--nested {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border-soft);
+}
+
+.routines-page__form-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+}
+
+.routines-page__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.routines-page__form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.routines-page__add-exercise {
+  margin-top: 4px;
+}
+
+.routines-page__client-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.routines-page__own-client {
+  margin-bottom: 4px;
+}
+
+.routines-page__status-select {
+  width: auto;
+  padding: 6px 10px;
+  font-size: 13px;
 }
 
 @media (max-width: 980px) {
@@ -96,8 +152,8 @@
   }
 }
 
-@media (max-width: 480px) {
-  .routines-page__assign-row {
+@media (max-width: 700px) {
+  .routines-page__form-row {
     grid-template-columns: 1fr;
   }
 }

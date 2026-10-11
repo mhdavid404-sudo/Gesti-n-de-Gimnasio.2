@@ -148,3 +148,83 @@ export interface ApiNotification {
   is_read: boolean
   created_at: string
 }
+
+// ---------------------------------------------------------------------------
+// Ejercicios y Rutinas (RF007, RF008) — ver backend/src/api/v1/routers/routines.py
+// ---------------------------------------------------------------------------
+
+export interface ApiExercise {
+  id: number
+  name: string
+  muscle_group: string | null
+  description: string | null
+  equipment: string | null
+  created_at: string
+}
+
+export interface ExerciseCreatePayload {
+  name: string
+  muscle_group?: string | null
+  description?: string | null
+  equipment?: string | null
+}
+
+export interface ApiRoutine {
+  id: number
+  name: string
+  /** Id del admin/entrenador autenticado que creó la rutina -- el backend lo rellena solo, nunca se manda en el body. */
+  created_by: number
+  description: string | null
+  created_at: string
+}
+
+export interface RoutineCreatePayload {
+  name: string
+  description?: string | null
+}
+
+export interface ApiRoutineExercise {
+  id: number
+  routine_id: number
+  exercise_id: number
+  sets: number
+  reps: number
+  order_index: number
+  rest_seconds: number | null
+  notes: string | null
+}
+
+export interface RoutineExerciseCreatePayload {
+  exercise_id: number
+  sets: number
+  reps: number
+  order_index: number
+  rest_seconds?: number | null
+  notes?: string | null
+}
+
+export type ApiRoutineAssignmentStatus = 'activa' | 'completada' | 'cancelada'
+
+export interface ApiRoutineAssignment {
+  id: number
+  routine_id: number
+  client_id: number
+  /** Id del admin/entrenador autenticado que asignó la rutina -- el backend lo rellena solo, nunca se manda en el body. */
+  assigned_by: number
+  assigned_date: string
+  status: ApiRoutineAssignmentStatus
+  notes: string | null
+}
+
+export interface RoutineAssignmentCreatePayload {
+  routine_id: number
+  client_id: number
+  assigned_date: string
+  status?: ApiRoutineAssignmentStatus
+  notes?: string | null
+}
+
+export interface RoutineAssignmentUpdatePayload {
+  status?: ApiRoutineAssignmentStatus
+  notes?: string | null
+}

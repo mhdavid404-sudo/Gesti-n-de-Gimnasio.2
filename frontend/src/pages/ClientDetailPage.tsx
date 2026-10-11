@@ -10,23 +10,20 @@ import { StatusPill } from '../components/ui/StatusPill'
 import { Tabs } from '../components/ui/Tabs'
 import { Toast } from '../components/ui/Toast'
 import { useAuth } from '../hooks/useAuth'
-import {
-  findDietPlan,
-  findExercise,
-  findRoutine,
-  getBodyProgressForClient,
-  getDietAssignmentsForClient,
-  getRoutineAssignmentsForClient,
-  getRoutineExercises,
-} from '../mocks/data'
+import { findDietPlan, getBodyProgressForClient, getDietAssignmentsForClient } from '../mocks/data'
 import type {
   ApiClientProfile,
+  ApiExercise,
   ApiMembership,
   ApiMembershipPlan,
   ApiPayment,
   ApiPaymentMethod,
+  ApiRoutine,
+  ApiRoutineAssignment,
+  ApiRoutineExercise,
   MembershipCreatePayload,
   PaymentCreatePayload,
+  RoutineAssignmentCreatePayload,
 } from '../types/api'
 import { addDaysIso, getMembershipDisplayStatus, pickCurrentMembership } from '../utils/membership'
 import './ClientDetailPage.css'
@@ -322,6 +319,152 @@ export function ClientDetailPage() {
     }
   }
 
+  // --- Rutina (RF007/RF008, módulo Ejercicios y Rutinas) ------------------
+  // Mismo patrón ya usado arriba por la pestaña "Membresía": historial real
+  // vía `GET /routines/assignments/clients/{id}` (ownership por dato ya
+  // resuelto en el backend -- si esta pantalla cargó, el rol actual ya tenía
+  // acceso a este cliente, ver docstring del router). Si es `entrenador` o
+  // `admin`, puede asignar una rutina nueva del catálogo.
+  const isStaff = user?.role === 'admin' || user?.role === 'entrenador'
+
+  const [routineAssignments, setRoutineAssignments] = useState<ApiRoutineAssignment[] | null>(null)
+  const [routineAssignmentsLoading, setRoutineAssignmentsLoading] = useState(true)
+  const [routineAssignmentsError, setRoutineAssignmentsError] = useState<string | null>(null)
+
+  const loadRoutineAssignments = () => {
+    setRoutineAssignmentsLoading(true)
+    setRoutineAssignmentsError(null)
+    apiFetch<ApiRoutineAssignment[]>(`/routines/assignments/clients/${clientProfileId}`)
+      .then(setRoutineAssignments)
+      .catch((err: unknown) => {
+        if (err instanceof ApiError) {
+          if (err.isUnauthorized) {
+            logout()
+            navigate('/login', { replace: true })
+            return
+          }
+          if (err.status === 403) {
+            setRoutineAssignmentsError('No tienes permiso para ver las rutinas de este cliente.')
+            return
+          }
+          setRoutineAssignmentsError(err.message)
+          return
+        }
+        setRoutineAssignmentsError('Ocurrió un error inesperado. Intenta de nuevo.')
+      })
+      .finally(() => setRoutineAssignmentsLoading(false))
+  }
+
+  useEffect(() => {
+    loadRoutineAssignments()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientProfileId])
+
+  // Catálogo de rutinas (para el selector del formulario de asignación) y de
+  // ejercicios (para mostrar los nombres dentro de cada rutina asignada) --
+  // se cargan una sola vez, mismo criterio que el catálogo de planes arriba.
+  const [routinesCatalog, setRoutinesCatalog] = useState<ApiRoutine[]>([])
+  const [exercisesCatalog, setExercisesCatalog] = useState<ApiExercise[]>([])
+
+  useEffect(() => {
+    apiFetch<ApiRoutine[]>('/routines').then(setRoutinesCatalog).catch(() => setRoutinesCatalog([]))
+    apiFetch<ApiExercise[]>('/exercises').then(setExercisesCatalog).catch(() => setExercisesCatalog([]))
+  }, [])
+
+  const routineById = useMemo(() => {
+    const map = new Map<number, ApiRoutine>()
+    routinesCatalog.forEach((r) => map.set(r.id, r))
+    return map
+  }, [routinesCatalog])
+
+  const exerciseById = useMemo(() => {
+    const map = new Map<number, ApiExercise>()
+    exercisesCatalog.forEach((e) => map.set(e.id, e))
+    return map
+  }, [exercisesCatalog])
+
+  // Ejercicios de cada rutina asignada -- se cargan en cuanto se conoce el
+  // historial (un cliente tiene pocas asignaciones, no amerita carga bajo
+  // demanda como en el catálogo completo de RoutinesPage.tsx).
+  const [routineExercisesById, setRoutineExercisesById] = useState<Map<number, ApiRoutineExercise[]>>(new Map())
+
+  useEffect(() => {
+    if (!routineAssignments) return
+    const pendingIds = Array.from(new Set(routineAssignments.map((ra) => ra.routine_id))).filter(
+      (id) => !routineExercisesById.has(id),
+    )
+    pendingIds.forEach((routineId) => {
+      apiFetch<ApiRoutineExercise[]>(`/routines/${routineId}/exercises`)
+        .then((items) => {
+          setRoutineExercisesById((prev) => new Map(prev).set(routineId, items))
+        })
+        .catch(() => {
+          setRoutineExercisesById((prev) => new Map(prev).set(routineId, []))
+        })
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routineAssignments])
+
+  // --- Asignar rutina (admin/entrenador dueño del cliente) -----------------
+  const [showAssignRoutineForm, setShowAssignRoutineForm] = useState(false)
+  const [assignRoutineId, setAssignRoutineId] = useState('')
+  const [assignRoutineDate, setAssignRoutineDate] = useState(todayIso)
+  const [assignRoutineServerError, setAssignRoutineServerError] = useState<string | null>(null)
+  const [isAssigningRoutine, setIsAssigningRoutine] = useState(false)
+  const [assignRoutineToast, setAssignRoutineToast] = useState<string | null>(null)
+
+  const resetAssignRoutineForm = () => {
+    setAssignRoutineId('')
+    setAssignRoutineDate(todayIso())
+    setAssignRoutineServerError(null)
+  }
+
+  const handleAssignRoutineSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    setAssignRoutineServerError(null)
+
+    if (!assignRoutineId) {
+      setAssignRoutineServerError('Selecciona una rutina.')
+      return
+    }
+    if (!assignRoutineDate) {
+      setAssignRoutineServerError('Selecciona una fecha de asignación.')
+      return
+    }
+
+    const payload: RoutineAssignmentCreatePayload = {
+      routine_id: Number(assignRoutineId),
+      client_id: clientProfileId,
+      assigned_date: assignRoutineDate,
+    }
+
+    setIsAssigningRoutine(true)
+    try {
+      const created = await apiFetch<ApiRoutineAssignment>('/routines/assignments', { method: 'POST', body: payload })
+      setRoutineAssignments((prev) => [created, ...(prev ?? [])])
+      setAssignRoutineToast('Rutina asignada correctamente.')
+      setShowAssignRoutineForm(false)
+      resetAssignRoutineForm()
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.isUnauthorized) {
+          logout()
+          navigate('/login', { replace: true })
+          return
+        }
+        if (err.status === 403) {
+          setAssignRoutineServerError('No tienes permiso para asignar rutinas a este cliente.')
+          return
+        }
+        setAssignRoutineServerError(err.message)
+        return
+      }
+      setAssignRoutineServerError('Ocurrió un error inesperado. Intenta de nuevo.')
+    } finally {
+      setIsAssigningRoutine(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="card">
@@ -349,8 +492,8 @@ export function ClientDetailPage() {
   // de pestañas sigue usando los mismos datos mock de Entrega 1, indexados
   // por `clientProfileId` de ejemplo -- no corresponden necesariamente al
   // cliente real de esta pantalla. Se reemplazan por llamadas reales cuando
-  // cada módulo exista. "Membresía" y "Pagos" (arriba) ya usan la API real.
-  const routineAssignments = getRoutineAssignmentsForClient(clientProfileId)
+  // cada módulo exista. "Membresía", "Pagos" y "Rutina" (arriba) ya usan la
+  // API real.
   const dietAssignments = getDietAssignmentsForClient(clientProfileId)
   const progress = getBodyProgressForClient(clientProfileId)
   const lastProgress = progress[progress.length - 1]
@@ -722,52 +865,166 @@ export function ClientDetailPage() {
             </div>
           )}
 
-          {/* TODO(módulo Rutinas, todavía no construido): pestaña mock. */}
-          {activeTab === 'rutina' &&
-            (routineAssignments.length > 0 ? (
-              <div className="client-detail__stack">
-                {routineAssignments.map((ra) => {
-                  const routine = findRoutine(ra.routine_id)
-                  const items = getRoutineExercises(ra.routine_id)
-                  return (
-                    <div key={ra.id} className="client-detail__sub-card">
-                      <div className="client-detail__sub-card-header">
-                        <div>
-                          <h3>{routine?.name}</h3>
-                          <p>{routine?.description}</p>
+          {/* Conectado a la API real (RF007/RF008) -- ver useEffect de
+              `routineAssignments`/`routinesCatalog`/`exercisesCatalog` arriba. */}
+          {activeTab === 'rutina' && (
+            <div className="client-detail__routine-tab">
+              {assignRoutineToast && (
+                <Toast message={assignRoutineToast} onDismiss={() => setAssignRoutineToast(null)} />
+              )}
+
+              {routineAssignmentsLoading ? (
+                <LoadingState label="Cargando rutinas…" variant="skeleton" rows={3} />
+              ) : routineAssignmentsError ? (
+                <ErrorMessage message={routineAssignmentsError} onRetry={loadRoutineAssignments} />
+              ) : (
+                <>
+                  {isStaff && showAssignRoutineForm && (
+                    <form className="client-detail__assign-form" onSubmit={handleAssignRoutineSubmit}>
+                      {assignRoutineServerError && (
+                        <ErrorMessage title="No se pudo asignar la rutina" message={assignRoutineServerError} />
+                      )}
+
+                      {routinesCatalog.length === 0 ? (
+                        <p className="client-detail__empty">
+                          Todavía no hay rutinas en el catálogo -- crea una primero desde{' '}
+                          <Link to="/rutinas">Rutinas</Link>.
+                        </p>
+                      ) : (
+                        <div className="client-detail__assign-row">
+                          <div className="client-detail__field">
+                            <label className="field-label" htmlFor="assignRoutineSelect">
+                              Rutina
+                            </label>
+                            <select
+                              id="assignRoutineSelect"
+                              className="input"
+                              value={assignRoutineId}
+                              onChange={(e) => setAssignRoutineId(e.target.value)}
+                              required
+                            >
+                              <option value="">Selecciona una rutina</option>
+                              {routinesCatalog.map((r) => (
+                                <option key={r.id} value={r.id}>
+                                  {r.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="client-detail__field">
+                            <label className="field-label" htmlFor="assignRoutineDate">
+                              Fecha de asignación
+                            </label>
+                            <input
+                              id="assignRoutineDate"
+                              type="date"
+                              className="input"
+                              value={assignRoutineDate}
+                              onChange={(e) => setAssignRoutineDate(e.target.value)}
+                              required
+                            />
+                          </div>
                         </div>
-                        <StatusPill status={ra.status} />
+                      )}
+
+                      <div className="client-detail__assign-actions">
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => {
+                            setShowAssignRoutineForm(false)
+                            resetAssignRoutineForm()
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          className="btn btn-primary"
+                          disabled={isAssigningRoutine || routinesCatalog.length === 0}
+                        >
+                          {isAssigningRoutine ? 'Asignando…' : 'Asignar rutina'}
+                        </button>
                       </div>
-                      <table className="client-detail__table">
-                        <thead>
-                          <tr>
-                            <th>Ejercicio</th>
-                            <th>Series</th>
-                            <th>Reps</th>
-                            <th>Descanso</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {items.map((it) => {
-                            const exercise = findExercise(it.exercise_id)
-                            return (
-                              <tr key={it.id}>
-                                <td>{exercise?.name}</td>
-                                <td>{it.sets}</td>
-                                <td>{it.reps}</td>
-                                <td>{it.rest_seconds}s</td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
+                    </form>
+                  )}
+
+                  {!routineAssignments || routineAssignments.length === 0 ? (
+                    !showAssignRoutineForm && (
+                      <EmptyState
+                        title="Este cliente no tiene rutinas asignadas"
+                        description="Asigna una rutina del catálogo para que empiece a entrenar con un plan."
+                        actionLabel={isStaff ? 'Asignar rutina' : undefined}
+                        onAction={isStaff ? () => setShowAssignRoutineForm(true) : undefined}
+                      />
+                    )
+                  ) : (
+                    <div className="client-detail__stack">
+                      {isStaff && !showAssignRoutineForm && (
+                        <div className="client-detail__payments-toolbar">
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            onClick={() => setShowAssignRoutineForm(true)}
+                          >
+                            + Asignar rutina
+                          </button>
+                        </div>
+                      )}
+                      {routineAssignments.map((ra) => {
+                        const routine = routineById.get(ra.routine_id)
+                        const items = routineExercisesById.get(ra.routine_id)
+                        return (
+                          <div key={ra.id} className="client-detail__sub-card">
+                            <div className="client-detail__sub-card-header">
+                              <div>
+                                <h3>{routine?.name ?? `Rutina #${ra.routine_id}`}</h3>
+                                <p>{routine?.description}</p>
+                              </div>
+                              <StatusPill status={ra.status} />
+                            </div>
+                            <p className="client-detail__diet-meta">
+                              Asignada el {ra.assigned_date}
+                              {ra.notes ? ` · ${ra.notes}` : ''}
+                            </p>
+                            {items === undefined ? (
+                              <LoadingState label="Cargando ejercicios…" variant="skeleton" rows={2} />
+                            ) : items.length === 0 ? (
+                              <p className="client-detail__empty">Esta rutina todavía no tiene ejercicios.</p>
+                            ) : (
+                              <table className="client-detail__table">
+                                <thead>
+                                  <tr>
+                                    <th>Ejercicio</th>
+                                    <th>Series</th>
+                                    <th>Reps</th>
+                                    <th>Descanso</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {items.map((it) => {
+                                    const exercise = exerciseById.get(it.exercise_id)
+                                    return (
+                                      <tr key={it.id}>
+                                        <td>{exercise?.name ?? `#${it.exercise_id}`}</td>
+                                        <td>{it.sets}</td>
+                                        <td>{it.reps}</td>
+                                        <td>{it.rest_seconds != null ? `${it.rest_seconds}s` : '—'}</td>
+                                      </tr>
+                                    )
+                                  })}
+                                </tbody>
+                              </table>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <p className="client-detail__empty">Este cliente no tiene rutinas asignadas.</p>
-            ))}
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {/* TODO(módulo Dietas, todavía no construido): pestaña mock. */}
           {activeTab === 'dieta' &&
