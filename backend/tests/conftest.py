@@ -29,6 +29,17 @@ ON DELETE CASCADE`), pero `membership_plans` NO tiene ninguna FK hacia
 `UNIQUE` del catalogo de planes rompe cualquier segundo test que intente
 crear un plan con el mismo nombre.
 
+`notifications` (modulo Vencimientos/Notificaciones, Entrega 2) NO se
+agrega de forma explicita a este TRUNCATE -- a diferencia de
+`membership_plans`, `notifications.user_id` SI tiene FK directa hacia
+`users.id` (`ON DELETE CASCADE`, ver
+`infrastructure/db/models/notifications.py`), asi que `TRUNCATE ...
+CASCADE` sobre `users` ya la arrastra automaticamente (Postgres hace
+cascade de TRUNCATE siguiendo cualquier FK hacia una tabla truncada,
+independientemente de su `ON DELETE`). Verificado con
+`pytest tests/test_notifications.py` corrido dos veces seguidas sin
+colisiones de datos entre corridas.
+
 Requiere una base de datos real corriendo y con las migraciones aplicadas
 antes de correr pytest:
 

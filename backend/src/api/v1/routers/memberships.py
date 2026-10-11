@@ -35,11 +35,34 @@ del modulo Planes y Membresias, ver DECISIONES.md):
   (RF006/deteccion automatica todavia no existe) cualquier cambio de
   estado es una decision manual, igual de administrativa/financiera que el
   resto de las decisiones de este tipo ya resueltas en el modulo Clientes.
-- `GET /memberships/expiring` (RF006): FUERA DE ALCANCE de este modulo, se
-  deja intencionalmente en 501 (ver docstring de la ruta).
+- `POST /memberships/detect-expiring` (RF006, modulo
+  "Vencimientos/Notificaciones"): solo `admin` -- corre
+  `DetectExpiringMembershipsUseCase` (ver docstring de la clase en
+  `application/memberships/use_cases.py`), que transiciona a "vencida" las
+  membresias ya vencidas y genera las notificaciones correspondientes. Es
+  una accion administrativa que muta datos (cambia `status`, crea
+  `Notification`), por eso queda detras de `admin` igual que
+  `PATCH /memberships/{id}` -- ningun rol lo dispara "en su propio
+  nombre".
+- `GET /memberships/expiring` (RF006): a diferencia del POST anterior, es
+  de SOLO LECTURA -- calcula al vuelo (sin mutar nada) que membresias
+  estan vencidas (status `"vencida"` ya persistido) o por vencer (status
+  `"activa"` con `end_date` dentro de la ventana `days_ahead`), mismo
+  criterio que `frontend/src/utils/membership.ts`
+  (`isMembershipExpiringSoon`/`getMembershipDisplayStatus`). No depende de
+  que el POST se haya ejecutado antes. Ownership por dato: mismo patron
+  que `list_memberships` -- `admin` ve todas, `entrenador` solo las de sus
+  clientes asignados. Se decide permitir tambien a `cliente` (ve solo
+  la(s) suya(s)): aunque en la practica un cliente solo tiene una
+  membresia activa, ya puede ver el detalle completo via
+  `GET /memberships/{id}` y `GET /memberships` -- restringir
+  especificamente este endpoint a admin/entrenador seria una
+  inconsistencia arbitraria frente a esos dos.
 """
 
 from __future__ import annotations
+
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -52,7 +75,11 @@ from src.api.v1.schemas.memberships import (
     MembershipRead,
     MembershipUpdate,
 )
-from src.application.memberships.use_cases import AssignMembershipUseCase
+from src.application.memberships.use_cases import (
+    AssignMembershipUseCase,
+    DetectExpiringMembershipsUseCase,
+)
+from src.application.notifications.use_cases import NotifyUserUseCase
 from src.domain.clients.entities import ClientProfile
 from src.domain.clients.exceptions import ClientNotFoundError
 from src.domain.memberships.entities import Membership, MembershipPlan
@@ -68,14 +95,15 @@ from src.infrastructure.repositories.memberships import (
     SqlAlchemyMembershipPlanRepository,
     SqlAlchemyMembershipRepository,
 )
+from src.infrastructure.repositories.notifications import SqlAlchemyNotificationRepository
 
 router = APIRouter(prefix="/memberships", tags=["memberships"])
 plans_router = APIRouter(prefix="/membership-plans", tags=["memberships"])
 
-_NOT_IMPLEMENTED = "Pendiente de implementacion completa en Entrega 2 (ver DECISIONES.md)."
 _PLAN_NO_ENCONTRADO = "El plan de membresia solicitado no existe."
 _MEMBRESIA_NO_ENCONTRADA = "La membresia solicitada no existe."
 _SIN_ACCESO_A_MEMBRESIA = "No tienes acceso a esta membresia."
+_VENTANA_POR_VENCER_DIAS = 7
 
 
 def _ensure_access_to_membership(current_user: User, profile: ClientProfile) -> None:
@@ -176,6 +204,40 @@ def assign_membership(payload: MembershipCreate, db: Session = Depends(get_db)) 
     return MembershipRead.model_validate(created)
 
 
+def _resolve_memberships_for_user(
+    current_user: User,
+    membership_repository: SqlAlchemyMembershipRepository,
+    client_repository: SqlAlchemyClientProfileRepository,
+    client_id: int | None,
+) -> list[Membership]:
+    """Ownership por rol, factorizado de `list_memberships` para
+    reutilizarse tambien en `GET /memberships/expiring` -- ver docstring
+    del modulo arriba."""
+    if current_user.role == "entrenador":
+        own_client_ids = [
+            profile.id for profile in client_repository.list_by_trainer(current_user.id)  # type: ignore[arg-type]
+        ]
+        if client_id is not None and client_id in own_client_ids:
+            own_client_ids = [client_id]
+        return [
+            m for cid in own_client_ids for m in membership_repository.list_by_client(cid)  # type: ignore[arg-type]
+        ]
+    if current_user.role == "cliente":
+        own_profile = client_repository.get_by_user_id(current_user.id)  # type: ignore[arg-type]
+        return (
+            membership_repository.list_by_client(own_profile.id)  # type: ignore[arg-type]
+            if own_profile is not None
+            else []
+        )
+    # admin
+    if client_id is not None:
+        return membership_repository.list_by_client(client_id)
+    all_client_ids = [profile.id for profile in client_repository.list_all()]
+    return [
+        m for cid in all_client_ids for m in membership_repository.list_by_client(cid)  # type: ignore[arg-type]
+    ]
+
+
 @router.get("", response_model=list[MembershipRead])
 def list_memberships(
     client_id: int | None = None,
@@ -186,48 +248,76 @@ def list_memberships(
     membership_repository = SqlAlchemyMembershipRepository(db)
     client_repository = SqlAlchemyClientProfileRepository(db)
 
-    if current_user.role == "entrenador":
-        own_client_ids = [
-            profile.id for profile in client_repository.list_by_trainer(current_user.id)  # type: ignore[arg-type]
-        ]
-        if client_id is not None and client_id in own_client_ids:
-            own_client_ids = [client_id]
-        memberships = [
-            m for cid in own_client_ids for m in membership_repository.list_by_client(cid)  # type: ignore[arg-type]
-        ]
-    elif current_user.role == "cliente":
-        own_profile = client_repository.get_by_user_id(current_user.id)  # type: ignore[arg-type]
-        memberships = (
-            membership_repository.list_by_client(own_profile.id)  # type: ignore[arg-type]
-            if own_profile is not None
-            else []
-        )
-    else:  # admin
-        if client_id is not None:
-            memberships = membership_repository.list_by_client(client_id)
-        else:
-            all_client_ids = [profile.id for profile in client_repository.list_all()]
-            memberships = [
-                m for cid in all_client_ids for m in membership_repository.list_by_client(cid)  # type: ignore[arg-type]
-            ]
-
+    memberships = _resolve_memberships_for_user(
+        current_user, membership_repository, client_repository, client_id
+    )
     return [MembershipRead.model_validate(m) for m in memberships]
 
 
-# IMPORTANTE: esta ruta estatica debe declararse ANTES que
-# "/{membership_id}" -- FastAPI/Starlette resuelve las rutas en el orden en
-# que se registran, y "/expiring" calzaria con el patron "/{membership_id}"
-# (fallando la validacion de tipo `int`) si quedara despues.
+# IMPORTANTE: estas dos rutas estaticas ("/expiring" y "/detect-expiring")
+# deben declararse ANTES que "/{membership_id}" -- FastAPI/Starlette
+# resuelve las rutas en el orden en que se registran, y calzarian con el
+# patron "/{membership_id}" (fallando la validacion de tipo `int`) si
+# quedaran despues.
 @router.get("/expiring", response_model=list[MembershipRead])
-def list_expiring_memberships(days_ahead: int = 7) -> list[MembershipRead]:
-    """RF006: detectar membresias vencidas o proximas a vencer.
+def list_expiring_memberships(
+    days_ahead: int = _VENTANA_POR_VENCER_DIAS,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[MembershipRead]:
+    """RF006: membresias vencidas o por vencer, calculado al vuelo (SOLO
+    LECTURA, no muta nada) -- ver docstring del modulo arriba para el
+    criterio completo de calculo y de ownership."""
+    membership_repository = SqlAlchemyMembershipRepository(db)
+    client_repository = SqlAlchemyClientProfileRepository(db)
 
-    FUERA DE ALCANCE de este modulo (Planes y Membresias, RF004) -- ver
-    docstring del modulo arriba y DECISIONES.md: pertenece al modulo
-    "Vencimientos/Notificaciones", siguiente en el orden fijo despues de
-    Pagos. Se deja intencionalmente en 501.
-    """
-    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=_NOT_IMPLEMENTED)
+    memberships = _resolve_memberships_for_user(
+        current_user, membership_repository, client_repository, None
+    )
+
+    today = date.today()
+
+    def _is_expired_or_expiring(membership: Membership) -> bool:
+        if membership.status == "vencida":
+            return True
+        if membership.status != "activa":
+            return False
+        days_left = (membership.end_date - today).days
+        return 0 <= days_left <= days_ahead
+
+    filtered = [m for m in memberships if _is_expired_or_expiring(m)]
+    return [MembershipRead.model_validate(m) for m in filtered]
+
+
+@router.post(
+    "/detect-expiring",
+    response_model=list[MembershipRead],
+    dependencies=[Depends(require_role("admin"))],
+)
+def detect_expiring_memberships(
+    days_ahead: int = _VENTANA_POR_VENCER_DIAS,
+    db: Session = Depends(get_db),
+) -> list[MembershipRead]:
+    """RF006: dispara `DetectExpiringMembershipsUseCase`. Solo `admin` --
+    ver docstring del modulo arriba.
+
+    Simplificacion documentada en DECISIONES.md: no existe
+    cron/scheduler en este proyecto; en un despliegue real esto correria
+    como un job diario, aqui es una accion manual."""
+    membership_repository = SqlAlchemyMembershipRepository(db)
+    client_repository = SqlAlchemyClientProfileRepository(db)
+    notification_repository = SqlAlchemyNotificationRepository(db)
+    notify_use_case = NotifyUserUseCase(notification_repository=notification_repository)
+
+    use_case = DetectExpiringMembershipsUseCase(
+        membership_repository=membership_repository,
+        client_repository=client_repository,
+        notify_use_case=notify_use_case,
+    )
+    affected = use_case.execute(days_ahead=days_ahead)
+
+    db.commit()
+    return [MembershipRead.model_validate(m) for m in affected]
 
 
 @router.get("/{membership_id}", response_model=MembershipRead)
