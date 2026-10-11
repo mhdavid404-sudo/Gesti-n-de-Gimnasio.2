@@ -55,6 +55,16 @@ depender de memorizar la cadena de FKs. `routine_exercises` (FK hacia
 necesitan entrada propia -- caen en cascada al truncar `routines`/
 `client_profiles`.
 
+`diet_plans` (modulo Dietas, Entrega 2) se agrega de forma explicita,
+aunque a diferencia de `exercises`/`routines` NO tiene ninguna columna
+`UNIQUE` (`name` admite duplicados) -- se agrega igual por el mismo
+criterio de documentacion ya usado en `client_profiles`/`routines` (que
+la dependencia quede explicita en el codigo sin depender de memorizar la
+cadena de FKs), no porque un segundo test fuera a colisionar sin ella.
+`diet_assignments` (FK hacia `diet_plans.id`/`client_profiles.id`, ambas
+`ON DELETE CASCADE`) NO necesita entrada propia -- cae en cascada al
+truncar `diet_plans`/`client_profiles`.
+
 Requiere una base de datos real corriendo y con las migraciones aplicadas
 antes de correr pytest:
 
@@ -94,7 +104,7 @@ def _clean_users_table() -> None:
         conn.execute(
             text(
                 "TRUNCATE TABLE users, client_profiles, membership_plans, memberships, "
-                "exercises, routines "
+                "exercises, routines, diet_plans "
                 "RESTART IDENTITY CASCADE"
             )
         )
@@ -103,7 +113,7 @@ def _clean_users_table() -> None:
         conn.execute(
             text(
                 "TRUNCATE TABLE users, client_profiles, membership_plans, memberships, "
-                "exercises, routines "
+                "exercises, routines, diet_plans "
                 "RESTART IDENTITY CASCADE"
             )
         )
