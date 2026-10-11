@@ -686,3 +686,25 @@ Registro de decisiones de arquitectura tomadas por Isai (revisor de diseño) dur
   - **Verificación de cierre:** `pytest backend/tests/test_notifications.py -v` → 7/7 PASA; `pytest backend/tests/ -v` completo → 43/43 PASA (36 previas + 7 nuevas), sin regresiones. Grep de `import`/`from` en `backend/src/domain/` confirma cero referencias a `sqlalchemy`, `fastapi`, `bcrypt` o `jwt` (las únicas coincidencias de texto son docstrings que mencionan esas palabras, no imports reales). Prueba manual con `httpx` dentro del contenedor `backend` (sin `curl` disponible en la imagen): se creó una membresía con `end_date` 5 días en el pasado, se corrió `POST /memberships/detect-expiring` como admin, y se confirmó tanto el cambio de `status` a `"vencida"` en la respuesta como la `Notification` tipo `membresia_vencida` generada para el `user_id` correcto vía `GET /notifications/users/{id}`. Tarea delimitada a backend — `frontend/` no se tocó.
 
 ---
+
+### 2026-10-11 — Módulo Vencimientos/Notificaciones: conexión de frontend y corrección del Topbar (RF006)
+
+- **Propuesta original:** conectar la zona "Resultados" del Dashboard (alertas de membresía, elementos recientes) a `GET /memberships/expiring`/`GET /notifications/users/{id}` reales, y agregar una acción manual de "revisar vencimientos ahora" ya que este stack no tiene scheduler real.
+
+- **Decisión:** aprobada y construida. Además se corrigió, en el mismo trabajo, un defecto real encontrado durante la verificación en vivo del módulo de Pagos: el `Topbar` mostraba siempre "Marisol Aragón / Administradora" sin importar qué usuario hubiera iniciado sesión de verdad (quedó así desde el rediseño de UX/UI de la Parte A, que trabajó con datos de ejemplo fijos porque el módulo de autenticación todavía no existía en ese momento).
+
+- **Por qué / detalle de cada sub-decisión:**
+  - **Topbar conectado a `useAuth().user` real**, con iniciales calculadas con el mismo criterio ya usado en `ClientDetailPage.tsx` (primeras letras de las primeras 2 palabras del nombre). Etiqueta de rol para `admin` elegida deliberadamente neutra ("Administración", no "Administrador"/"Administradora") porque ni `User` ni `AuthUser` tienen un campo de género — evita asumir uno sin dato real; `entrenador`/`cliente` no tienen esa ambigüedad y usan el nombre del rol tal cual.
+  - **Campana de notificaciones con panel desplegable**, no solo el badge: al abrir, lista título+mensaje de las notificaciones del usuario autenticado (`GET /notifications/users/{user.id}`); clic en una la marca leída de forma optimista (`POST /notifications/{id}/read`, revierte si falla) y actualiza el conteo del badge en el acto. Se decidió construir el panel completo en vez de solo el contador porque el costo adicional era bajo y cierra mejor el ciclo de RF006 ("notificar" implica poder leer la notificación, no solo saber que existe).
+  - **"Elementos recientes" del Dashboard también migrado** de `getNotificationsForUser(1)` (mock, hardcodeado al id 1) a `GET /notifications/users/{user.id}` real — mismo defecto de raíz que la campana (dato fijo sin relación al usuario de sesión), corregido en el mismo cambio por tratarse de la misma causa.
+  - **El criterio visual de "vencida" vs. "por vencer" en el Dashboard sigue siendo el de `frontend/src/utils/membership.ts`** (`isMembershipExpiringSoon`) aplicado sobre la respuesta de `GET /memberships/expiring` — no se introdujo un criterio nuevo en el componente, evitando dos fuentes de verdad para la misma regla.
+  - **Botón "Revisar vencimientos ahora"** en `MembershipsPage.tsx`, visible solo para `admin`, dispara `POST /memberships/detect-expiring` y refresca la tabla con el resultado real (incluye el caso honesto "todo al día, nada que actualizar" cuando no hay membresías afectadas).
+
+- **Alternativa aplicada:**
+  - `frontend/src/types/api.ts`: `ApiNotificationType`, `ApiNotification`.
+  - `frontend/src/components/layout/Topbar.tsx`/`.css`: reescrito, usuario real + panel desplegable de notificaciones.
+  - `frontend/src/pages/DashboardPage.tsx`: zona Resultados conectada a datos reales (alertas de membresía + notificaciones), con `LoadingState`/`ErrorMessage` propios que no bloquean el resto del panel si la sección falla.
+  - `frontend/src/pages/MembershipsPage.tsx`: botón "Revisar vencimientos ahora".
+  - **Verificación de cierre (en navegador, stack real):** login como admin real → Topbar muestra el nombre/rol correctos (no el mock) → alertas de membresía del Dashboard reflejan membresías vencidas reales → login como el cliente afectado → campana muestra 1 notificación no leída con el mensaje real, se marca como leída al hacer clic y el badge baja a 0 → de vuelta como admin, "Revisar vencimientos ahora" corre sin duplicar nada ("todo al día") porque esas membresías ya habían sido detectadas antes. Sin errores en consola del navegador en ningún paso (pestaña nueva, sin ruido de sesiones anteriores).
+
+---
