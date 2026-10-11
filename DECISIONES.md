@@ -789,3 +789,15 @@ Registro de decisiones de arquitectura tomadas por Isai (revisor de diseño) dur
   - **Verificación de cierre:** `pytest backend/tests/test_diets.py -v` → 8/8 PASA; `pytest backend/tests/ -v` completo → 61/61 PASA (53 previas + 8 nuevas), sin regresiones. Grep de `import`/`from` en `backend/src/domain/` confirma cero referencias a `sqlalchemy`/`fastapi`/`pydantic`. Tarea delimitada a backend — `frontend/` no se tocó.
 
 ---
+
+### 2026-10-11 — Módulo Dietas: conexión de frontend (RF009, RF012, RF013)
+
+- **Propuesta original:** conectar `DietsPage.tsx` (catálogo + asignaciones, hoy 100% mock) y la pestaña "Dieta" de `ClientDetailPage.tsx` a la API real, replicando exactamente el patrón ya usado en el módulo de Rutinas (mismo selector de cliente en vez de listado global, misma alta inline de catálogo, mismo control de cambio de estado).
+
+- **Decisión:** aprobada y construida.
+
+- **Nota de cierre:** el trabajo quedó interrumpido a medio terminar por un corte de conexión antes de completar la pestaña "Dieta" de `ClientDetailPage.tsx` (los imports y el resto de la pantalla ya estaban conectados; esa pestaña seguía llamando a `getDietAssignmentsForClient`/`findDietPlan` del mock). Se completó manualmente replicando línea por línea la misma estructura de estado/efectos/formulario ya usada por la pestaña "Rutina" del mismo archivo (fetch del historial, catálogo de planes, formulario de asignación con `EmptyState`), sin desviarse del patrón ya establecido.
+
+- **Alternativa aplicada:** `frontend/src/types/api.ts` (tipos de Dietas), `frontend/src/pages/DietsPage.tsx`/`.css` (reescrita completa), `frontend/src/pages/ClientDetailPage.tsx` (pestaña "Dieta" conectada). Verificado en navegador de punta a punta (stack real): alta de plan → alta de cliente → asignación desde el detalle → reflejada en `/dietas` (selector de cliente) y en la pestaña del detalle → cambio de estado a "Completada" vía `PATCH` reflejado en ambos lugares. Sin errores de consola en ningún paso.
+
+---
