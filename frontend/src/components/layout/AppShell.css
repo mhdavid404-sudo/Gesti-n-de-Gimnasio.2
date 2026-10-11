@@ -16,7 +16,12 @@
   display: flex;
   align-items: flex-start;
   gap: var(--space-4);
-  padding: 28px 32px 48px;
+  /* El padding inferior deja espacio de sobra para el selector de rol de
+     desarrollo (ver RoleSwitcher.css, `position: fixed; bottom: var(--space-4)`),
+     que de otro modo tapa el botón de acción principal de cualquier pantalla
+     cuyo contenido llegue hasta el fondo del viewport (ej. el submit de un
+     formulario largo) -- encontrado al probar el alta de cliente en vivo. */
+  padding: 28px 32px 96px;
 }
 
 .app-shell__content {
@@ -133,7 +138,7 @@
 
 @media (max-width: 900px) {
   .app-shell__body {
-    padding: 20px 16px 32px;
+    padding: 20px 16px 88px;
     gap: var(--space-3);
   }
 
