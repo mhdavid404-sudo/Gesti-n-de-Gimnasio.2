@@ -1,21 +1,37 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { ApiError } from '../api/client'
+import { useAuth } from '../hooks/useAuth'
 import './LoginPage.css'
 
 /**
- * Pantalla de Login — SOLO UI (Entrega 1).
- * No hay validación real ni conexión a backend: cualquier submit navega
- * directo al dashboard, tal como especifica el alcance de la entrega.
+ * Pantalla de Login — conectada al backend real (Entrega 2, RF001).
  */
 export function LoginPage() {
   const navigate = useNavigate()
+  const { login } = useAuth()
   const [email, setEmail] = useState('marisol@strongeraragon.mx')
   const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleSubmit = (event: FormEvent) => {
+  const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
-    navigate('/dashboard')
+    setError(null)
+    setIsSubmitting(true)
+    try {
+      await login(email, password)
+      navigate('/dashboard')
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message)
+      } else {
+        setError('No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.')
+      }
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -58,10 +74,7 @@ export function LoginPage() {
         <form className="login__card card" onSubmit={handleSubmit}>
           <span className="eyebrow">Acceso al sistema</span>
           <h1 className="login__title">Iniciar sesión</h1>
-          <p className="login__helper">
-            Prototipo de Entrega 1 — este formulario no valida credenciales todavía,
-            cualquier dato te lleva al panel.
-          </p>
+          <p className="login__helper">Ingresa con tu correo y contraseña registrados en el sistema.</p>
 
           <div className="login__field">
             <label className="field-label" htmlFor="email">
@@ -93,13 +106,19 @@ export function LoginPage() {
             />
           </div>
 
-          <button type="submit" className="btn btn-primary login__submit">
-            Entrar al panel
+          {error && (
+            <p className="field-error" role="alert">
+              {error}
+            </p>
+          )}
+
+          <button type="submit" className="btn btn-primary login__submit" disabled={isSubmitting}>
+            {isSubmitting ? 'Entrando…' : 'Entrar al panel'}
           </button>
 
           <p className="login__footnote">
-            El control de acceso por rol (Admin / Entrenador / Cliente) se activa en la
-            Entrega 2, cuando exista backend real.
+            El control de acceso por rol (Admin / Entrenador / Cliente) ya esta activo en el
+            backend.
           </p>
         </form>
       </section>

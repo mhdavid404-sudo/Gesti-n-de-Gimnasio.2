@@ -1,5 +1,7 @@
+import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
+import { useAuth } from './hooks/useAuth'
 import { ClientDetailPage } from './pages/ClientDetailPage'
 import { ClientFormPage } from './pages/ClientFormPage'
 import { ClientsListPage } from './pages/ClientsListPage'
@@ -11,13 +13,26 @@ import { MembershipsPage } from './pages/MembershipsPage'
 import { ProgressPage } from './pages/ProgressPage'
 import { RoutinesPage } from './pages/RoutinesPage'
 
+/** Redirige a `/login` si no hay sesión activa -- envuelve las rutas internas (`<AppShell />`). */
+function RequireAuth({ children }: { children: ReactNode }) {
+  const { isAuthenticated } = useAuth()
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  return children
+}
+
 function App() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
 
-      <Route element={<AppShell />}>
+      <Route
+        element={
+          <RequireAuth>
+            <AppShell />
+          </RequireAuth>
+        }
+      >
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/clientes" element={<ClientsListPage />} />
         <Route path="/clientes/nuevo" element={<ClientFormPage />} />
