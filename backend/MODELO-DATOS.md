@@ -1,9 +1,17 @@
-# MODELO-DATOS.md — SmartGym v2 (Entrega 1)
+# MODELO-DATOS.md — SmartGym v2 (Entrega 1 + backlog de Entrega 2)
 
 Tabla plana derivada 1:1 de las migraciones de Alembic
-(`src/infrastructure/migrations/versions/0001_initial_schema.py`) y de los
-modelos SQLAlchemy (`src/infrastructure/db/models/`). Pensada para que Leo
-(frontend) escriba sus tipos TypeScript sin tener que leer Python.
+(`src/infrastructure/migrations/versions/0001_initial_schema.py` y
+`0002_backlog_alineacion_modelo.py`) y de los modelos SQLAlchemy
+(`src/infrastructure/db/models/`). Pensada para que quien escriba el
+frontend pueda derivar sus tipos TypeScript sin tener que leer Python.
+
+**Actualizacion de Entrega 2 (2026-10-10):** la migracion `0002` agrega
+`membership_plans.benefits`, `exercises.equipment`,
+`routine_assignments.notes` y `diet_assignments.notes` -- resolucion del
+backlog de 11 inconsistencias registrado en `../DECISIONES.md`
+("Backlog de alineacion de modelo para Entrega 2" y su resolucion del
+2026-10-10). Las tablas abajo ya reflejan el esquema final.
 
 **Nota sobre el conteo de entidades:** `../DECISIONES.md` titula el modelo
 como "13 entidades" pero la lista que aprobo Isai enumera 14 (incluye
@@ -64,6 +72,7 @@ implementado, no divergente). Se agrego como campo unico, no como par
 | price | NUMERIC(10,2) | NOT NULL |
 | duration_days | INTEGER | NOT NULL |
 | description | TEXT | NULLABLE |
+| benefits | JSON | NOT NULL, DEFAULT '[]' (lista de texto libre, agregada en migracion 0002 -- backlog de Entrega 2) |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
 
 ## memberships
@@ -109,6 +118,7 @@ estructurado -- queda roto).
 | name | VARCHAR(150) | NOT NULL, UNIQUE |
 | muscle_group | VARCHAR(100) | NULLABLE |
 | description | TEXT | NULLABLE |
+| equipment | VARCHAR(100) | NULLABLE (agregada en migracion 0002 -- backlog de Entrega 2) |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
 
 ## routines
@@ -151,6 +161,7 @@ repeticiones de cada ejercicio dentro de una rutina.
 | assigned_by | INTEGER | NOT NULL, FK -> users.id (ON DELETE RESTRICT) |
 | assigned_date | DATE | NOT NULL |
 | status | VARCHAR(20) | NOT NULL, CHECK IN ('activa', 'completada', 'cancelada') |
+| notes | TEXT | NULLABLE (agregada en migracion 0002 -- backlog de Entrega 2) |
 
 ## diet_plans
 
@@ -177,6 +188,7 @@ entrenador o admin.
 | assigned_by | INTEGER | NOT NULL, FK -> users.id (ON DELETE RESTRICT) |
 | assigned_date | DATE | NOT NULL |
 | status | VARCHAR(20) | NOT NULL, CHECK IN ('activa', 'completada', 'cancelada') |
+| notes | TEXT | NULLABLE (agregada en migracion 0002 -- backlog de Entrega 2) |
 
 ## body_progress
 
@@ -245,6 +257,15 @@ Bitacora de eventos/errores del sistema (RF015).
 | `payments.status` | `completado` \| `pendiente` \| `rechazado` |
 | `routine_assignments.status` / `diet_assignments.status` | `activa` \| `completada` \| `cancelada` |
 | `notifications.type` | `membresia_vencida` \| `membresia_por_vencer` \| `pago_registrado` \| `rutina_asignada` \| `dieta_asignada` \| `sistema` |
+
+## Backlog de alineacion de modelo (resuelto en Entrega 2)
+
+Ver `../DECISIONES.md`, entrada "2026-10-10 -- Resolucion del backlog de
+alineacion de modelo (B0)" para el detalle completo de los 11 puntos. Las
+4 columnas nuevas (`membership_plans.benefits`, `exercises.equipment`,
+`routine_assignments.notes`, `diet_assignments.notes`) ya estan reflejadas
+en las tablas de arriba. Los otros 7 puntos no requirieron cambio de
+esquema -- la correccion fue unicamente en `frontend/src/types/models.ts`.
 
 ## Entrypoint FastAPI (para Royer)
 

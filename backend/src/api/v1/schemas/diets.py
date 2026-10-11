@@ -34,6 +34,7 @@ class DietAssignmentCreate(BaseModel):
     assigned_by: int
     assigned_date: date
     status: AssignmentStatus = "activa"
+    notes: str | None = None
 
 
 class DietAssignmentRead(BaseModel):
@@ -45,3 +46,4 @@ class DietAssignmentRead(BaseModel):
     assigned_by: int
     assigned_date: date
     status: AssignmentStatus
+    notes: str | None

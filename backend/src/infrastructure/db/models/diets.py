@@ -54,3 +54,6 @@ class DietAssignmentModel(Base):
     )
     assigned_date: Mapped[date] = mapped_column(Date, nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False)
+    # Backlog de alineacion de modelo (DECISIONES.md, 2026-10-10): nota
+    # libre del entrenador/admin al asignar, ya modelada en el frontend.
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)

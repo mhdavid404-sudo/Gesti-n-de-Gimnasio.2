@@ -247,7 +247,7 @@ export function ClientDetailPage() {
                         <StatusPill status={da.status} />
                       </div>
                       <p className="client-detail__diet-meta">
-                        {plan?.daily_calories ? `${plan.daily_calories} kcal / día` : 'Sin objetivo calórico definido'}{' '}
+                        {plan?.calories_target ? `${plan.calories_target} kcal / día` : 'Sin objetivo calórico definido'}{' '}
                         · asignado el {da.assigned_date}
                       </p>
                     </div>

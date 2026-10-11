@@ -22,6 +22,7 @@ def _plan_to_entity(model: MembershipPlanModel) -> MembershipPlan:
         price=model.price,
         duration_days=model.duration_days,
         description=model.description,
+        benefits=list(model.benefits or []),
         created_at=model.created_at,
     )
 
@@ -56,6 +57,7 @@ class SqlAlchemyMembershipPlanRepository(MembershipPlanRepository):
             price=plan.price,
             duration_days=plan.duration_days,
             description=plan.description,
+            benefits=list(plan.benefits),
         )
         self._session.add(model)
         self._session.flush()
@@ -69,6 +71,7 @@ class SqlAlchemyMembershipPlanRepository(MembershipPlanRepository):
         model.price = plan.price
         model.duration_days = plan.duration_days
         model.description = plan.description
+        model.benefits = list(plan.benefits)
         self._session.flush()
         return _plan_to_entity(model)
 

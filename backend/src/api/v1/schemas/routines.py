@@ -14,6 +14,7 @@ class ExerciseCreate(BaseModel):
     name: str = Field(min_length=1, max_length=150)
     muscle_group: str | None = Field(default=None, max_length=100)
     description: str | None = None
+    equipment: str | None = Field(default=None, max_length=100)
 
 
 class ExerciseRead(BaseModel):
@@ -23,6 +24,7 @@ class ExerciseRead(BaseModel):
     name: str
     muscle_group: str | None
     description: str | None
+    equipment: str | None
     created_at: datetime
 
 
@@ -70,6 +72,7 @@ class RoutineAssignmentCreate(BaseModel):
     assigned_by: int
     assigned_date: date
     status: AssignmentStatus = "activa"
+    notes: str | None = None
 
 
 class RoutineAssignmentRead(BaseModel):
@@ -81,3 +84,4 @@ class RoutineAssignmentRead(BaseModel):
     assigned_by: int
     assigned_date: date
     status: AssignmentStatus
+    notes: str | None

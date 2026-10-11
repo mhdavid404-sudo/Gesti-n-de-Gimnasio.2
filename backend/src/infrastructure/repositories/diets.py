@@ -30,6 +30,7 @@ def _assignment_to_entity(model: DietAssignmentModel) -> DietAssignment:
         assigned_by=model.assigned_by,
         assigned_date=model.assigned_date,
         status=model.status,
+        notes=model.notes,
     )
 
 
@@ -107,6 +108,7 @@ class SqlAlchemyDietAssignmentRepository(DietAssignmentRepository):
             assigned_by=assignment.assigned_by,
             assigned_date=assignment.assigned_date,
             status=assignment.status,
+            notes=assignment.notes,
         )
         self._session.add(model)
         self._session.flush()
@@ -117,6 +119,7 @@ class SqlAlchemyDietAssignmentRepository(DietAssignmentRepository):
         if model is None:
             raise ValueError(f"DietAssignment {assignment.id} no existe")
         model.status = assignment.status
+        model.notes = assignment.notes
         self._session.flush()
         return _assignment_to_entity(model)
 

@@ -16,6 +16,7 @@ class MembershipPlanCreate(BaseModel):
     price: Decimal = Field(gt=0)
     duration_days: int = Field(gt=0)
     description: str | None = None
+    benefits: list[str] = Field(default_factory=list)
 
 
 class MembershipPlanRead(BaseModel):
@@ -26,6 +27,7 @@ class MembershipPlanRead(BaseModel):
     price: Decimal
     duration_days: int
     description: str | None
+    benefits: list[str]
     created_at: datetime
 
 

@@ -45,9 +45,9 @@ export function DietsPage() {
               <span className="diet-card__name">{plan.name}</span>
               <p className="diet-card__description">{plan.description}</p>
               <div className="diet-card__calories">
-                {plan.daily_calories ? (
+                {plan.calories_target ? (
                   <>
-                    <strong>{plan.daily_calories}</strong> kcal / día
+                    <strong>{plan.calories_target}</strong> kcal / día
                   </>
                 ) : (
                   'Sin objetivo calórico fijo'

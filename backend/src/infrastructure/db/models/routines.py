@@ -36,6 +36,10 @@ class ExerciseModel(Base):
     name: Mapped[str] = mapped_column(String(150), unique=True, nullable=False)
     muscle_group: Mapped[str | None] = mapped_column(String(100), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Backlog de alineacion de modelo (DECISIONES.md, 2026-10-10): el
+    # frontend ya tenia `equipment` sin respaldo en el backend. Nullable:
+    # ejercicios de peso corporal (plancha, dominadas) no requieren equipo.
+    equipment: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -98,3 +102,6 @@ class RoutineAssignmentModel(Base):
     )
     assigned_date: Mapped[date] = mapped_column(Date, nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False)
+    # Backlog de alineacion de modelo (DECISIONES.md, 2026-10-10): nota
+    # libre del entrenador/admin al asignar, ya modelada en el frontend.
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -31,6 +31,7 @@ def _exercise_to_entity(model: ExerciseModel) -> Exercise:
         name=model.name,
         muscle_group=model.muscle_group,
         description=model.description,
+        equipment=model.equipment,
         created_at=model.created_at,
     )
 
@@ -66,6 +67,7 @@ def _assignment_to_entity(model: RoutineAssignmentModel) -> RoutineAssignment:
         assigned_by=model.assigned_by,
         assigned_date=model.assigned_date,
         status=model.status,
+        notes=model.notes,
     )
 
 
@@ -86,6 +88,7 @@ class SqlAlchemyExerciseRepository(ExerciseRepository):
             name=exercise.name,
             muscle_group=exercise.muscle_group,
             description=exercise.description,
+            equipment=exercise.equipment,
         )
         self._session.add(model)
         self._session.flush()
@@ -98,6 +101,7 @@ class SqlAlchemyExerciseRepository(ExerciseRepository):
         model.name = exercise.name
         model.muscle_group = exercise.muscle_group
         model.description = exercise.description
+        model.equipment = exercise.equipment
         self._session.flush()
         return _exercise_to_entity(model)
 
@@ -208,6 +212,7 @@ class SqlAlchemyRoutineAssignmentRepository(RoutineAssignmentRepository):
             assigned_by=assignment.assigned_by,
             assigned_date=assignment.assigned_date,
             status=assignment.status,
+            notes=assignment.notes,
         )
         self._session.add(model)
         self._session.flush()
@@ -218,6 +223,7 @@ class SqlAlchemyRoutineAssignmentRepository(RoutineAssignmentRepository):
         if model is None:
             raise ValueError(f"RoutineAssignment {assignment.id} no existe")
         model.status = assignment.status
+        model.notes = assignment.notes
         self._session.flush()
         return _assignment_to_entity(model)
 

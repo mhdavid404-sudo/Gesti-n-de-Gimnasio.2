@@ -6,7 +6,7 @@ correccion #2).
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -23,6 +23,9 @@ class MembershipPlan:
     price: Decimal
     duration_days: int
     description: str | None = None
+    # Backlog de alineacion de modelo (DECISIONES.md, 2026-10-10): lista
+    # de beneficios en texto libre, ya modelada en el frontend.
+    benefits: list[str] = field(default_factory=list)
     created_at: datetime | None = None
 
 

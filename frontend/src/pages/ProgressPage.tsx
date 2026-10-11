@@ -76,7 +76,7 @@ export function ProgressPage() {
               <StatNumber value={latest.weight_kg} suffix="kg" label="Peso actual" />
             </div>
           )}
-          {latest && (
+          {latest?.height_cm != null && (
             <div className="card">
               <StatNumber value={latest.height_cm} suffix="cm" label="Estatura registrada" />
             </div>

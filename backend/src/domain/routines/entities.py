@@ -21,6 +21,9 @@ class Exercise:
     name: str
     muscle_group: str | None = None
     description: str | None = None
+    # Backlog de alineacion de modelo (DECISIONES.md, 2026-10-10): equipo
+    # requerido, ya modelado en el frontend.
+    equipment: str | None = None
     created_at: datetime | None = None
 
 
@@ -72,3 +75,6 @@ class RoutineAssignment:
     assigned_by: int  # User.id
     assigned_date: date
     status: str  # uno de ESTADOS_ASIGNACION_VALIDOS
+    # Backlog de alineacion de modelo (DECISIONES.md, 2026-10-10): nota
+    # libre del entrenador/admin al asignar, ya modelada en el frontend.
+    notes: str | None = None

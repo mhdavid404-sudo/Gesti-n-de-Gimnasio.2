@@ -1,9 +1,11 @@
 /**
  * Modelo de datos del frontend — SmartGym v2 / Stronger Aragón
  *
- * Estos tipos reflejan 1:1 el modelo lógico de 13 entidades aprobado por
- * Isai en `DECISIONES.md` (raíz del repo, sección "2026-09-12 — Modelo de
- * datos y estructura hexagonal para Entrega 1").
+ * Estos tipos reflejan 1:1 el modelo lógico de 14 entidades aprobado en
+ * `DECISIONES.md` (raíz del repo, sección "2026-09-12 — Modelo de datos y
+ * estructura hexagonal para Entrega 1"), más la resolución del backlog de
+ * alineación de modelo de Entrega 2 (`DECISIONES.md`, entrada "2026-10-10 —
+ * Resolución del backlog de alineación de modelo (B0)").
  *
  * Reglas heredadas de esa decisión (NO cambiar sin actualizar DECISIONES.md):
  * - Los campos tipo `role` / `status` / `method` / `type` son VARCHAR + CHECK
@@ -15,6 +17,8 @@
  *   se implementa en Entrega 1 (la pantalla de Login es solo UI).
  * - `height_cm` vive en `BodyProgress`, NO en `ClientProfile` (punto menor
  *   confirmado en DECISIONES.md, no mover por criterio propio).
+ * - La nulabilidad de cada campo refleja la columna real del backend
+ *   (`NULLABLE` -> `| null` en TypeScript), no una relajación cosmética.
  *
  * En Entrega 2, cuando exista la API real, estos mismos tipos deberían poder
  * usarse casi sin cambios contra las respuestas del backend (swap de fuente
@@ -70,6 +74,7 @@ export interface User {
   role: UserRole
   is_active: boolean
   created_at: string // ISO datetime
+  updated_at: string // ISO datetime
 }
 
 // ---------------------------------------------------------------------------
@@ -82,12 +87,13 @@ export interface ClientProfile {
   user_id: number
   /** FK -> User.id (role = 'entrenador'). 1:n, nullable si aún no se asigna. */
   trainer_id: number | null
-  phone: string
-  birth_date: string // ISO date (YYYY-MM-DD)
-  address: string
+  phone: string | null
+  birth_date: string | null // ISO date (YYYY-MM-DD)
+  address: string | null
   /** Texto libre, ej. "María López - 555-1234" (ver DECISIONES.md, 2026-09-12). */
   emergency_contact: string | null
   created_at: string
+  updated_at: string
 }
 
 // ---------------------------------------------------------------------------
@@ -100,6 +106,7 @@ export interface MembershipPlan {
   price: number
   duration_days: number
   benefits: string[]
+  created_at: string
 }
 
 // ---------------------------------------------------------------------------
@@ -127,6 +134,7 @@ export interface Payment {
   status: PaymentStatus
   registered_by: number // FK -> User.id (quien lo registró)
   notes: string | null
+  created_at: string
 }
 
 // ---------------------------------------------------------------------------
@@ -135,9 +143,10 @@ export interface Payment {
 export interface Exercise {
   id: number
   name: string
-  muscle_group: string
+  muscle_group: string | null
   equipment: string | null
-  description: string
+  description: string | null
+  created_at: string
 }
 
 // ---------------------------------------------------------------------------
@@ -146,7 +155,7 @@ export interface Exercise {
 export interface Routine {
   id: number
   name: string
-  description: string
+  description: string | null
   created_by: number // FK -> User.id (invariante: debe ser entrenador o admin)
   created_at: string
 }
@@ -161,7 +170,12 @@ export interface RoutineExercise {
   sets: number
   reps: number
   rest_seconds: number
-  order: number
+  /**
+   * Nombre unificado con la columna real del backend (`order_index`) --
+   * ver DECISIONES.md, resolución del backlog de alineación de modelo
+   * (2026-10-10, punto 2). Antes se llamaba `order` solo en el frontend.
+   */
+  order_index: number
   notes: string | null
 }
 
@@ -185,7 +199,13 @@ export interface DietPlan {
   id: number
   name: string
   description: string
-  daily_calories: number | null
+  /**
+   * Nombre unificado con la columna real del backend (`calories_target`)
+   * -- ver DECISIONES.md, resolución del backlog de alineación de modelo
+   * (2026-10-10, punto 3). Antes se llamaba `daily_calories` solo en el
+   * frontend.
+   */
+  calories_target: number | null
   created_by: number // FK -> User.id
   created_at: string
 }
@@ -212,7 +232,7 @@ export interface BodyProgress {
   client_id: number // FK -> ClientProfile.id
   record_date: string // ISO date
   weight_kg: number
-  height_cm: number
+  height_cm: number | null
   body_fat_pct: number | null
   muscle_mass_kg: number | null
   chest_cm: number | null
@@ -229,6 +249,8 @@ export interface Notification {
   id: number
   user_id: number // FK -> User.id (destinatario)
   type: NotificationType
+  /** NOT NULL en el backend -- faltaba en el frontend (backlog de Entrega 2, punto 1). */
+  title: string
   message: string
   is_read: boolean
   created_at: string
@@ -241,8 +263,13 @@ export interface AuditLog {
   id: number
   user_id: number | null // FK -> User.id (null si fue el propio sistema)
   action: string
-  entity_type: string
-  entity_id: number | null
+  /** NULLABLE en el backend -- corregido de `string` no-nulo (backlog de Entrega 2, punto 11). */
+  entity_type: string | null
+  /**
+   * El backend persiste esto como VARCHAR(50), no como número -- corregido
+   * de `number | null` (backlog de Entrega 2, punto 6).
+   */
+  entity_id: string | null
   details: string | null
   created_at: string
 }
