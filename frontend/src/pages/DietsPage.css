@@ -6,7 +6,57 @@
 }
 
 .diets-page__section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
   margin-bottom: 16px;
+}
+
+.diets-page__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  margin-bottom: 14px;
+}
+
+.diets-page__inline-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: 14px;
+}
+
+.diets-page__form-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+}
+
+.diets-page__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.diets-page__form-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.diets-page__client-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.diets-page__own-client {
+  margin-bottom: 4px;
+}
+
+.diets-page__status-select {
+  width: auto;
+  padding: 6px 10px;
+  font-size: 13px;
 }
 
 .diets-page__catalog {
@@ -53,18 +103,6 @@
   gap: 16px;
 }
 
-.diets-page__assign-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.diets-page__assign-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
 .diets-page__table-wrap {
   padding: 8px 20px 4px;
   overflow-x: auto;
@@ -95,8 +133,8 @@
   }
 }
 
-@media (max-width: 480px) {
-  .diets-page__assign-row {
+@media (max-width: 700px) {
+  .diets-page__form-row {
     grid-template-columns: 1fr;
   }
 }

@@ -228,3 +228,53 @@ export interface RoutineAssignmentUpdatePayload {
   status?: ApiRoutineAssignmentStatus
   notes?: string | null
 }
+
+// ---------------------------------------------------------------------------
+// Dietas (RF009, RF012, RF013) — ver backend/src/api/v1/routers/diets.py
+//
+// A diferencia de Rutinas, un `DietPlan` NO tiene un catálogo de sub-items
+// equivalente a `Exercise`/`RoutineExercise` -- es un plan plano con
+// `calories_target` opcional, sin endpoint de "agregar item a un plan".
+// ---------------------------------------------------------------------------
+
+export interface ApiDietPlan {
+  id: number
+  name: string
+  /** Id del admin/entrenador autenticado que creó el plan -- el backend lo rellena solo, nunca se manda en el body. */
+  created_by: number
+  description: string | null
+  calories_target: number | null
+  created_at: string
+}
+
+export interface DietPlanCreatePayload {
+  name: string
+  description?: string | null
+  calories_target?: number | null
+}
+
+export type ApiDietAssignmentStatus = 'activa' | 'completada' | 'cancelada'
+
+export interface ApiDietAssignment {
+  id: number
+  diet_plan_id: number
+  client_id: number
+  /** Id del admin/entrenador autenticado que asignó el plan -- el backend lo rellena solo, nunca se manda en el body. */
+  assigned_by: number
+  assigned_date: string
+  status: ApiDietAssignmentStatus
+  notes: string | null
+}
+
+export interface DietAssignmentCreatePayload {
+  diet_plan_id: number
+  client_id: number
+  assigned_date: string
+  status?: ApiDietAssignmentStatus
+  notes?: string | null
+}
+
+export interface DietAssignmentUpdatePayload {
+  status?: ApiDietAssignmentStatus
+  notes?: string | null
+}

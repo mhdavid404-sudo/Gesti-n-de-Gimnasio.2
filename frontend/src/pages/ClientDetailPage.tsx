@@ -10,9 +10,11 @@ import { StatusPill } from '../components/ui/StatusPill'
 import { Tabs } from '../components/ui/Tabs'
 import { Toast } from '../components/ui/Toast'
 import { useAuth } from '../hooks/useAuth'
-import { findDietPlan, getBodyProgressForClient, getDietAssignmentsForClient } from '../mocks/data'
+import { getBodyProgressForClient } from '../mocks/data'
 import type {
   ApiClientProfile,
+  ApiDietAssignment,
+  ApiDietPlan,
   ApiExercise,
   ApiMembership,
   ApiMembershipPlan,
@@ -21,6 +23,7 @@ import type {
   ApiRoutine,
   ApiRoutineAssignment,
   ApiRoutineExercise,
+  DietAssignmentCreatePayload,
   MembershipCreatePayload,
   PaymentCreatePayload,
   RoutineAssignmentCreatePayload,
@@ -465,6 +468,120 @@ export function ClientDetailPage() {
     }
   }
 
+  // --- Dieta (RF009, módulo Dietas) ----------------------------------------
+  // Mismo patrón que "Rutina" arriba: historial real vía
+  // `GET /diets/assignments/clients/{id}` (ownership por dato ya resuelto en
+  // el backend). Un `DietPlan` no tiene sub-items (a diferencia de
+  // `Routine`/`RoutineExercise`), así que no hace falta cargar nada por
+  // asignación.
+  const [dietAssignments, setDietAssignments] = useState<ApiDietAssignment[] | null>(null)
+  const [dietAssignmentsLoading, setDietAssignmentsLoading] = useState(true)
+  const [dietAssignmentsError, setDietAssignmentsError] = useState<string | null>(null)
+
+  const loadDietAssignments = () => {
+    setDietAssignmentsLoading(true)
+    setDietAssignmentsError(null)
+    apiFetch<ApiDietAssignment[]>(`/diets/assignments/clients/${clientProfileId}`)
+      .then(setDietAssignments)
+      .catch((err: unknown) => {
+        if (err instanceof ApiError) {
+          if (err.isUnauthorized) {
+            logout()
+            navigate('/login', { replace: true })
+            return
+          }
+          if (err.status === 403) {
+            setDietAssignmentsError('No tienes permiso para ver las dietas de este cliente.')
+            return
+          }
+          setDietAssignmentsError(err.message)
+          return
+        }
+        setDietAssignmentsError('Ocurrió un error inesperado. Intenta de nuevo.')
+      })
+      .finally(() => setDietAssignmentsLoading(false))
+  }
+
+  useEffect(() => {
+    loadDietAssignments()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientProfileId])
+
+  // Catálogo de planes de dieta (para el selector del formulario de
+  // asignación) -- se carga una sola vez, mismo criterio que el catálogo de
+  // rutinas arriba.
+  const [dietPlansCatalog, setDietPlansCatalog] = useState<ApiDietPlan[]>([])
+
+  useEffect(() => {
+    apiFetch<ApiDietPlan[]>('/diets/plans').then(setDietPlansCatalog).catch(() => setDietPlansCatalog([]))
+  }, [])
+
+  const dietPlanById = useMemo(() => {
+    const map = new Map<number, ApiDietPlan>()
+    dietPlansCatalog.forEach((p) => map.set(p.id, p))
+    return map
+  }, [dietPlansCatalog])
+
+  // --- Asignar dieta (admin/entrenador dueño del cliente) -------------------
+  const [showAssignDietForm, setShowAssignDietForm] = useState(false)
+  const [assignDietPlanId, setAssignDietPlanId] = useState('')
+  const [assignDietDate, setAssignDietDate] = useState(todayIso)
+  const [assignDietServerError, setAssignDietServerError] = useState<string | null>(null)
+  const [isAssigningDiet, setIsAssigningDiet] = useState(false)
+  const [assignDietToast, setAssignDietToast] = useState<string | null>(null)
+
+  const resetAssignDietForm = () => {
+    setAssignDietPlanId('')
+    setAssignDietDate(todayIso())
+    setAssignDietServerError(null)
+  }
+
+  const handleAssignDietSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    setAssignDietServerError(null)
+
+    if (!assignDietPlanId) {
+      setAssignDietServerError('Selecciona un plan de dieta.')
+      return
+    }
+    if (!assignDietDate) {
+      setAssignDietServerError('Selecciona una fecha de asignación.')
+      return
+    }
+
+    const payload: DietAssignmentCreatePayload = {
+      diet_plan_id: Number(assignDietPlanId),
+      client_id: clientProfileId,
+      assigned_date: assignDietDate,
+    }
+
+    setIsAssigningDiet(true)
+    try {
+      const created = await apiFetch<ApiDietAssignment>('/diets/assignments', { method: 'POST', body: payload })
+      setDietAssignments((prev) => [created, ...(prev ?? [])])
+      setAssignDietToast('Dieta asignada correctamente.')
+      setShowAssignDietForm(false)
+      resetAssignDietForm()
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.isUnauthorized) {
+          logout()
+          navigate('/login', { replace: true })
+          return
+        }
+        if (err.status === 403) {
+          setAssignDietServerError('No tienes permiso para asignar dietas a este cliente.')
+          return
+        }
+        setAssignDietServerError(err.message)
+        return
+      }
+      setAssignDietServerError('Ocurrió un error inesperado. Intenta de nuevo.')
+    } finally {
+      setIsAssigningDiet(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="card">
@@ -488,13 +605,11 @@ export function ClientDetailPage() {
     )
   }
 
-  // TODO(módulos Rutinas/Dietas/Progreso, todavía no construidos): el resto
-  // de pestañas sigue usando los mismos datos mock de Entrega 1, indexados
-  // por `clientProfileId` de ejemplo -- no corresponden necesariamente al
-  // cliente real de esta pantalla. Se reemplazan por llamadas reales cuando
-  // cada módulo exista. "Membresía", "Pagos" y "Rutina" (arriba) ya usan la
-  // API real.
-  const dietAssignments = getDietAssignmentsForClient(clientProfileId)
+  // TODO(módulo Progreso, todavía no construido): esa pestaña sigue usando
+  // datos mock de Entrega 1, indexados por `clientProfileId` de ejemplo -- no
+  // corresponde necesariamente al cliente real de esta pantalla. Se reemplaza
+  // por llamadas reales cuando ese módulo exista. El resto de pestañas
+  // ("Membresía", "Pagos", "Rutina", "Dieta") ya usan la API real.
   const progress = getBodyProgressForClient(clientProfileId)
   const lastProgress = progress[progress.length - 1]
 
@@ -1026,32 +1141,133 @@ export function ClientDetailPage() {
             </div>
           )}
 
-          {/* TODO(módulo Dietas, todavía no construido): pestaña mock. */}
-          {activeTab === 'dieta' &&
-            (dietAssignments.length > 0 ? (
-              <div className="client-detail__stack">
-                {dietAssignments.map((da) => {
-                  const plan = findDietPlan(da.diet_plan_id)
-                  return (
-                    <div key={da.id} className="client-detail__sub-card">
-                      <div className="client-detail__sub-card-header">
-                        <div>
-                          <h3>{plan?.name}</h3>
-                          <p>{plan?.description}</p>
+          {/* Conectado a la API real (RF009) -- ver useEffect de
+              `dietAssignments`/`dietPlansCatalog` arriba. */}
+          {activeTab === 'dieta' && (
+            <div className="client-detail__routine-tab">
+              {assignDietToast && (
+                <Toast message={assignDietToast} onDismiss={() => setAssignDietToast(null)} />
+              )}
+
+              {dietAssignmentsLoading ? (
+                <LoadingState label="Cargando dietas…" variant="skeleton" rows={3} />
+              ) : dietAssignmentsError ? (
+                <ErrorMessage message={dietAssignmentsError} onRetry={loadDietAssignments} />
+              ) : (
+                <>
+                  {isStaff && showAssignDietForm && (
+                    <form className="client-detail__assign-form" onSubmit={handleAssignDietSubmit}>
+                      {assignDietServerError && (
+                        <ErrorMessage title="No se pudo asignar la dieta" message={assignDietServerError} />
+                      )}
+
+                      {dietPlansCatalog.length === 0 ? (
+                        <p className="client-detail__empty">
+                          Todavía no hay planes de dieta en el catálogo -- crea uno primero desde{' '}
+                          <Link to="/dietas">Dietas</Link>.
+                        </p>
+                      ) : (
+                        <div className="client-detail__assign-row">
+                          <div className="client-detail__field">
+                            <label className="field-label" htmlFor="assignDietSelect">
+                              Plan de dieta
+                            </label>
+                            <select
+                              id="assignDietSelect"
+                              className="input"
+                              value={assignDietPlanId}
+                              onChange={(e) => setAssignDietPlanId(e.target.value)}
+                              required
+                            >
+                              <option value="">Selecciona un plan</option>
+                              {dietPlansCatalog.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="client-detail__field">
+                            <label className="field-label" htmlFor="assignDietDate">
+                              Fecha de asignación
+                            </label>
+                            <input
+                              id="assignDietDate"
+                              type="date"
+                              className="input"
+                              value={assignDietDate}
+                              onChange={(e) => setAssignDietDate(e.target.value)}
+                              required
+                            />
+                          </div>
                         </div>
-                        <StatusPill status={da.status} />
+                      )}
+
+                      <div className="client-detail__assign-actions">
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => {
+                            setShowAssignDietForm(false)
+                            resetAssignDietForm()
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="submit"
+                          className="btn btn-primary"
+                          disabled={isAssigningDiet || dietPlansCatalog.length === 0}
+                        >
+                          {isAssigningDiet ? 'Asignando…' : 'Asignar dieta'}
+                        </button>
                       </div>
-                      <p className="client-detail__diet-meta">
-                        {plan?.calories_target ? `${plan.calories_target} kcal / día` : 'Sin objetivo calórico definido'}{' '}
-                        · asignado el {da.assigned_date}
-                      </p>
+                    </form>
+                  )}
+
+                  {!dietAssignments || dietAssignments.length === 0 ? (
+                    !showAssignDietForm && (
+                      <EmptyState
+                        title="Este cliente no tiene un plan de dieta asignado"
+                        description="Asigna un plan del catálogo para que empiece a seguirlo."
+                        actionLabel={isStaff ? 'Asignar dieta' : undefined}
+                        onAction={isStaff ? () => setShowAssignDietForm(true) : undefined}
+                      />
+                    )
+                  ) : (
+                    <div className="client-detail__stack">
+                      {isStaff && !showAssignDietForm && (
+                        <div className="client-detail__payments-toolbar">
+                          <button type="button" className="btn btn-ghost" onClick={() => setShowAssignDietForm(true)}>
+                            + Asignar dieta
+                          </button>
+                        </div>
+                      )}
+                      {dietAssignments.map((da) => {
+                        const plan = dietPlanById.get(da.diet_plan_id)
+                        return (
+                          <div key={da.id} className="client-detail__sub-card">
+                            <div className="client-detail__sub-card-header">
+                              <div>
+                                <h3>{plan?.name ?? `Plan #${da.diet_plan_id}`}</h3>
+                                <p>{plan?.description}</p>
+                              </div>
+                              <StatusPill status={da.status} />
+                            </div>
+                            <p className="client-detail__diet-meta">
+                              {plan?.calories_target ? `${plan.calories_target} kcal / día` : 'Sin objetivo calórico definido'}
+                              {' · '}asignado el {da.assigned_date}
+                              {da.notes ? ` · ${da.notes}` : ''}
+                            </p>
+                          </div>
+                        )
+                      })}
                     </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <p className="client-detail__empty">Este cliente no tiene un plan de dieta asignado.</p>
-            ))}
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {/* TODO(módulo Progreso corporal, todavía no construido): pestaña mock. */}
           {activeTab === 'progreso' &&
