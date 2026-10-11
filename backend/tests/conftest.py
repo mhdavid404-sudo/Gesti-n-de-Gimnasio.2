@@ -65,6 +65,13 @@ cadena de FKs), no porque un segundo test fuera a colisionar sin ella.
 `ON DELETE CASCADE`) NO necesita entrada propia -- cae en cascada al
 truncar `diet_plans`/`client_profiles`.
 
+`body_progress` (modulo Progreso Corporal, Entrega 2) NO se agrega de
+forma explicita a este TRUNCATE -- a diferencia de `diet_plans`, tiene
+una unica FK (`client_id -> client_profiles.id ON DELETE CASCADE`) y
+ninguna columna `UNIQUE`, asi que `TRUNCATE ... CASCADE` sobre
+`client_profiles` ya la arrastra automaticamente sin necesidad de
+listarla aparte.
+
 Requiere una base de datos real corriendo y con las migraciones aplicadas
 antes de correr pytest:
 
