@@ -126,3 +126,25 @@ export interface PaymentCreatePayload {
   status?: ApiPaymentStatus
   notes?: string | null
 }
+
+// ---------------------------------------------------------------------------
+// Notifications (RF006) — ver backend/src/api/v1/routers/notifications.py
+// ---------------------------------------------------------------------------
+
+export type ApiNotificationType =
+  | 'membresia_vencida'
+  | 'membresia_por_vencer'
+  | 'pago_registrado'
+  | 'rutina_asignada'
+  | 'dieta_asignada'
+  | 'sistema'
+
+export interface ApiNotification {
+  id: number
+  user_id: number
+  type: ApiNotificationType
+  title: string
+  message: string
+  is_read: boolean
+  created_at: string
+}

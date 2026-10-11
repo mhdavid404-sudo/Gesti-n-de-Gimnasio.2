@@ -80,6 +80,10 @@
   gap: 18px;
 }
 
+.topbar__bell-wrap {
+  position: relative;
+}
+
 .topbar__bell {
   position: relative;
   background: var(--color-surface);
@@ -116,6 +120,107 @@
   align-items: center;
   justify-content: center;
   padding: 0 4px;
+}
+
+.topbar__notif-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-dialog);
+  z-index: 20;
+  overflow: hidden;
+}
+
+.topbar__notif-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--color-border-soft);
+  font-size: 14px;
+}
+
+.topbar__notif-viewall {
+  background: transparent;
+  border: none;
+  color: var(--color-accent);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 0;
+}
+
+.topbar__notif-empty {
+  padding: 18px 14px;
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+}
+
+.topbar__notif-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.topbar__notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-border-soft);
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  transition: background-color 0.15s ease;
+}
+
+.topbar__notif-item:last-child {
+  border-bottom: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .topbar__notif-item:hover {
+    background: var(--color-surface-2);
+  }
+}
+
+.topbar__notif-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: transparent;
+}
+
+.topbar__notif-item[data-unread='true'] .topbar__notif-dot {
+  background: var(--color-info);
+}
+
+.topbar__notif-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.topbar__notif-text strong {
+  font-size: 13.5px;
+  color: var(--color-text);
+}
+
+.topbar__notif-item[data-unread='true'] .topbar__notif-text strong {
+  color: var(--color-text);
+  font-weight: 700;
 }
 
 .topbar__user {

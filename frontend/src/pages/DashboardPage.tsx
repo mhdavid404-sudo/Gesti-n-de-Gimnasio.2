@@ -1,12 +1,17 @@
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { ApiError, apiFetch } from '../api/client'
 import { useAppShell } from '../components/layout/AppShellContext'
 import { IconBarbell, IconBowl, IconCard, IconTrend, IconUsers } from '../components/layout/icons'
 import { useResultsPanel } from '../components/layout/useResultsPanel'
 import { EmptyState } from '../components/ui/EmptyState'
+import { ErrorMessage } from '../components/ui/ErrorMessage'
+import { LoadingState } from '../components/ui/LoadingState'
 import { QuickActionCard } from '../components/ui/QuickActionCard'
 import { StatNumber } from '../components/ui/StatNumber'
 import { StatusPill } from '../components/ui/StatusPill'
+import { useAuth } from '../hooks/useAuth'
 import {
   auditLogs,
   clients,
@@ -14,25 +19,16 @@ import {
   findMembershipByClient,
   findMembershipPlan,
   getBodyProgressForClient,
-  getClientDisplayName,
   getMembershipDisplayStatusMock,
-  getNotificationsForUser,
   getTrainerDisplayName,
-  memberships,
-  MOCK_TODAY,
   payments,
 } from '../mocks/data'
-import type { Membership, UserRole } from '../types/models'
-import { isMembershipExpiringSoon } from '../utils/membership'
+import type { ApiClientProfile, ApiMembership, ApiNotification } from '../types/api'
+import type { UserRole } from '../types/models'
+import { getMembershipDisplayStatus, isMembershipExpiringSoon } from '../utils/membership'
 import './DashboardPage.css'
 
 const CURRENT_MONTH_PREFIX = '2026-09'
-
-// `memberships`/`MOCK_TODAY` son constantes de módulo (nunca cambian de
-// referencia): calcular esto una sola vez aquí, en vez de en cada render de
-// DashboardPage, mantiene estable el array que llega a `useResultsPanel`.
-const EXPIRING_MEMBERSHIPS = memberships.filter((m) => isMembershipExpiringSoon(m, MOCK_TODAY))
-const EXPIRED_MEMBERSHIPS = memberships.filter((m) => m.status === 'vencida')
 
 /**
  * No existe todavía sesión real de cliente (la construye el proceso de
@@ -130,21 +126,132 @@ const ROLE_LABEL: Record<UserRole, string> = {
   cliente: 'Cliente (solo lectura)',
 }
 
+/** Ventana de aviso usada por `GET /memberships/expiring` -- igual a `EXPIRING_SOON_WINDOW_DAYS` de `utils/membership.ts`. */
+const DAYS_AHEAD = 7
+
 export function DashboardPage() {
   const { mockRole } = useAppShell()
+  const { user, logout } = useAuth()
+  const navigate = useNavigate()
 
   const activeClients = clients.filter((c) => c.is_active).length
   const monthIncome = payments
     .filter((p) => p.payment_date.startsWith(CURRENT_MONTH_PREFIX))
     .reduce((sum, p) => sum + p.amount, 0)
-  // "Por vencer" se calcula sobre end_date, no es un status persistido
-  // (ver DECISIONES.md, arbitraje del 2026-09-12).
-  const expiring = EXPIRING_MEMBERSHIPS
-  const expired = EXPIRED_MEMBERSHIPS
+
+  // --- Alertas de membresía reales (RF006) -------------------------------
+  // `GET /memberships/expiring` ya trae mezcladas las vencidas (status
+  // persistido) y las por vencer (activa, end_date dentro de la ventana) --
+  // se separan aquí con el mismo criterio de `utils/membership.ts` que ya
+  // usa el resto del proyecto, nunca un criterio nuevo inventado aquí.
+  const [expiringMemberships, setExpiringMemberships] = useState<ApiMembership[] | null>(null)
+  const [expiringLoading, setExpiringLoading] = useState(true)
+  const [expiringError, setExpiringError] = useState<string | null>(null)
+
+  // Mapa en memoria cliente -> nombre, mismo patrón ya usado por
+  // `MembershipsPage.tsx` (sin N+1): admin/entrenador cargan `GET /clients`
+  // completo (ya filtrado por ownership en el backend); `cliente` no tiene
+  // acceso a esa lista (403), así que usa `GET /clients/me`.
+  const [alertClients, setAlertClients] = useState<ApiClientProfile[] | null>(null)
+  const [alertClientsLoading, setAlertClientsLoading] = useState(true)
+  const [alertClientsError, setAlertClientsError] = useState<string | null>(null)
+
+  const [recentNotifications, setRecentNotifications] = useState<ApiNotification[] | null>(null)
+  const [notificationsLoading, setNotificationsLoading] = useState(true)
+
+  const handleSectionError = (err: unknown, onOther: (message: string) => void) => {
+    if (err instanceof ApiError) {
+      if (err.isUnauthorized) {
+        logout()
+        navigate('/login', { replace: true })
+        return
+      }
+      onOther(err.message)
+      return
+    }
+    onOther('Ocurrió un error inesperado. Intenta de nuevo.')
+  }
+
+  const loadExpiring = () => {
+    setExpiringLoading(true)
+    setExpiringError(null)
+    apiFetch<ApiMembership[]>(`/memberships/expiring?days_ahead=${DAYS_AHEAD}`)
+      .then(setExpiringMemberships)
+      .catch((err: unknown) => handleSectionError(err, setExpiringError))
+      .finally(() => setExpiringLoading(false))
+  }
+
+  const loadAlertClients = () => {
+    setAlertClientsLoading(true)
+    setAlertClientsError(null)
+    const request =
+      user?.role === 'cliente'
+        ? apiFetch<ApiClientProfile>('/clients/me').then((profile) => [profile])
+        : apiFetch<ApiClientProfile[]>('/clients')
+    request
+      .then(setAlertClients)
+      .catch((err: unknown) => handleSectionError(err, setAlertClientsError))
+      .finally(() => setAlertClientsLoading(false))
+  }
+
+  useEffect(() => {
+    loadExpiring()
+    loadAlertClients()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    if (!user) {
+      setRecentNotifications([])
+      setNotificationsLoading(false)
+      return
+    }
+    setNotificationsLoading(true)
+    apiFetch<ApiNotification[]>(`/notifications/users/${user.id}`)
+      .then(setRecentNotifications)
+      .catch(() => setRecentNotifications([]))
+      .finally(() => setNotificationsLoading(false))
+  }, [user])
+
+  const clientById = useMemo(() => {
+    const map = new Map<number, ApiClientProfile>()
+    alertClients?.forEach((c) => map.set(c.id, c))
+    return map
+  }, [alertClients])
+
+  const expiringSoon = (expiringMemberships ?? []).filter((m) => isMembershipExpiringSoon(m))
+  const expiredReal = (expiringMemberships ?? []).filter((m) => m.status === 'vencida')
 
   useResultsPanel(
-    () => <ResultsContent role={mockRole} expiring={expiring} expired={expired} />,
-    [mockRole, expiring, expired],
+    () => (
+      <ResultsContent
+        role={mockRole}
+        expiringSoon={expiringSoon}
+        expired={expiredReal}
+        expiringLoading={expiringLoading}
+        expiringError={expiringError}
+        onRetryExpiring={() => {
+          loadExpiring()
+          loadAlertClients()
+        }}
+        clientById={clientById}
+        clientsLoading={alertClientsLoading}
+        clientsError={alertClientsError}
+        recentNotifications={recentNotifications ?? []}
+        notificationsLoading={notificationsLoading}
+      />
+    ),
+    [
+      mockRole,
+      expiringMemberships,
+      expiringLoading,
+      expiringError,
+      clientById,
+      alertClientsLoading,
+      alertClientsError,
+      recentNotifications,
+      notificationsLoading,
+    ],
   )
 
   const actions = ACTIONS_BY_ROLE[mockRole]
@@ -174,10 +281,18 @@ export function DashboardPage() {
             <StatNumber value={`$${monthIncome.toLocaleString('es-MX')}`} label="Ingresos de septiembre" />
           </div>
           <div className="card dashboard__stat-card">
-            <StatNumber value={expiring.length} label="Membresías por vencer" tone="warning" />
+            <StatNumber
+              value={expiringLoading ? '…' : expiringError ? '—' : expiringSoon.length}
+              label="Membresías por vencer"
+              tone="warning"
+            />
           </div>
           <div className="card dashboard__stat-card">
-            <StatNumber value={expired.length} label="Membresías vencidas" tone="danger" />
+            <StatNumber
+              value={expiringLoading ? '…' : expiringError ? '—' : expiredReal.length}
+              label="Membresías vencidas"
+              tone="danger"
+            />
           </div>
         </div>
       </div>
@@ -192,12 +307,28 @@ export function DashboardPage() {
  */
 function ResultsContent({
   role,
-  expiring,
+  expiringSoon,
   expired,
+  expiringLoading,
+  expiringError,
+  onRetryExpiring,
+  clientById,
+  clientsLoading,
+  clientsError,
+  recentNotifications,
+  notificationsLoading,
 }: {
   role: UserRole
-  expiring: Membership[]
-  expired: Membership[]
+  expiringSoon: ApiMembership[]
+  expired: ApiMembership[]
+  expiringLoading: boolean
+  expiringError: string | null
+  onRetryExpiring: () => void
+  clientById: Map<number, ApiClientProfile>
+  clientsLoading: boolean
+  clientsError: string | null
+  recentNotifications: ApiNotification[]
+  notificationsLoading: boolean
 }) {
   if (role === 'cliente') {
     const profile = findClientProfile(DEMO_CLIENT_ID)
@@ -241,8 +372,12 @@ function ResultsContent({
     )
   }
 
-  const attentionList = [...expired, ...expiring].sort((a, b) => a.end_date.localeCompare(b.end_date)).slice(0, 5)
-  const recentNotifications = getNotificationsForUser(1).slice(0, 4)
+  const attentionList = [...expired, ...expiringSoon]
+    .sort((a, b) => a.end_date.localeCompare(b.end_date))
+    .slice(0, 5)
+  const sectionLoading = expiringLoading || clientsLoading
+  const sectionError = expiringError ?? clientsError
+  const recentForList = recentNotifications.slice(0, 4)
   const lastAction = [...auditLogs].sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
 
   return (
@@ -254,16 +389,20 @@ function ResultsContent({
             Ver todas
           </Link>
         </div>
-        {attentionList.length === 0 ? (
+        {sectionLoading ? (
+          <LoadingState label="Cargando alertas…" />
+        ) : sectionError ? (
+          <ErrorMessage message={sectionError} onRetry={onRetryExpiring} />
+        ) : attentionList.length === 0 ? (
           <EmptyState compact title="Sin pendientes" description="No hay membresías vencidas ni por vencer." />
         ) : (
           <ul className="dashboard-results__list">
             {attentionList.map((m) => (
               <li key={m.id} className="dashboard-results__item">
                 <Link to={`/clientes/${m.client_id}`} className="dashboard-results__item-name">
-                  {getClientDisplayName(m.client_id)}
+                  {clientById.get(m.client_id)?.full_name ?? 'Cliente no disponible'}
                 </Link>
-                <StatusPill status={getMembershipDisplayStatusMock(m)} />
+                <StatusPill status={getMembershipDisplayStatus(m)} />
               </li>
             ))}
           </ul>
@@ -272,11 +411,13 @@ function ResultsContent({
 
       <section className="dashboard-results__section">
         <h3 className="dashboard-results__heading">Elementos recientes</h3>
-        {recentNotifications.length === 0 ? (
+        {notificationsLoading ? (
+          <LoadingState label="Cargando notificaciones…" />
+        ) : recentForList.length === 0 ? (
           <EmptyState compact title="Sin notificaciones" />
         ) : (
           <ul className="dashboard-results__notifications">
-            {recentNotifications.map((n) => (
+            {recentForList.map((n) => (
               <li key={n.id} className="dashboard-results__notification" data-unread={!n.is_read}>
                 <span className="dashboard-results__notification-dot" />
                 <div>

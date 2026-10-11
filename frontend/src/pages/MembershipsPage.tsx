@@ -219,9 +219,46 @@ export function MembershipsPage() {
   const tableLoading = membershipsLoading || clientsLoading || plansLoading
   const tableError = membershipsError ?? clientsError ?? plansError
 
+  // --- Revisar vencimientos ahora (RF006, solo admin) --------------------
+  // No hay scheduler real en este stack (ver DECISIONES.md, módulo
+  // Vencimientos/Notificaciones) -- `DetectExpiringMembershipsUseCase` se
+  // dispara manualmente desde aquí en vez de correr como job diario.
+  const [isDetecting, setIsDetecting] = useState(false)
+  const [detectToast, setDetectToast] = useState<string | null>(null)
+  const [detectError, setDetectError] = useState<string | null>(null)
+
+  const handleDetectExpiring = async () => {
+    setIsDetecting(true)
+    setDetectError(null)
+    try {
+      const affected = await apiFetch<ApiMembership[]>('/memberships/detect-expiring', { method: 'POST' })
+      setDetectToast(
+        affected.length === 0
+          ? 'Todo al día, nada que actualizar.'
+          : `${affected.length} membresía${affected.length === 1 ? '' : 's'} actualizada${affected.length === 1 ? '' : 's'}.`,
+      )
+      loadMemberships()
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.isUnauthorized) {
+          logout()
+          navigate('/login', { replace: true })
+          return
+        }
+        setDetectError(err.message)
+        return
+      }
+      setDetectError('Ocurrió un error inesperado. Intenta de nuevo.')
+    } finally {
+      setIsDetecting(false)
+    }
+  }
+
   return (
     <div className="memberships-page">
       {planToast && <Toast message={planToast} onDismiss={() => setPlanToast(null)} />}
+      {detectToast && <Toast message={detectToast} onDismiss={() => setDetectToast(null)} />}
+      {detectError && <Toast message={detectError} tone="danger" onDismiss={() => setDetectError(null)} />}
 
       <section>
         <div className="memberships-page__section-header">
@@ -400,6 +437,16 @@ export function MembershipsPage() {
       <section>
         <div className="memberships-page__section-header">
           <h2 className="section-title">Membresías activas</h2>
+          {isAdmin && (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={handleDetectExpiring}
+              disabled={isDetecting}
+            >
+              {isDetecting ? 'Revisando…' : 'Revisar vencimientos ahora'}
+            </button>
+          )}
         </div>
 
         {tableLoading ? (
