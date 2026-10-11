@@ -632,3 +632,24 @@ Registro de decisiones de arquitectura tomadas por Isai (revisor de diseño) dur
   - **Verificación de cierre:** `pytest backend/tests/test_payments.py -v` → 7/7 PASA; `pytest backend/tests/ -v` completo → 36/36 PASA (29 previas + 7 nuevas), sin regresiones. Grep de `import`/`from` en `backend/src/domain/` confirma cero referencias a `sqlalchemy`, `fastapi`, `bcrypt` o `jwt`. Tarea delimitada a backend — `frontend/` no se tocó; la conexión de pantallas a estos endpoints queda para un trabajo posterior.
 
 ---
+
+### 2026-10-11 — Módulo Pagos: conexión de frontend y cierre del ciclo de alta de cliente (RF005)
+
+- **Propuesta original:** conectar la pestaña "Pagos" de `ClientDetailPage.tsx` a la API real, y — más importante — cerrar el ciclo que quedó pendiente explícitamente desde el módulo Clientes y otra vez desde Membresías: la sección "Membresía y pago inicial" de `ClientFormPage.tsx`, con el hint "todavía no conectado a un backend real", ahora que ambos módulos (Membresías y Pagos) ya existen.
+
+- **Decisión:** aprobada y construida.
+
+- **Por qué / detalle de cada sub-decisión:**
+  - **Pestaña "Pagos" depende de que el cliente ya tenga membresía.** RF005 liga el pago a una membresía (`Payment.membership_id`), así que si el cliente no tiene ninguna, la pestaña muestra un `EmptyState` que dirige a la pestaña "Membresía" en vez de simular un estado vacío de pagos sin explicar la causa real.
+  - **El plan en `ClientFormPage.tsx` es explícitamente opcional.** Se agregó una opción "Sin membresía por ahora (asignar después)", preseleccionada por default — antes el primer plan mock quedaba preseleccionado de fábrica, lo cual habría forzado una asignación no solicitada ahora que la sección sí persiste de verdad. El hint de la sección se reescribió para decir esto explícitamente ("opcional... si no eliges un plan, el cliente se registra sin membresía").
+  - **Encadenamiento de 3 llamadas (`POST /clients` → `POST /memberships` → `POST /payments`) desde el frontend, sin una transacción atómica de backend que las una.** Se decidió así porque cada módulo ya expone su propio endpoint bien delimitado (alcance de cada entrega anterior) y un caso de uso compuesto en el backend habría mezclado las fronteras de los tres módulos de dominio (Users/Clients, Memberships, Payments) solo para este único flujo de UI. El costo de esta decisión es que el paso 1 (alta de cliente), si tiene éxito, nunca se revierte automáticamente si el 2 o el 3 fallan después.
+  - **Mensaje de cierre honesto sobre fallos parciales.** Si el cliente se crea pero la membresía o el pago fallan, el aviso final no dice "ocurrió un error" de forma genérica (induciría a pensar que no se guardó nada) ni "todo salió bien" — construye el mensaje de forma incremental según qué pasos realmente se completaron, y dirige al admin a terminar manualmente lo que falte desde el detalle del cliente (pestaña Membresía o Pagos, según el paso que haya fallado).
+  - **`addDaysIso` centralizada en `frontend/src/utils/membership.ts`.** Vivía duplicada en `ClientDetailPage.tsx` (para calcular `end_date` al asignar membresía desde el detalle); ahora también la usa `ClientFormPage.tsx` para el mismo cálculo al elegir un plan en el alta combinada — un solo lugar para la fórmula `fecha_inicio + duration_days`.
+
+- **Alternativa aplicada:**
+  - `frontend/src/types/api.ts`: `ApiPaymentMethod`, `ApiPaymentStatus`, `ApiPayment`, `PaymentCreatePayload` (mismo patrón que los tipos de Membresías; `amount` tipado `string` porque el backend serializa el `Decimal` así, igual que `MembershipPlanRead.price`).
+  - `frontend/src/pages/ClientDetailPage.tsx`/`.css`: pestaña "Pagos" conectada (historial real + alta de pago solo para `admin`, con el mismo patrón de validación en línea del resto del proyecto).
+  - `frontend/src/pages/ClientFormPage.tsx`: sección de membresía/pago conectada completa, selector de plan alimentado por `GET /membership-plans` real (ya no mock), opción "sin membresía" explícita, manejo de fallo parcial como se describe arriba.
+  - **Verificación de cierre (en navegador, stack real vía `docker compose`):** alta de cliente CON plan (VIP) → confirmado que se crearon los 3 registros reales (cliente, membresía activa, pago) y que el aviso de éxito los menciona los tres; alta de cliente SIN plan → confirmado que no se intenta crear membresía/pago de más; pago adicional registrado desde la pestaña "Pagos" de un cliente con historial existente → reflejado correctamente en la tabla. Sin errores en consola del navegador en ningún caso (pestaña nueva, sin ruido de ejecuciones anteriores).
+
+---
