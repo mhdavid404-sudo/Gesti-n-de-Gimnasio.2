@@ -436,7 +436,7 @@ export function MembershipsPage() {
 
       <section>
         <div className="memberships-page__section-header">
-          <h2 className="section-title">Membresías activas</h2>
+          <h2 className="section-title">{user?.role === 'cliente' ? 'Mi membresía' : 'Membresías activas'}</h2>
           {isAdmin && (
             <button
               type="button"
@@ -465,8 +465,12 @@ export function MembershipsPage() {
         ) : !memberships || memberships.length === 0 ? (
           <div className="card">
             <EmptyState
-              title="Todavía no hay membresías asignadas"
-              description="Asigna la primera membresía desde el detalle de un cliente."
+              title={user?.role === 'cliente' ? 'Todavía no tienes una membresía' : 'Todavía no hay membresías asignadas'}
+              description={
+                user?.role === 'cliente'
+                  ? 'Acércate a recepción para activar tu membresía.'
+                  : 'Asigna la primera membresía desde el detalle de un cliente.'
+              }
             />
           </div>
         ) : (
@@ -474,12 +478,16 @@ export function MembershipsPage() {
             <table className="memberships-page__table">
               <thead>
                 <tr>
-                  <th>Cliente</th>
+                  {/* Para el propio cliente, la columna "Cliente" y el link
+                      "Ver cliente" son redundantes -- la fila siempre es él
+                      mismo (RF013, mismo criterio ya aplicado al resto del
+                      panel). */}
+                  {user?.role !== 'cliente' && <th>Cliente</th>}
                   <th>Plan</th>
                   <th>Inicio</th>
                   <th>Vence</th>
                   <th>Estado</th>
-                  <th />
+                  {user?.role !== 'cliente' && <th />}
                 </tr>
               </thead>
               <tbody>
@@ -488,18 +496,20 @@ export function MembershipsPage() {
                   const plan = planById.get(m.plan_id)
                   return (
                     <tr key={m.id}>
-                      <td>{client?.full_name ?? 'Cliente no disponible'}</td>
+                      {user?.role !== 'cliente' && <td>{client?.full_name ?? 'Cliente no disponible'}</td>}
                       <td>{plan?.name ?? 'Plan no disponible'}</td>
                       <td>{m.start_date}</td>
                       <td>{m.end_date}</td>
                       <td>
                         <StatusPill status={getMembershipDisplayStatus(m)} />
                       </td>
-                      <td>
-                        <Link to={`/clientes/${m.client_id}`} className="btn btn-ghost memberships-page__view">
-                          Ver cliente
-                        </Link>
-                      </td>
+                      {user?.role !== 'cliente' && (
+                        <td>
+                          <Link to={`/clientes/${m.client_id}`} className="btn btn-ghost memberships-page__view">
+                            Ver cliente
+                          </Link>
+                        </td>
+                      )}
                     </tr>
                   )
                 })}

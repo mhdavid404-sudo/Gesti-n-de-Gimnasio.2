@@ -12,33 +12,13 @@ import { QuickActionCard } from '../components/ui/QuickActionCard'
 import { StatNumber } from '../components/ui/StatNumber'
 import { StatusPill } from '../components/ui/StatusPill'
 import { useAuth } from '../hooks/useAuth'
-import {
-  auditLogs,
-  clients,
-  findClientProfile,
-  findMembershipByClient,
-  findMembershipPlan,
-  getBodyProgressForClient,
-  getMembershipDisplayStatusMock,
-  getTrainerDisplayName,
-  payments,
-} from '../mocks/data'
-import type { ApiClientProfile, ApiMembership, ApiNotification } from '../types/api'
+import { auditLogs, clients, payments } from '../mocks/data'
+import type { ApiBodyProgress, ApiClientProfile, ApiMembership, ApiMembershipPlan, ApiNotification } from '../types/api'
 import type { UserRole } from '../types/models'
-import { getMembershipDisplayStatus, isMembershipExpiringSoon } from '../utils/membership'
+import { getMembershipDisplayStatus, isMembershipExpiringSoon, pickCurrentMembership } from '../utils/membership'
 import './DashboardPage.css'
 
 const CURRENT_MONTH_PREFIX = '2026-09'
-
-/**
- * No existe todavía sesión real de cliente (la construye el proceso de
- * autenticación en paralelo) — para demostrar "resumen del cliente actual"
- * en la zona Resultados cuando el rol mock es "cliente", se fija este id
- * de ejemplo (Karla Jiménez, ya tiene membresía/rutina/dieta/progreso
- * completos en mocks/data.ts). Punto de integración: reemplazar por el
- * client_id real de la sesión.
- */
-const DEMO_CLIENT_ID = 100
 
 interface QuickAction {
   to: string
@@ -222,6 +202,53 @@ export function DashboardPage() {
   const expiringSoon = (expiringMemberships ?? []).filter((m) => isMembershipExpiringSoon(m))
   const expiredReal = (expiringMemberships ?? []).filter((m) => m.status === 'vencida')
 
+  // --- Resumen propio del cliente (RF011/RF013) --------------------------
+  // `alertClients` ya trae el perfil propio cuando `user.role === 'cliente'`
+  // (ver `loadAlertClients` arriba, usa `GET /clients/me`) -- se reusa en
+  // vez de pedirlo otra vez. Si quien previsualiza "Cliente" con el switch
+  // de desarrollo es en realidad un admin/entrenador, no hay perfil propio
+  // que mostrar (esa cuenta no es un cliente real) y las secciones de abajo
+  // lo dicen explícitamente en vez de mostrar datos inventados.
+  const ownProfile = user?.role === 'cliente' ? (alertClients?.[0] ?? null) : null
+
+  const [ownMembership, setOwnMembership] = useState<ApiMembership | null>(null)
+  const [ownPlan, setOwnPlan] = useState<ApiMembershipPlan | null>(null)
+  const [ownMembershipLoading, setOwnMembershipLoading] = useState(false)
+  const [ownProgress, setOwnProgress] = useState<ApiBodyProgress[] | null>(null)
+  const [ownProgressLoading, setOwnProgressLoading] = useState(false)
+
+  useEffect(() => {
+    if (!ownProfile) {
+      setOwnMembership(null)
+      setOwnPlan(null)
+      setOwnProgress(null)
+      return
+    }
+
+    setOwnMembershipLoading(true)
+    Promise.all([
+      apiFetch<ApiMembership[]>('/memberships'),
+      apiFetch<ApiMembershipPlan[]>('/membership-plans'),
+    ])
+      .then(([memberships, plans]) => {
+        const current = pickCurrentMembership(memberships) ?? null
+        setOwnMembership(current)
+        setOwnPlan(current ? (plans.find((p) => p.id === current.plan_id) ?? null) : null)
+      })
+      .catch(() => {
+        setOwnMembership(null)
+        setOwnPlan(null)
+      })
+      .finally(() => setOwnMembershipLoading(false))
+
+    setOwnProgressLoading(true)
+    apiFetch<ApiBodyProgress[]>(`/progress/clients/${ownProfile.id}`)
+      .then(setOwnProgress)
+      .catch(() => setOwnProgress([]))
+      .finally(() => setOwnProgressLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownProfile?.id])
+
   useResultsPanel(
     () => (
       <ResultsContent
@@ -239,6 +266,12 @@ export function DashboardPage() {
         clientsError={alertClientsError}
         recentNotifications={recentNotifications ?? []}
         notificationsLoading={notificationsLoading}
+        ownProfile={ownProfile}
+        ownMembership={ownMembership}
+        ownPlan={ownPlan}
+        ownMembershipLoading={ownMembershipLoading}
+        ownProgress={ownProgress}
+        ownProgressLoading={ownProgressLoading}
       />
     ),
     [
@@ -251,6 +284,12 @@ export function DashboardPage() {
       alertClientsError,
       recentNotifications,
       notificationsLoading,
+      ownProfile,
+      ownMembership,
+      ownPlan,
+      ownMembershipLoading,
+      ownProgress,
+      ownProgressLoading,
     ],
   )
 
@@ -271,31 +310,36 @@ export function DashboardPage() {
         ))}
       </div>
 
-      <div className="dashboard__secondary">
-        <span className="eyebrow">En números</span>
-        <div className="dashboard__stats">
-          <div className="card dashboard__stat-card">
-            <StatNumber value={activeClients} label="Clientes activos" />
-          </div>
-          <div className="card dashboard__stat-card">
-            <StatNumber value={`$${monthIncome.toLocaleString('es-MX')}`} label="Ingresos de septiembre" />
-          </div>
-          <div className="card dashboard__stat-card">
-            <StatNumber
-              value={expiringLoading ? '…' : expiringError ? '—' : expiringSoon.length}
-              label="Membresías por vencer"
-              tone="warning"
-            />
-          </div>
-          <div className="card dashboard__stat-card">
-            <StatNumber
-              value={expiringLoading ? '…' : expiringError ? '—' : expiredReal.length}
-              label="Membresías vencidas"
-              tone="danger"
-            />
+      {/* RF013: el cliente consulta SU PROPIA información, nunca métricas de
+          negocio del gimnasio completo (clientes activos, ingresos del mes,
+          etc.) -- esta sección es exclusiva de admin/entrenador. */}
+      {mockRole !== 'cliente' && (
+        <div className="dashboard__secondary">
+          <span className="eyebrow">En números</span>
+          <div className="dashboard__stats">
+            <div className="card dashboard__stat-card">
+              <StatNumber value={activeClients} label="Clientes activos" />
+            </div>
+            <div className="card dashboard__stat-card">
+              <StatNumber value={`$${monthIncome.toLocaleString('es-MX')}`} label="Ingresos de septiembre" />
+            </div>
+            <div className="card dashboard__stat-card">
+              <StatNumber
+                value={expiringLoading ? '…' : expiringError ? '—' : expiringSoon.length}
+                label="Membresías por vencer"
+                tone="warning"
+              />
+            </div>
+            <div className="card dashboard__stat-card">
+              <StatNumber
+                value={expiringLoading ? '…' : expiringError ? '—' : expiredReal.length}
+                label="Membresías vencidas"
+                tone="danger"
+              />
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -317,6 +361,12 @@ function ResultsContent({
   clientsError,
   recentNotifications,
   notificationsLoading,
+  ownProfile,
+  ownMembership,
+  ownPlan,
+  ownMembershipLoading,
+  ownProgress,
+  ownProgressLoading,
 }: {
   role: UserRole
   expiringSoon: ApiMembership[]
@@ -329,23 +379,43 @@ function ResultsContent({
   clientsError: string | null
   recentNotifications: ApiNotification[]
   notificationsLoading: boolean
+  ownProfile: ApiClientProfile | null
+  ownMembership: ApiMembership | null
+  ownPlan: ApiMembershipPlan | null
+  ownMembershipLoading: boolean
+  ownProgress: ApiBodyProgress[] | null
+  ownProgressLoading: boolean
 }) {
   if (role === 'cliente') {
-    const profile = findClientProfile(DEMO_CLIENT_ID)
-    const membership = findMembershipByClient(DEMO_CLIENT_ID)
-    const plan = membership ? findMembershipPlan(membership.plan_id) : undefined
-    const progress = getBodyProgressForClient(DEMO_CLIENT_ID)
-    const lastProgress = progress[progress.length - 1]
+    // Sin perfil propio: quien está previsualizando "Cliente" con el switch
+    // de desarrollo es en realidad una cuenta admin/entrenador sin
+    // ClientProfile -- no hay datos reales que mostrar, se dice así en vez
+    // de inventar un cliente de ejemplo.
+    if (!ownProfile) {
+      return (
+        <div className="dashboard-results">
+          <EmptyState
+            compact
+            title="Sin perfil de cliente"
+            description="Esta cuenta no tiene un perfil de cliente propio (vista de prueba)."
+          />
+        </div>
+      )
+    }
+
+    const lastProgress = ownProgress && ownProgress.length > 0 ? ownProgress[ownProgress.length - 1] : null
 
     return (
       <div className="dashboard-results">
         <section className="dashboard-results__section">
           <h3 className="dashboard-results__heading">Mi membresía</h3>
-          {membership && plan ? (
+          {ownMembershipLoading ? (
+            <LoadingState label="Cargando…" />
+          ) : ownMembership && ownPlan ? (
             <div className="dashboard-results__row">
-              <StatusPill status={getMembershipDisplayStatusMock(membership)} />
+              <StatusPill status={getMembershipDisplayStatus(ownMembership)} />
               <p>
-                Plan {plan.name} · vence el {membership.end_date}
+                Plan {ownPlan.name} · vence el {ownMembership.end_date}
               </p>
             </div>
           ) : (
@@ -355,9 +425,11 @@ function ResultsContent({
 
         <section className="dashboard-results__section">
           <h3 className="dashboard-results__heading">Mi progreso más reciente</h3>
-          {lastProgress ? (
+          {ownProgressLoading ? (
+            <LoadingState label="Cargando…" />
+          ) : lastProgress ? (
             <p className="dashboard-results__text">
-              {lastProgress.weight_kg} kg registrados el {lastProgress.record_date}
+              {Number(lastProgress.weight_kg)} kg registrados el {lastProgress.record_date}
             </p>
           ) : (
             <EmptyState compact title="Sin registros" description="Todavía no hay mediciones guardadas." />
@@ -366,7 +438,7 @@ function ResultsContent({
 
         <section className="dashboard-results__section">
           <h3 className="dashboard-results__heading">Mi entrenador</h3>
-          <p className="dashboard-results__text">{getTrainerDisplayName(profile?.trainer_id ?? null)}</p>
+          <p className="dashboard-results__text">{ownProfile.trainer_name ?? 'Sin asignar'}</p>
         </section>
       </div>
     )

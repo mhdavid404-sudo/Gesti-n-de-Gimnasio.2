@@ -278,3 +278,42 @@ export interface DietAssignmentUpdatePayload {
   status?: ApiDietAssignmentStatus
   notes?: string | null
 }
+
+// ---------------------------------------------------------------------------
+// Progreso Corporal (RF010, RF011) — ver backend/src/api/v1/routers/progress.py
+//
+// Sin campo de autoría (a diferencia de Payment/Routine/Diet): BodyProgress
+// solo liga peso/medidas/fecha a un client_id, nunca tuvo un
+// created_by/registered_by que corregir.
+// ---------------------------------------------------------------------------
+
+export interface ApiBodyProgress {
+  id: number
+  client_id: number
+  record_date: string
+  /** Decimal del backend serializado como string -- mismo criterio que ApiMembershipPlan.price. */
+  weight_kg: string
+  height_cm: string | null
+  body_fat_pct: string | null
+  muscle_mass_kg: string | null
+  chest_cm: string | null
+  waist_cm: string | null
+  hip_cm: string | null
+  arm_cm: string | null
+  notes: string | null
+}
+
+export interface BodyProgressCreatePayload {
+  client_id: number
+  record_date: string
+  /** Se envía como number: FastAPI/Pydantic acepta int|float|str para un campo Decimal. */
+  weight_kg: number
+  height_cm?: number | null
+  body_fat_pct?: number | null
+  muscle_mass_kg?: number | null
+  chest_cm?: number | null
+  waist_cm?: number | null
+  hip_cm?: number | null
+  arm_cm?: number | null
+  notes?: string | null
+}
