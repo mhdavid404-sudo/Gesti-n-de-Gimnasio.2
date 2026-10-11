@@ -13,12 +13,19 @@ PaymentStatus = Literal["completado", "pendiente", "rechazado"]
 
 
 class PaymentCreate(BaseModel):
+    """Defecto de diseno corregido (DECISIONES.md, modulo Pagos): el
+    esqueleto original traia `registered_by: int` aqui, es decir, el
+    CLIENTE HTTP decidia quien registro el pago -- cualquier llamada podia
+    falsificar esa autoria. Se quita del payload; el router lo rellena
+    siempre con `current_user.id` (el admin autenticado que hace la
+    peticion), nunca con un valor que venga del body.
+    """
+
     membership_id: int
     amount: Decimal = Field(gt=0)
     payment_date: datetime
     method: PaymentMethod
     status: PaymentStatus = "completado"
-    registered_by: int
     notes: str | None = None
 
 
