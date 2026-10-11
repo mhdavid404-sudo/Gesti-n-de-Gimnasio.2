@@ -14,7 +14,7 @@ import {
 import { isMembershipExpiringSoon } from '../utils/membership'
 import './DashboardPage.css'
 
-const CURRENT_MONTH_PREFIX = '2025-09'
+const CURRENT_MONTH_PREFIX = '2026-09'
 
 export function DashboardPage() {
   const activeClients = clients.filter((c) => c.is_active).length

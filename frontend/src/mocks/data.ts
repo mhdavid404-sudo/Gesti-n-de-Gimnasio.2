@@ -35,21 +35,21 @@ import { getMembershipDisplayStatus, type MembershipDisplayStatus } from '../uti
  * determinística sin importar cuándo se abra la app de verdad. En Entrega 2,
  * al conectar al backend real, esto desaparece y se usa `new Date()`.
  */
-export const MOCK_TODAY = new Date('2025-09-12T09:00:00')
+export const MOCK_TODAY = new Date('2026-09-30T09:00:00')
 
 // ---------------------------------------------------------------------------
 // 1. Users (admin, entrenadores, clientes)
 // ---------------------------------------------------------------------------
 export const users: User[] = [
-  { id: 1, full_name: 'Marisol Aragón', email: 'marisol@strongeraragon.mx', password_hash: '$2b$mock', role: 'admin', is_active: true, created_at: '2024-01-10T08:00:00Z' },
-  { id: 2, full_name: 'Diego Herrera', email: 'diego.herrera@strongeraragon.mx', password_hash: '$2b$mock', role: 'entrenador', is_active: true, created_at: '2024-02-01T08:00:00Z' },
-  { id: 3, full_name: 'Paola Nuñez', email: 'paola.nunez@strongeraragon.mx', password_hash: '$2b$mock', role: 'entrenador', is_active: true, created_at: '2024-02-15T08:00:00Z' },
-  { id: 10, full_name: 'Karla Jiménez', email: 'karla.jimenez@gmail.com', password_hash: '$2b$mock', role: 'cliente', is_active: true, created_at: '2025-03-01T08:00:00Z' },
-  { id: 11, full_name: 'Luis Ángel Torres', email: 'luisangel.torres@gmail.com', password_hash: '$2b$mock', role: 'cliente', is_active: true, created_at: '2025-04-12T08:00:00Z' },
-  { id: 12, full_name: 'Fernanda Casillas', email: 'fer.casillas@gmail.com', password_hash: '$2b$mock', role: 'cliente', is_active: true, created_at: '2025-05-20T08:00:00Z' },
-  { id: 13, full_name: 'Rodrigo Bautista', email: 'rodrigo.bautista@gmail.com', password_hash: '$2b$mock', role: 'cliente', is_active: true, created_at: '2025-06-02T08:00:00Z' },
-  { id: 14, full_name: 'Ximena Cordero', email: 'ximena.cordero@gmail.com', password_hash: '$2b$mock', role: 'cliente', is_active: true, created_at: '2025-07-18T08:00:00Z' },
-  { id: 15, full_name: 'Iván Salgado', email: 'ivan.salgado@gmail.com', password_hash: '$2b$mock', role: 'cliente', is_active: false, created_at: '2024-11-09T08:00:00Z' },
+  { id: 1, full_name: 'Marisol Aragón', email: 'marisol@strongeraragon.mx', password_hash: '$2b$mock', role: 'admin', is_active: true, created_at: '2026-01-10T08:00:00Z' },
+  { id: 2, full_name: 'Diego Herrera', email: 'diego.herrera@strongeraragon.mx', password_hash: '$2b$mock', role: 'entrenador', is_active: true, created_at: '2026-02-01T08:00:00Z' },
+  { id: 3, full_name: 'Paola Nuñez', email: 'paola.nunez@strongeraragon.mx', password_hash: '$2b$mock', role: 'entrenador', is_active: true, created_at: '2026-02-15T08:00:00Z' },
+  { id: 10, full_name: 'Karla Jiménez', email: 'karla.jimenez@gmail.com', password_hash: '$2b$mock', role: 'cliente', is_active: true, created_at: '2026-03-01T08:00:00Z' },
+  { id: 11, full_name: 'Luis Ángel Torres', email: 'luisangel.torres@gmail.com', password_hash: '$2b$mock', role: 'cliente', is_active: true, created_at: '2026-04-12T08:00:00Z' },
+  { id: 12, full_name: 'Fernanda Casillas', email: 'fer.casillas@gmail.com', password_hash: '$2b$mock', role: 'cliente', is_active: true, created_at: '2026-05-20T08:00:00Z' },
+  { id: 13, full_name: 'Rodrigo Bautista', email: 'rodrigo.bautista@gmail.com', password_hash: '$2b$mock', role: 'cliente', is_active: true, created_at: '2026-06-02T08:00:00Z' },
+  { id: 14, full_name: 'Ximena Cordero', email: 'ximena.cordero@gmail.com', password_hash: '$2b$mock', role: 'cliente', is_active: true, created_at: '2026-07-18T08:00:00Z' },
+  { id: 15, full_name: 'Iván Salgado', email: 'ivan.salgado@gmail.com', password_hash: '$2b$mock', role: 'cliente', is_active: false, created_at: '2026-01-20T08:00:00Z' },
 ]
 
 export const findUser = (id: number): User | undefined => users.find((u) => u.id === id)
@@ -58,12 +58,12 @@ export const findUser = (id: number): User | undefined => users.find((u) => u.id
 // 2. ClientProfile
 // ---------------------------------------------------------------------------
 export const clientProfiles: ClientProfile[] = [
-  { id: 100, user_id: 10, trainer_id: 2, phone: '55 1234 5670', birth_date: '1996-03-14', address: 'Av. 510 #212, San Juan de Aragón', emergency_contact: 'Rocío Jiménez - 55 1234 9911', created_at: '2025-03-01T08:10:00Z' },
-  { id: 101, user_id: 11, trainer_id: 2, phone: '55 2233 4455', birth_date: '1990-11-02', address: 'Calle Oriente 158, Aragón La Villa', emergency_contact: 'Marta Torres - 55 2233 0099', created_at: '2025-04-12T09:00:00Z' },
-  { id: 102, user_id: 12, trainer_id: 3, phone: '55 3344 5566', birth_date: '2000-07-22', address: 'Av. 412 #88, San Juan de Aragón 4ta Sección', emergency_contact: 'Hugo Casillas - 55 3344 1122', created_at: '2025-05-20T10:30:00Z' },
-  { id: 103, user_id: 13, trainer_id: null, phone: '55 4455 6677', birth_date: '1985-01-30', address: 'Calle 546 #34, Aragón Inguarán', emergency_contact: 'Brenda Bautista - 55 4455 0033', created_at: '2025-06-02T07:45:00Z' },
-  { id: 104, user_id: 14, trainer_id: 3, phone: '55 5566 7788', birth_date: '1998-09-09', address: 'Av. 675 #19, San Juan de Aragón 6ta Sección', emergency_contact: 'Noé Cordero - 55 5566 4400', created_at: '2025-07-18T16:20:00Z' },
-  { id: 105, user_id: 15, trainer_id: 2, phone: '55 6677 8899', birth_date: '1993-05-17', address: 'Calle 522 #7, Aragón La Villa', emergency_contact: 'Diana Salgado - 55 6677 2233', created_at: '2024-11-09T08:30:00Z' },
+  { id: 100, user_id: 10, trainer_id: 2, phone: '55 1234 5670', birth_date: '1996-03-14', address: 'Av. 510 #212, San Juan de Aragón', emergency_contact: 'Rocío Jiménez - 55 1234 9911', created_at: '2026-03-01T08:10:00Z' },
+  { id: 101, user_id: 11, trainer_id: 2, phone: '55 2233 4455', birth_date: '1990-11-02', address: 'Calle Oriente 158, Aragón La Villa', emergency_contact: 'Marta Torres - 55 2233 0099', created_at: '2026-04-12T09:00:00Z' },
+  { id: 102, user_id: 12, trainer_id: 3, phone: '55 3344 5566', birth_date: '2000-07-22', address: 'Av. 412 #88, San Juan de Aragón 4ta Sección', emergency_contact: 'Hugo Casillas - 55 3344 1122', created_at: '2026-05-20T10:30:00Z' },
+  { id: 103, user_id: 13, trainer_id: null, phone: '55 4455 6677', birth_date: '1985-01-30', address: 'Calle 546 #34, Aragón Inguarán', emergency_contact: 'Brenda Bautista - 55 4455 0033', created_at: '2026-06-02T07:45:00Z' },
+  { id: 104, user_id: 14, trainer_id: 3, phone: '55 5566 7788', birth_date: '1998-09-09', address: 'Av. 675 #19, San Juan de Aragón 6ta Sección', emergency_contact: 'Noé Cordero - 55 5566 4400', created_at: '2026-07-18T16:20:00Z' },
+  { id: 105, user_id: 15, trainer_id: 2, phone: '55 6677 8899', birth_date: '1993-05-17', address: 'Calle 522 #7, Aragón La Villa', emergency_contact: 'Diana Salgado - 55 6677 2233', created_at: '2026-01-20T08:30:00Z' },
 ]
 
 export const findClientProfile = (id: number): ClientProfile | undefined =>
@@ -119,12 +119,16 @@ export const findMembershipPlan = (id: number): MembershipPlan | undefined =>
 export const memberships: Membership[] = [
   // status = 'activa': "por vencer" no es un estado propio, se calcula sobre
   // end_date vs. MOCK_TODAY (ver utils/membership.ts y DECISIONES.md).
-  { id: 900, client_id: 100, plan_id: 3, start_date: '2025-08-15', end_date: '2025-09-14', status: 'activa', created_at: '2025-08-15T09:00:00Z' },
-  { id: 901, client_id: 101, plan_id: 2, start_date: '2025-08-01', end_date: '2025-08-31', status: 'vencida', created_at: '2025-08-01T09:00:00Z' },
-  { id: 902, client_id: 102, plan_id: 1, start_date: '2025-09-01', end_date: '2025-10-01', status: 'activa', created_at: '2025-09-01T09:00:00Z' },
-  { id: 903, client_id: 103, plan_id: 2, start_date: '2025-09-05', end_date: '2025-10-05', status: 'activa', created_at: '2025-09-05T09:00:00Z' },
-  { id: 904, client_id: 104, plan_id: 3, start_date: '2025-08-20', end_date: '2025-09-19', status: 'activa', created_at: '2025-08-20T09:00:00Z' },
-  { id: 905, client_id: 105, plan_id: 1, start_date: '2025-07-01', end_date: '2025-07-31', status: 'cancelada', created_at: '2025-07-01T09:00:00Z' },
+  // Calendario (relativo a MOCK_TODAY = 2026-09-30): 900 y 904 vencen dentro
+  // de la ventana de 7 días (octubre, "por vencer"); 902 y 903 vencen en
+  // noviembre/diciembre (activas, sin aviso); 901 ya venció en septiembre
+  // (vencida); 905 es un caso histórico cancelado.
+  { id: 900, client_id: 100, plan_id: 3, start_date: '2026-09-02', end_date: '2026-10-02', status: 'activa', created_at: '2026-09-02T09:00:00Z' },
+  { id: 901, client_id: 101, plan_id: 2, start_date: '2026-08-19', end_date: '2026-09-18', status: 'vencida', created_at: '2026-08-19T09:00:00Z' },
+  { id: 902, client_id: 102, plan_id: 1, start_date: '2026-09-01', end_date: '2026-11-01', status: 'activa', created_at: '2026-09-01T09:00:00Z' },
+  { id: 903, client_id: 103, plan_id: 2, start_date: '2026-09-05', end_date: '2026-12-05', status: 'activa', created_at: '2026-09-05T09:00:00Z' },
+  { id: 904, client_id: 104, plan_id: 3, start_date: '2026-09-07', end_date: '2026-10-07', status: 'activa', created_at: '2026-09-07T09:00:00Z' },
+  { id: 905, client_id: 105, plan_id: 1, start_date: '2026-07-01', end_date: '2026-07-31', status: 'cancelada', created_at: '2026-07-01T09:00:00Z' },
 ]
 
 export const findMembershipByClient = (clientId: number): Membership | undefined =>
@@ -138,13 +142,13 @@ export const getMembershipDisplayStatusMock = (membership: Membership): Membersh
 // 5. Payment
 // ---------------------------------------------------------------------------
 export const payments: Payment[] = [
-  { id: 700, membership_id: 900, amount: 999, payment_date: '2025-08-15', method: 'tarjeta', status: 'completado', registered_by: 1, notes: null },
-  { id: 701, membership_id: 901, amount: 649, payment_date: '2025-08-01', method: 'efectivo', status: 'completado', registered_by: 1, notes: null },
-  { id: 702, membership_id: 902, amount: 399, payment_date: '2025-09-01', method: 'transferencia', status: 'completado', registered_by: 1, notes: 'Pago de reinscripción' },
-  { id: 703, membership_id: 903, amount: 649, payment_date: '2025-09-05', method: 'tarjeta', status: 'pendiente', registered_by: 1, notes: 'Transferencia en validación' },
-  { id: 704, membership_id: 904, amount: 999, payment_date: '2025-08-20', method: 'efectivo', status: 'completado', registered_by: 1, notes: null },
-  { id: 705, membership_id: 900, amount: 100, payment_date: '2025-08-16', method: 'efectivo', status: 'completado', registered_by: 1, notes: 'Ajuste por promoción de temporada' },
-  { id: 706, membership_id: 905, amount: 399, payment_date: '2025-07-01', method: 'efectivo', status: 'rechazado', registered_by: 1, notes: 'Cliente canceló a media membresía' },
+  { id: 700, membership_id: 900, amount: 999, payment_date: '2026-09-02', method: 'tarjeta', status: 'completado', registered_by: 1, notes: null },
+  { id: 701, membership_id: 901, amount: 649, payment_date: '2026-08-19', method: 'efectivo', status: 'completado', registered_by: 1, notes: null },
+  { id: 702, membership_id: 902, amount: 399, payment_date: '2026-09-01', method: 'transferencia', status: 'completado', registered_by: 1, notes: 'Pago de reinscripción' },
+  { id: 703, membership_id: 903, amount: 649, payment_date: '2026-09-05', method: 'tarjeta', status: 'pendiente', registered_by: 1, notes: 'Transferencia en validación' },
+  { id: 704, membership_id: 904, amount: 999, payment_date: '2026-09-07', method: 'efectivo', status: 'completado', registered_by: 1, notes: null },
+  { id: 705, membership_id: 900, amount: 100, payment_date: '2026-09-03', method: 'efectivo', status: 'completado', registered_by: 1, notes: 'Ajuste por promoción de temporada' },
+  { id: 706, membership_id: 905, amount: 399, payment_date: '2026-07-01', method: 'efectivo', status: 'rechazado', registered_by: 1, notes: 'Cliente canceló a media membresía' },
 ]
 
 export const getPaymentsForMembership = (membershipId: number): Payment[] =>
@@ -172,10 +176,10 @@ export const findExercise = (id: number): Exercise | undefined => exercises.find
 // 7. Routine
 // ---------------------------------------------------------------------------
 export const routines: Routine[] = [
-  { id: 1, name: 'Fuerza — Full Body A', description: 'Rutina de fuerza de cuerpo completo, 3 días por semana.', created_by: 2, created_at: '2025-01-15T08:00:00Z' },
-  { id: 2, name: 'Hipertrofia — Push/Pull/Legs', description: 'Split de 6 días orientado a volumen.', created_by: 2, created_at: '2025-02-10T08:00:00Z' },
-  { id: 3, name: 'Acondicionamiento general', description: 'Rutina de baja carga para clientes nuevos.', created_by: 3, created_at: '2025-03-05T08:00:00Z' },
-  { id: 4, name: 'Premium — Fuerza + Core', description: 'Rutina para plan Premium, incluye trabajo de core dedicado.', created_by: 3, created_at: '2025-04-01T08:00:00Z' },
+  { id: 1, name: 'Fuerza — Full Body A', description: 'Rutina de fuerza de cuerpo completo, 3 días por semana.', created_by: 2, created_at: '2026-01-15T08:00:00Z' },
+  { id: 2, name: 'Hipertrofia — Push/Pull/Legs', description: 'Split de 6 días orientado a volumen.', created_by: 2, created_at: '2026-02-10T08:00:00Z' },
+  { id: 3, name: 'Acondicionamiento general', description: 'Rutina de baja carga para clientes nuevos.', created_by: 3, created_at: '2026-03-05T08:00:00Z' },
+  { id: 4, name: 'Premium — Fuerza + Core', description: 'Rutina para plan Premium, incluye trabajo de core dedicado.', created_by: 3, created_at: '2026-04-01T08:00:00Z' },
 ]
 
 export const findRoutine = (id: number): Routine | undefined => routines.find((r) => r.id === id)
@@ -209,11 +213,11 @@ export const getRoutineExercises = (routineId: number): RoutineExercise[] =>
 // 9. RoutineAssignment
 // ---------------------------------------------------------------------------
 export const routineAssignments: RoutineAssignment[] = [
-  { id: 500, routine_id: 4, client_id: 100, assigned_by: 3, assigned_date: '2025-08-16', status: 'activa', notes: null },
-  { id: 501, routine_id: 2, client_id: 101, assigned_by: 2, assigned_date: '2025-08-02', status: 'activa', notes: null },
-  { id: 502, routine_id: 3, client_id: 102, assigned_by: 3, assigned_date: '2025-09-01', status: 'activa', notes: 'Cliente nuevo, revisar técnica primero' },
-  { id: 503, routine_id: 1, client_id: 103, assigned_by: 2, assigned_date: '2025-06-10', status: 'completada', notes: null },
-  { id: 504, routine_id: 4, client_id: 104, assigned_by: 3, assigned_date: '2025-08-21', status: 'activa', notes: null },
+  { id: 500, routine_id: 4, client_id: 100, assigned_by: 3, assigned_date: '2026-09-03', status: 'activa', notes: null },
+  { id: 501, routine_id: 2, client_id: 101, assigned_by: 2, assigned_date: '2026-08-20', status: 'activa', notes: null },
+  { id: 502, routine_id: 3, client_id: 102, assigned_by: 3, assigned_date: '2026-09-01', status: 'activa', notes: 'Cliente nuevo, revisar técnica primero' },
+  { id: 503, routine_id: 1, client_id: 103, assigned_by: 2, assigned_date: '2026-06-10', status: 'completada', notes: null },
+  { id: 504, routine_id: 4, client_id: 104, assigned_by: 3, assigned_date: '2026-09-08', status: 'activa', notes: null },
 ]
 
 export const getRoutineAssignmentsForClient = (clientId: number): RoutineAssignment[] =>
@@ -223,9 +227,9 @@ export const getRoutineAssignmentsForClient = (clientId: number): RoutineAssignm
 // 10. DietPlan
 // ---------------------------------------------------------------------------
 export const dietPlans: DietPlan[] = [
-  { id: 1, name: 'Déficit calórico moderado', description: 'Enfocado en pérdida de grasa manteniendo masa muscular.', daily_calories: 1800, created_by: 3, created_at: '2025-01-20T08:00:00Z' },
-  { id: 2, name: 'Superávit — ganancia muscular', description: 'Aumento calórico progresivo con alto aporte proteico.', daily_calories: 2600, created_by: 2, created_at: '2025-02-14T08:00:00Z' },
-  { id: 3, name: 'Mantenimiento general', description: 'Plan balanceado sin objetivo de cambio de peso.', daily_calories: 2200, created_by: 3, created_at: '2025-03-18T08:00:00Z' },
+  { id: 1, name: 'Déficit calórico moderado', description: 'Enfocado en pérdida de grasa manteniendo masa muscular.', daily_calories: 1800, created_by: 3, created_at: '2026-01-20T08:00:00Z' },
+  { id: 2, name: 'Superávit — ganancia muscular', description: 'Aumento calórico progresivo con alto aporte proteico.', daily_calories: 2600, created_by: 2, created_at: '2026-02-14T08:00:00Z' },
+  { id: 3, name: 'Mantenimiento general', description: 'Plan balanceado sin objetivo de cambio de peso.', daily_calories: 2200, created_by: 3, created_at: '2026-03-18T08:00:00Z' },
 ]
 
 export const findDietPlan = (id: number): DietPlan | undefined => dietPlans.find((d) => d.id === id)
@@ -234,9 +238,9 @@ export const findDietPlan = (id: number): DietPlan | undefined => dietPlans.find
 // 11. DietAssignment
 // ---------------------------------------------------------------------------
 export const dietAssignments: DietAssignment[] = [
-  { id: 600, diet_plan_id: 1, client_id: 100, assigned_by: 3, assigned_date: '2025-08-16', status: 'activa', notes: null },
-  { id: 601, diet_plan_id: 2, client_id: 101, assigned_by: 2, assigned_date: '2025-08-02', status: 'activa', notes: null },
-  { id: 602, diet_plan_id: 3, client_id: 104, assigned_by: 3, assigned_date: '2025-08-21', status: 'activa', notes: null },
+  { id: 600, diet_plan_id: 1, client_id: 100, assigned_by: 3, assigned_date: '2026-09-03', status: 'activa', notes: null },
+  { id: 601, diet_plan_id: 2, client_id: 101, assigned_by: 2, assigned_date: '2026-08-20', status: 'activa', notes: null },
+  { id: 602, diet_plan_id: 3, client_id: 104, assigned_by: 3, assigned_date: '2026-09-08', status: 'activa', notes: null },
 ]
 
 export const getDietAssignmentsForClient = (clientId: number): DietAssignment[] =>
@@ -247,23 +251,23 @@ export const getDietAssignmentsForClient = (clientId: number): DietAssignment[] 
 // ---------------------------------------------------------------------------
 export const bodyProgress: BodyProgress[] = [
   // Karla Jiménez (client 100)
-  { id: 1, client_id: 100, record_date: '2025-06-01', weight_kg: 68.4, height_cm: 164, body_fat_pct: 29.5, muscle_mass_kg: 43.1, chest_cm: 92, waist_cm: 78, hip_cm: 101, arm_cm: 27, notes: 'Inicio de plan Premium' },
-  { id: 2, client_id: 100, record_date: '2025-07-01', weight_kg: 67.1, height_cm: 164, body_fat_pct: 28.1, muscle_mass_kg: 43.6, chest_cm: 91, waist_cm: 76, hip_cm: 100, arm_cm: 27.3, notes: null },
-  { id: 3, client_id: 100, record_date: '2025-08-01', weight_kg: 65.9, height_cm: 164, body_fat_pct: 27.0, muscle_mass_kg: 44.0, chest_cm: 90, waist_cm: 74, hip_cm: 99, arm_cm: 27.6, notes: null },
-  { id: 4, client_id: 100, record_date: '2025-09-01', weight_kg: 64.8, height_cm: 164, body_fat_pct: 26.2, muscle_mass_kg: 44.3, chest_cm: 90, waist_cm: 73, hip_cm: 98, arm_cm: 28, notes: 'Buena adherencia a la dieta' },
+  { id: 1, client_id: 100, record_date: '2026-06-01', weight_kg: 68.4, height_cm: 164, body_fat_pct: 29.5, muscle_mass_kg: 43.1, chest_cm: 92, waist_cm: 78, hip_cm: 101, arm_cm: 27, notes: 'Inicio de plan Premium' },
+  { id: 2, client_id: 100, record_date: '2026-07-01', weight_kg: 67.1, height_cm: 164, body_fat_pct: 28.1, muscle_mass_kg: 43.6, chest_cm: 91, waist_cm: 76, hip_cm: 100, arm_cm: 27.3, notes: null },
+  { id: 3, client_id: 100, record_date: '2026-08-01', weight_kg: 65.9, height_cm: 164, body_fat_pct: 27.0, muscle_mass_kg: 44.0, chest_cm: 90, waist_cm: 74, hip_cm: 99, arm_cm: 27.6, notes: null },
+  { id: 4, client_id: 100, record_date: '2026-09-01', weight_kg: 64.8, height_cm: 164, body_fat_pct: 26.2, muscle_mass_kg: 44.3, chest_cm: 90, waist_cm: 73, hip_cm: 98, arm_cm: 28, notes: 'Buena adherencia a la dieta' },
   // Luis Ángel Torres (client 101)
-  { id: 5, client_id: 101, record_date: '2025-06-01', weight_kg: 74.2, height_cm: 178, body_fat_pct: 18.4, muscle_mass_kg: 58.9, chest_cm: 99, waist_cm: 83, hip_cm: 96, arm_cm: 33, notes: null },
-  { id: 6, client_id: 101, record_date: '2025-07-01', weight_kg: 75.6, height_cm: 178, body_fat_pct: 18.0, muscle_mass_kg: 60.1, chest_cm: 100, waist_cm: 83, hip_cm: 96, arm_cm: 33.6, notes: null },
-  { id: 7, client_id: 101, record_date: '2025-08-01', weight_kg: 76.9, height_cm: 178, body_fat_pct: 17.6, muscle_mass_kg: 61.3, chest_cm: 101, waist_cm: 84, hip_cm: 97, arm_cm: 34.2, notes: 'Fase de volumen' },
+  { id: 5, client_id: 101, record_date: '2026-06-01', weight_kg: 74.2, height_cm: 178, body_fat_pct: 18.4, muscle_mass_kg: 58.9, chest_cm: 99, waist_cm: 83, hip_cm: 96, arm_cm: 33, notes: null },
+  { id: 6, client_id: 101, record_date: '2026-07-01', weight_kg: 75.6, height_cm: 178, body_fat_pct: 18.0, muscle_mass_kg: 60.1, chest_cm: 100, waist_cm: 83, hip_cm: 96, arm_cm: 33.6, notes: null },
+  { id: 7, client_id: 101, record_date: '2026-08-01', weight_kg: 76.9, height_cm: 178, body_fat_pct: 17.6, muscle_mass_kg: 61.3, chest_cm: 101, waist_cm: 84, hip_cm: 97, arm_cm: 34.2, notes: 'Fase de volumen' },
   // Fernanda Casillas (client 102)
-  { id: 8, client_id: 102, record_date: '2025-09-01', weight_kg: 58.0, height_cm: 160, body_fat_pct: 24.8, muscle_mass_kg: 38.4, chest_cm: 85, waist_cm: 68, hip_cm: 92, arm_cm: 24, notes: 'Primera evaluación' },
+  { id: 8, client_id: 102, record_date: '2026-09-01', weight_kg: 58.0, height_cm: 160, body_fat_pct: 24.8, muscle_mass_kg: 38.4, chest_cm: 85, waist_cm: 68, hip_cm: 92, arm_cm: 24, notes: 'Primera evaluación' },
   // Rodrigo Bautista (client 103)
-  { id: 9, client_id: 103, record_date: '2025-06-10', weight_kg: 88.5, height_cm: 172, body_fat_pct: 31.2, muscle_mass_kg: 54.8, chest_cm: 104, waist_cm: 98, hip_cm: 106, arm_cm: 31, notes: null },
-  { id: 10, client_id: 103, record_date: '2025-07-10', weight_kg: 86.1, height_cm: 172, body_fat_pct: 29.6, muscle_mass_kg: 55.4, chest_cm: 103, waist_cm: 95, hip_cm: 105, arm_cm: 31.2, notes: null },
-  { id: 11, client_id: 103, record_date: '2025-08-10', weight_kg: 84.0, height_cm: 172, body_fat_pct: 28.1, muscle_mass_kg: 55.9, chest_cm: 102, waist_cm: 92, hip_cm: 104, arm_cm: 31.4, notes: null },
-  { id: 12, client_id: 103, record_date: '2025-09-10', weight_kg: 82.3, height_cm: 172, body_fat_pct: 27.0, muscle_mass_kg: 56.3, chest_cm: 101, waist_cm: 90, hip_cm: 103, arm_cm: 31.6, notes: 'Sigue en descenso constante' },
+  { id: 9, client_id: 103, record_date: '2026-06-10', weight_kg: 88.5, height_cm: 172, body_fat_pct: 31.2, muscle_mass_kg: 54.8, chest_cm: 104, waist_cm: 98, hip_cm: 106, arm_cm: 31, notes: null },
+  { id: 10, client_id: 103, record_date: '2026-07-10', weight_kg: 86.1, height_cm: 172, body_fat_pct: 29.6, muscle_mass_kg: 55.4, chest_cm: 103, waist_cm: 95, hip_cm: 105, arm_cm: 31.2, notes: null },
+  { id: 11, client_id: 103, record_date: '2026-08-10', weight_kg: 84.0, height_cm: 172, body_fat_pct: 28.1, muscle_mass_kg: 55.9, chest_cm: 102, waist_cm: 92, hip_cm: 104, arm_cm: 31.4, notes: null },
+  { id: 12, client_id: 103, record_date: '2026-09-10', weight_kg: 82.3, height_cm: 172, body_fat_pct: 27.0, muscle_mass_kg: 56.3, chest_cm: 101, waist_cm: 90, hip_cm: 103, arm_cm: 31.6, notes: 'Sigue en descenso constante' },
   // Ximena Cordero (client 104)
-  { id: 13, client_id: 104, record_date: '2025-08-21', weight_kg: 61.5, height_cm: 166, body_fat_pct: 25.4, muscle_mass_kg: 40.2, chest_cm: 88, waist_cm: 71, hip_cm: 96, arm_cm: 25.5, notes: null },
+  { id: 13, client_id: 104, record_date: '2026-08-21', weight_kg: 61.5, height_cm: 166, body_fat_pct: 25.4, muscle_mass_kg: 40.2, chest_cm: 88, waist_cm: 71, hip_cm: 96, arm_cm: 25.5, notes: null },
 ]
 
 export const getBodyProgressForClient = (clientId: number): BodyProgress[] =>
@@ -275,12 +279,12 @@ export const getBodyProgressForClient = (clientId: number): BodyProgress[] =>
 // 13. Notification
 // ---------------------------------------------------------------------------
 export const notifications: Notification[] = [
-  { id: 1, user_id: 1, type: 'membresia_vencida', message: 'La membresía de Luis Ángel Torres venció el 31/08/2025.', is_read: false, created_at: '2025-09-01T07:00:00Z' },
-  { id: 2, user_id: 1, type: 'membresia_por_vencer', message: 'La membresía de Karla Jiménez vence el 14/09/2025.', is_read: false, created_at: '2025-09-10T07:00:00Z' },
-  { id: 3, user_id: 1, type: 'membresia_por_vencer', message: 'La membresía de Ximena Cordero vence el 19/09/2025.', is_read: false, created_at: '2025-09-11T07:00:00Z' },
-  { id: 4, user_id: 1, type: 'pago_registrado', message: 'Se registró un pago de $649 de Rodrigo Bautista.', is_read: true, created_at: '2025-09-05T12:00:00Z' },
-  { id: 5, user_id: 2, type: 'rutina_asignada', message: 'Se asignó la rutina "Push/Pull/Legs" a Luis Ángel Torres.', is_read: true, created_at: '2025-08-02T09:00:00Z' },
-  { id: 6, user_id: 3, type: 'dieta_asignada', message: 'Se asignó el plan "Mantenimiento general" a Ximena Cordero.', is_read: false, created_at: '2025-08-21T09:30:00Z' },
+  { id: 1, user_id: 1, type: 'membresia_vencida', message: 'La membresía de Luis Ángel Torres venció el 18/09/2026.', is_read: false, created_at: '2026-09-19T07:00:00Z' },
+  { id: 2, user_id: 1, type: 'membresia_por_vencer', message: 'La membresía de Karla Jiménez vence el 02/10/2026.', is_read: false, created_at: '2026-09-28T07:00:00Z' },
+  { id: 3, user_id: 1, type: 'membresia_por_vencer', message: 'La membresía de Ximena Cordero vence el 07/10/2026.', is_read: false, created_at: '2026-09-29T07:00:00Z' },
+  { id: 4, user_id: 1, type: 'pago_registrado', message: 'Se registró un pago de $649 de Rodrigo Bautista.', is_read: true, created_at: '2026-09-05T12:00:00Z' },
+  { id: 5, user_id: 2, type: 'rutina_asignada', message: 'Se asignó la rutina "Push/Pull/Legs" a Luis Ángel Torres.', is_read: true, created_at: '2026-08-20T09:00:00Z' },
+  { id: 6, user_id: 3, type: 'dieta_asignada', message: 'Se asignó el plan "Mantenimiento general" a Ximena Cordero.', is_read: false, created_at: '2026-09-08T09:30:00Z' },
 ]
 
 export const getNotificationsForUser = (userId: number): Notification[] =>
@@ -290,10 +294,10 @@ export const getNotificationsForUser = (userId: number): Notification[] =>
 // 14. AuditLog
 // ---------------------------------------------------------------------------
 export const auditLogs: AuditLog[] = [
-  { id: 1, user_id: 1, action: 'CREATE', entity_type: 'Membership', entity_id: 900, details: 'Alta de membresía Premium para cliente 100', created_at: '2025-08-15T09:00:00Z' },
-  { id: 2, user_id: 1, action: 'CREATE', entity_type: 'Payment', entity_id: 700, details: 'Pago de $999 registrado', created_at: '2025-08-15T09:05:00Z' },
-  { id: 3, user_id: 2, action: 'CREATE', entity_type: 'RoutineAssignment', entity_id: 501, details: 'Rutina Push/Pull/Legs asignada', created_at: '2025-08-02T09:00:00Z' },
-  { id: 4, user_id: null, action: 'DETECT_EXPIRING', entity_type: 'Membership', entity_id: 900, details: 'Job automático detectó membresía próxima a vencer', created_at: '2025-09-10T06:00:00Z' },
+  { id: 1, user_id: 1, action: 'CREATE', entity_type: 'Membership', entity_id: 900, details: 'Alta de membresía Premium para cliente 100', created_at: '2026-09-02T09:00:00Z' },
+  { id: 2, user_id: 1, action: 'CREATE', entity_type: 'Payment', entity_id: 700, details: 'Pago de $999 registrado', created_at: '2026-09-02T09:05:00Z' },
+  { id: 3, user_id: 2, action: 'CREATE', entity_type: 'RoutineAssignment', entity_id: 501, details: 'Rutina Push/Pull/Legs asignada', created_at: '2026-08-20T09:00:00Z' },
+  { id: 4, user_id: null, action: 'DETECT_EXPIRING', entity_type: 'Membership', entity_id: 900, details: 'Job automático detectó membresía próxima a vencer', created_at: '2026-09-28T06:00:00Z' },
 ]
 
 // ---------------------------------------------------------------------------

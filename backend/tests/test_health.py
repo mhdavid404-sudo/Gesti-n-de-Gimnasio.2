@@ -1,8 +1,8 @@
 """Smoke test minimo del esqueleto de Entrega 1.
 
 No requiere una base de datos viva -- el health check no toca la BD. El
-plan de pruebas formal (pytest, casos de uso reales) es alcance de Cofi
-(QA) en una entrega posterior, una vez que exista logica de negocio que
+plan de pruebas formal (pytest, casos de uso reales) es alcance de QA
+en una entrega posterior, una vez que exista logica de negocio que
 probar.
 """
 
