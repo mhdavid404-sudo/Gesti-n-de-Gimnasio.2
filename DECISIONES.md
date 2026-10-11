@@ -400,3 +400,185 @@ Registro de decisiones de arquitectura tomadas por Isai (revisor de diseño) dur
     paralelo de autenticación — ni `LandingPage.css`/el scope `.landing`.
 
 ---
+
+### 2026-10-10 — Módulo Clientes completo (RF003, bases de RF012/RF013): casos de uso reales, autorización por rol, conexión frontend↔backend
+
+- **Propuesta original:** implementar los 4 casos de uso de dominio del
+  módulo Clientes (`RegisterClientUseCase`, `AssignTrainerToClientUseCase`,
+  `UpdateClientProfileUseCase`, `DeleteClientUseCase`, todos
+  `NotImplementedError`), el router `clients.py` (todo `501`), resolver la
+  ambigüedad de que el formulario de alta (`ClientFormPage.tsx`) registra
+  datos de `User` + `ClientProfile` sin pedir password aunque el cliente sí
+  necesita poder iniciar sesión después, aplicar la invariante de
+  `trainer_id` como excepción de dominio propia, definir la autorización
+  fina por rol de cada endpoint, y conectar las 3 pantallas de Clientes del
+  frontend a la API real.
+
+- **Decisión:** aprobada y construida.
+
+- **Por qué / detalle de cada sub-decisión:**
+  - **Password del cliente nuevo: generada por el backend, no pedida en el
+    formulario.** De las dos opciones delegadas (agregar campo de password
+    al formulario, o generar una temporal y mostrarla una vez al staff), se
+    eligió la segunda. Razón: el formulario de alta ya está construido y en
+    uso (Entrega 1) sin ese campo — agregar un campo de password ahí
+    obligaría al staff de recepción a inventar/comunicar una contraseña en
+    el momento del alta, que es exactamente el flujo que un sistema de
+    staff de gimnasio (no un registro de autoservicio) no necesita. Generar
+    una temporal con `secrets` (criptográficamente segura, no `random`),
+    hashearla igual que cualquier password (`hash_password`, reutilizado de
+    `infrastructure/security/password.py`) y devolverla en texto claro UNA
+    SOLA VEZ en la respuesta de `POST /clients` replica el patrón real de
+    "alta con contraseña temporal + cambio en el primer login" usado en
+    sistemas de staff, sin inventar todavía un flujo de "cambiar mi
+    password" (fuera de alcance de RF003/RF013 en esta entrega). El
+    frontend (`ClientFormPage.tsx`) la muestra en el aviso de éxito al
+    volver a `/clientes`, con la instrucción explícita de copiarla y
+    compartirla porque no se vuelve a mostrar.
+  - **`RegisterClientUseCase` orquesta `UserRepository` +
+    `ClientProfileRepository` a la vez** (ya autorizado en el encargo): valida
+    unicidad de email igual que `RegisterUserUseCase` (mismo
+    `EmailAlreadyExistsError`), valida `trainer_id` si viene en el alta con
+    la misma invariante de rol que `AssignTrainerToClientUseCase` (factorizada
+    en una función compartida `_ensure_trainer_role`, para no duplicar la
+    regla en dos lugares), y crea `User` (role='cliente') + `ClientProfile`
+    en una sola llamada. Como ningún repositorio hace `commit()` interno
+    (solo `flush()`), si cualquier paso falla antes de que el router llame
+    `db.commit()`, toda la operación se revierte junta — no queda un `User`
+    huérfano sin `ClientProfile`.
+  - **`InvalidTrainerAssignmentError` nueva, en `domain/clients/exceptions.py`
+    (nuevo archivo).** Mismo patrón que `domain/users/exceptions.py`: el
+    dominio no conoce HTTP: el router la traduce a `400`. Se agrega también
+    `ClientNotFoundError` para los casos de `404` (antes el esqueleto no
+    tenía ninguna excepción de dominio propia en este módulo).
+  - **`UpdateClientProfileUseCase` delega la reasignación de `trainer_id` en
+    `AssignTrainerToClientUseCase`** en vez de duplicar la validación de rol
+    — tal como pedía el docstring original del router: si el payload del
+    `PATCH` trae un `trainer_id` distinto al actual, se construye y ejecuta
+    `AssignTrainerToClientUseCase` internamente antes de aplicar el resto de
+    campos (`phone`/`birth_date`/`address`/`emergency_contact`, con el mismo
+    criterio de "campo en `None` = no cambiar" que ya usa `UserUpdate` en
+    `application/users/use_cases.py`).
+  - **`DeleteClientUseCase` NO borra el `User` asociado.** Solo elimina la
+    fila de `client_profiles` (mismo alcance del esqueleto original, que
+    declaraba esta clase dependiendo únicamente de `ClientProfileRepository`).
+    La cuenta de acceso (`User`, role='cliente') queda huérfana sin perfil —
+    desactivarla/eliminarla es una operación distinta (`DELETE /users/{id}`,
+    módulo Users) que no se mezcla aquí. Documentado como limitación
+    conocida, revisable si una entrega futura pide que "eliminar cliente"
+    también desactive la cuenta.
+  - **Autorización por endpoint** (detalle fino, base ya sentada por
+    `require_role`/`get_current_user` del módulo Auth):
+    - `POST /clients`: solo `admin` (`require_role("admin")`) — alta de
+      clientes es tarea de recepción/administración, nunca autoservicio.
+    - `GET /clients`: `require_role("admin", "entrenador")` bloquea `cliente`
+      de entrada (403). Dentro del handler, si `current_user.role ==
+      "entrenador"` se fuerza `list_by_trainer(current_user.id)` — el
+      `trainer_id` de query se IGNORA para ese rol (no se usa para ver la
+      cartera de otro entrenador); `admin` ve todos o filtra por el
+      `trainer_id` de query si lo manda.
+    - `GET /clients/me` (nuevo, no pedido por el esqueleto original):
+      conveniencia para `cliente` (`require_role("cliente")`), resuelve el
+      perfil propio vía `client_repository.get_by_user_id(current_user.id)`
+      sin que el frontend necesite conocer el `client_id` numérico para
+      consultar RF013. Se declaró ANTES de `GET /clients/{client_id}` en el
+      archivo — importante porque FastAPI/Starlette resuelve rutas en
+      orden de declaración y `{client_id}` sin convertidor explícito
+      matchea el string `"me"` antes de que FastAPI intente convertirlo a
+      `int` (declarado después habría devuelto 422 en vez del perfil).
+    - `GET /clients/{client_id}`: los 3 roles pueden llegar (no hay rol
+      bloqueado de entrada, el filtro es por dato) — `admin` sin
+      restricción; `entrenador` solo si `profile.trainer_id ==
+      current_user.id` (403 si no); `cliente` solo si `profile.user_id ==
+      current_user.id` (403 si no).
+    - `PATCH /clients/{client_id}`: solo `admin`
+      (`require_role("admin")`). RF012 (entrenador actualiza rutinas/dietas
+      de SUS clientes asignados) es de los módulos Rutinas/Dietas, no de
+      este perfil — el perfil de cliente (incluida la reasignación de
+      entrenador) es decisión administrativa, no del propio entrenador.
+    - `DELETE /clients/{client_id}`: solo `admin`.
+  - **Esquema de respuesta `ClientProfileRead` ampliado con `email`,
+    `full_name` (del `User` dueño del perfil) y `trainer_name` (del `User`
+    entrenador, si tiene uno asignado).** Sin esto, `ClientsListPage`
+    necesitaría 2-3 llamadas extra a `GET /users/{id}` por fila solo para
+    mostrar nombre/correo/entrenador en la misma tabla que lista perfiles —
+    el router ya tiene ambos repositorios disponibles (`_enrich()` en
+    `clients.py`) y enriquecer ahí es más simple que forzar al frontend a
+    des-normalizar. `ClientProfileCreate` también cambió: ya no recibe
+    `user_id` (lo crea el propio caso de uso) sino `email`/`full_name`
+    directos, sin campo de password (ver decisión de arriba).
+  - **`backend/tests/conftest.py` extendido** para truncar también
+    `client_profiles` (antes solo truncaba `users`) — aunque
+    `TRUNCATE ... CASCADE` sobre `users` ya arrastraba `client_profiles` por
+    la FK, se deja explícito en el propio `TRUNCATE` para que el código
+    documente que este módulo también necesita aislamiento entre tests.
+
+- **Alternativa aplicada:**
+  - `backend/src/domain/clients/exceptions.py` (nuevo): `ClientNotFoundError`,
+    `InvalidTrainerAssignmentError`.
+  - `backend/src/infrastructure/security/password.py`: nueva función
+    `generate_temporary_password()` (módulo `secrets`, 12 caracteres
+    alfanuméricos).
+  - `backend/src/application/clients/use_cases.py`: los 4 casos de uso con
+    lógica real (antes `NotImplementedError`), más `RegisterClientResult`
+    (dataclass con `client_profile` + `temporary_password`) y la función
+    compartida `_ensure_trainer_role`.
+  - `backend/src/api/v1/schemas/clients.py`: `ClientProfileCreate`
+    reescrito (sin `user_id`, con `email`/`full_name`, sin password);
+    `ClientProfileRead` con `email`/`full_name`/`trainer_name` embebidos;
+    `ClientRegisterResponse` nuevo (`client` + `temporary_password`).
+  - `backend/src/api/v1/routers/clients.py`: reescrito completo (los 5
+    endpoints + `GET /clients/me` nuevo), autorización detallada arriba,
+    traduce excepciones de dominio a 400/403/404/409 en español.
+  - `backend/tests/conftest.py`: `TRUNCATE` extendido a `client_profiles`.
+  - `backend/tests/test_clients.py` (nuevo): 8 casos (alta exitosa admin,
+    alta rechazada no-admin 403, listado admin ve todos, listado entrenador
+    ve solo los suyos, cliente accede a su propio perfil, cliente NO accede
+    al perfil de otro 403, reasignar entrenador con `trainer_id` inválido
+    400, eliminar como no-admin 403) — los 8 pasan contra Postgres real.
+  - Frontend: `frontend/src/types/api.ts` (nuevo) documenta las formas de
+    respuesta reales del backend (`ApiClientProfile`,
+    `ClientRegisterPayload`, `ClientRegisterResponse`) por separado de
+    `types/models.ts` (modelo lógico original, pensado para mocks), ya que
+    `ClientProfileRead` del backend embebe campos que el modelo lógico de
+    14 entidades no tenía.
+  - `frontend/src/pages/ClientsListPage.tsx`: conectada a `GET /clients`
+    real con `LoadingState`/`ErrorMessage`/`EmptyState`; columnas
+    "Cliente"/"Contacto"/"Entrenador" vienen de la API real, columnas
+    "Plan"/"Membresía" siguen con `clientListRows` mock (TODO explícito en
+    el código, indexado por posición ya que los ids mock no corresponden a
+    los reales); 401 cierra sesión (`logout()`) y redirige a `/login`, 403
+    muestra mensaje claro en español.
+  - `frontend/src/pages/ClientFormPage.tsx`: sección "Datos del cliente"
+    (incluido el selector de entrenador, ahora alimentado por
+    `GET /users?role=entrenador` real en vez del mock `trainers` — un
+    `trainer_id` mock casi nunca existe en la base real, así que mantener el
+    mock ahí habría roto el alta en la práctica) conectada a `POST /clients`
+    real; email duplicado (409) se muestra como error del campo correo, no
+    un toast genérico; el aviso de éxito es honesto (solo confirma que el
+    cliente se registró y muestra la password temporal, nunca menciona que
+    el pago se registró); "Membresía y pago inicial" sigue sin conectar,
+    con el hint de la tarjeta actualizado para decirlo explícitamente.
+  - `frontend/src/pages/ClientDetailPage.tsx`: header + pestaña "Perfil"
+    conectados a `GET /clients/{id}` real (con `LoadingState`/
+    `ErrorMessage`, 404 propio, 403 con mensaje claro, 401 redirige a
+    login); las 5 pestañas restantes (Membresía/Pagos/Rutina/Dieta/Progreso)
+    quedan con mocks y un comentario TODO explícito cada una. No se agregó
+    un botón de eliminar cliente aquí — no existía en el alcance visual
+    previo y agregarlo sin que el resto del flujo de "archivar/reactivar
+    cliente" esté definido habría sido inventar una acción a medias.
+  - **Verificación de cierre:** `pytest backend/tests/test_clients.py -v` ->
+    8/8 PASA; `pytest backend/tests/ -v` -> 19/19 PASA (incluye los 7 de
+    Auth y los 4 de salud/documentación, sin regresiones). Grep de
+    `import`/`from` en `backend/src/domain/` confirma cero referencias a
+    `sqlalchemy`, `fastapi`, `bcrypt` o `jwt`. `cd frontend && npx tsc -b` y
+    `npm run build` compilan sin errores. Verificación manual con `curl`
+    contra el stack completo (`docker compose up -d db backend`): login
+    admin -> `POST /clients` (201, devuelve password temporal) -> `GET
+    /clients` (admin ve el cliente nuevo) -> `GET /clients/{id}` (200) ->
+    login entrenador sin ese cliente asignado -> `GET /clients/{id}` del
+    cliente ajeno devuelve 403 -> `GET /clients` del entrenador devuelve `[]`
+    -> login del cliente con la password temporal -> `GET /clients/me`
+    devuelve su propio perfil -> `GET /clients` del cliente devuelve 403.
+
+---
