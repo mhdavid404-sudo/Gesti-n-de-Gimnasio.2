@@ -46,3 +46,22 @@ export function getMembershipDisplayStatus(
 ): MembershipDisplayStatus {
   return isMembershipExpiringSoon(membership, referenceDate) ? 'por_vencer' : membership.status
 }
+
+/**
+ * Criterio compartido para elegir "la" membresía a mostrar cuando un
+ * cliente tiene más de una (módulo Memberships, Entrega 2, datos reales de
+ * la API — `GET /memberships` puede devolver historial completo, no solo
+ * la vigente): se prefiere la que esté `activa`; si no hay ninguna activa,
+ * se toma la de `end_date` más lejana (la más reciente/relevante del
+ * historial). Usado por `ClientsListPage.tsx` (columna Plan/Membresía) y
+ * `ClientDetailPage.tsx` (header + pestaña Membresía) para no duplicar el
+ * criterio en dos lugares.
+ */
+export function pickCurrentMembership<T extends { status: string; end_date: string }>(
+  memberships: T[],
+): T | undefined {
+  if (memberships.length === 0) return undefined
+  const activa = memberships.find((m) => m.status === 'activa')
+  if (activa) return activa
+  return [...memberships].sort((a, b) => b.end_date.localeCompare(a.end_date))[0]
+}

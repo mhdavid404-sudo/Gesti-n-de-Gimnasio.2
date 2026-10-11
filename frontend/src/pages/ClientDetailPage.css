@@ -168,8 +168,47 @@
   color: var(--color-text-dim);
 }
 
+.client-detail__meta-loading {
+  font-size: 14.5px;
+  color: var(--color-text-dim);
+}
+
+.client-detail__membership-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.client-detail__assign-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.client-detail__assign-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.client-detail__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.client-detail__assign-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
 @media (max-width: 700px) {
   .client-detail__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .client-detail__assign-row {
     grid-template-columns: 1fr;
   }
 }

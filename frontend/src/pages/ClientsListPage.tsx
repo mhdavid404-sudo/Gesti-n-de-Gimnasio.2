@@ -6,8 +6,8 @@ import { LoadingState } from '../components/ui/LoadingState'
 import { StatusPill } from '../components/ui/StatusPill'
 import { useAuth } from '../hooks/useAuth'
 import { apiFetch, ApiError } from '../api/client'
-import { clientListRows } from '../mocks/data'
-import type { ApiClientProfile } from '../types/api'
+import type { ApiClientProfile, ApiMembership, ApiMembershipPlan } from '../types/api'
+import { getMembershipDisplayStatus, pickCurrentMembership } from '../utils/membership'
 import './ClientsListPage.css'
 
 interface ClientsListLocationState {
@@ -26,6 +26,16 @@ export function ClientsListPage() {
   const [clients, setClients] = useState<ApiClientProfile[] | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  // Columna "Plan"/"Membresía" -- antes mock (`clientListRows`), ahora datos
+  // reales de `GET /memberships` + `GET /membership-plans` (ver TODO que
+  // vivía aquí mismo). Se cargan UNA SOLA VEZ (no una llamada por fila) y se
+  // indexan en memoria por `client_id`/`plan_id`; si cualquiera de las dos
+  // falla, la tabla principal de clientes sigue funcionando y esa columna
+  // simplemente cae a "Sin membresía" (es información secundaria, no
+  // amerita tapar todo el listado con un error de pantalla completa).
+  const [memberships, setMemberships] = useState<ApiMembership[]>([])
+  const [plans, setPlans] = useState<ApiMembershipPlan[]>([])
 
   // El mensaje de éxito viaja como router state desde /clientes/nuevo. Se
   // limpia del history en cuanto se muestra para que un refresh o un
@@ -63,8 +73,52 @@ export function ClientsListPage() {
 
   useEffect(() => {
     loadClients()
+
+    apiFetch<ApiMembership[]>('/memberships')
+      .then(setMemberships)
+      .catch((err: unknown) => {
+        if (err instanceof ApiError && err.isUnauthorized) {
+          logout()
+          navigate('/login', { replace: true })
+        }
+        // Otros errores: columna degrada a "Sin membresía", ver comentario arriba.
+      })
+
+    apiFetch<ApiMembershipPlan[]>('/membership-plans')
+      .then(setPlans)
+      .catch((err: unknown) => {
+        if (err instanceof ApiError && err.isUnauthorized) {
+          logout()
+          navigate('/login', { replace: true })
+        }
+      })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const planById = useMemo(() => {
+    const map = new Map<number, ApiMembershipPlan>()
+    plans.forEach((p) => map.set(p.id, p))
+    return map
+  }, [plans])
+
+  // Un cliente puede tener varias membresías en su historial -- criterio
+  // compartido con ClientDetailPage, ver `pickCurrentMembership` en
+  // utils/membership.ts (prefiere la `activa`; si no hay, la de `end_date`
+  // más lejana).
+  const membershipByClientId = useMemo(() => {
+    const byClient = new Map<number, ApiMembership[]>()
+    memberships.forEach((m) => {
+      const list = byClient.get(m.client_id) ?? []
+      list.push(m)
+      byClient.set(m.client_id, list)
+    })
+    const map = new Map<number, ApiMembership>()
+    byClient.forEach((list, clientId) => {
+      const current = pickCurrentMembership(list)
+      if (current) map.set(clientId, current)
+    })
+    return map
+  }, [memberships])
 
   const filtered = useMemo(() => {
     if (!clients) return []
@@ -141,14 +195,8 @@ export function ClientsListPage() {
             </thead>
             <tbody>
               {filtered.map((row, index) => {
-                // TODO(módulo Membresías, todavía no construido): "Plan" y
-                // "Membresía" siguen con datos MOCK (`clientListRows`,
-                // ver mocks/data.ts) indexados por posición, no por cliente
-                // real -- los ids de `clientListRows` son de datos de
-                // ejemplo y no corresponden a los ids reales de esta
-                // tabla. Reemplazar por datos reales cuando exista
-                // `GET /memberships?client_id=...`.
-                const mockRow = clientListRows[index % clientListRows.length]
+                const membership = membershipByClientId.get(row.id)
+                const plan = membership ? planById.get(membership.plan_id) : undefined
                 return (
                   <tr
                     key={row.id}
@@ -164,9 +212,9 @@ export function ClientsListPage() {
                       </div>
                     </td>
                     <td>{row.trainer_name ?? 'Sin asignar'}</td>
-                    <td>{mockRow?.planName ?? 'Sin membresía'}</td>
+                    <td>{plan?.name ?? 'Sin membresía'}</td>
                     <td>
-                      <StatusPill status={mockRow?.membershipStatus ?? 'sin_membresia'} />
+                      <StatusPill status={membership ? getMembershipDisplayStatus(membership) : 'sin_membresia'} />
                     </td>
                     <td>
                       <Link to={`/clientes/${row.id}`} className="btn btn-ghost clients-page__view">

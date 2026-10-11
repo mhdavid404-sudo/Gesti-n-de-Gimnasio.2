@@ -143,3 +143,43 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Alta de plan (solo admin) — formulario inline, mismo lenguaje de
+   validación en línea que ClientFormPage (.input[data-invalid], .field-error).
+--------------------------------------------------------------------------- */
+.plan-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: 18px;
+}
+
+.plan-form__row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: var(--space-3);
+}
+
+.plan-form__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.plan-form__benefits-input {
+  resize: vertical;
+  font-family: var(--font-body);
+  min-height: 72px;
+}
+
+.plan-form__actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 700px) {
+  .plan-form__row {
+    grid-template-columns: 1fr;
+  }
+}
