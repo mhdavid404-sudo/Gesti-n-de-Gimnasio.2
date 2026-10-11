@@ -18,7 +18,8 @@ export function ClientsListPage() {
   const [query, setQuery] = useState('')
   const location = useLocation()
   const navigate = useNavigate()
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
+  const isAdmin = user?.role === 'admin'
 
   const initialToast = (location.state as ClientsListLocationState | null)?.toast ?? null
   const [toast, setToast] = useState<string | null>(initialToast)
@@ -156,9 +157,11 @@ export function ClientsListPage() {
         />
         <span className="clients-page__count">{clients ? `${filtered.length} clientes` : ''}</span>
         <span className="clients-page__toolbar-spacer" />
-        <Link to="/clientes/nuevo" className="btn btn-primary">
-          + Nuevo cliente
-        </Link>
+        {isAdmin && (
+          <Link to="/clientes/nuevo" className="btn btn-primary">
+            + Nuevo cliente
+          </Link>
+        )}
       </div>
 
       {isLoading ? (
@@ -176,8 +179,8 @@ export function ClientsListPage() {
                 ? 'Ningún cliente coincide con tu búsqueda.'
                 : 'Da de alta al primer cliente para empezar a usar el padrón.'
             }
-            actionLabel={query ? undefined : 'Nuevo cliente'}
-            actionHref={query ? undefined : '/clientes/nuevo'}
+            actionLabel={query || !isAdmin ? undefined : 'Nuevo cliente'}
+            actionHref={query || !isAdmin ? undefined : '/clientes/nuevo'}
           />
         </div>
       ) : (

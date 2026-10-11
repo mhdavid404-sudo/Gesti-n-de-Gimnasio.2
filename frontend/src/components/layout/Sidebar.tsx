@@ -1,11 +1,29 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import type { UserRole } from '../../types/models'
 import { IconBarbell, IconBowl, IconCard, IconClose, IconGrid, IconLogout, IconTrend, IconUsers } from './icons'
 import './Sidebar.css'
 
-const NAV_ITEMS = [
+interface NavItem {
+  to: string
+  label: string
+  Icon: typeof IconGrid
+  /** Si se omite, el link es visible para los 3 roles. */
+  roles?: UserRole[]
+}
+
+const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Panel', Icon: IconGrid },
-  { to: '/clientes', label: 'Clientes', Icon: IconUsers },
+  // "Clientes" es un padrón administrativo (listar/dar de alta clientes) --
+  // RF013 limita al rol `cliente` a consultar SU PROPIA información, nunca
+  // un listado de clientes (el backend ya responde 403 a `GET /clients`
+  // para ese rol, ver routers/clients.py). Membresías/Rutinas/Dietas/
+  // Progreso sí se quedan visibles para `cliente`: esas pantallas ya se
+  // auto-acotan a "lo propio" cuando las abre un cliente (ver
+  // MembershipsPage/RoutinesPage/DietsPage/ProgressPage), son el mismo
+  // destino que ya usan sus accesos rápidos "Mi rutina"/"Mi dieta"/etc. del
+  // Dashboard.
+  { to: '/clientes', label: 'Clientes', Icon: IconUsers, roles: ['admin', 'entrenador'] },
   { to: '/membresias', label: 'Membresías', Icon: IconCard },
   { to: '/rutinas', label: 'Rutinas', Icon: IconBarbell },
   { to: '/dietas', label: 'Dietas', Icon: IconBowl },
@@ -19,7 +37,8 @@ interface SidebarProps {
 }
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
+  const visibleItems = NAV_ITEMS.filter((item) => !item.roles || (user && item.roles.includes(user.role)))
 
   return (
     <aside className="sidebar" data-open={isOpen}>
@@ -35,7 +54,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       </div>
 
       <nav className="sidebar__nav" aria-label="Navegación principal">
-        {NAV_ITEMS.map(({ to, label, Icon }) => (
+        {visibleItems.map(({ to, label, Icon }) => (
           <NavLink
             key={to}
             to={to}
