@@ -745,3 +745,23 @@ Registro de decisiones de arquitectura tomadas por Isai (revisor de diseño) dur
   - **Verificación de cierre:** `pytest backend/tests/test_routines.py -v` → 10/10 PASA; `pytest backend/tests/ -v` completo → 53/53 PASA (43 previas + 10 nuevas), sin regresiones. Grep de `import`/`from` en `backend/src/domain/` confirma cero referencias a `sqlalchemy`, `fastapi`, `bcrypt` o `jwt`. Tarea delimitada a backend — `frontend/` no se tocó.
 
 ---
+
+### 2026-10-11 — Módulo Ejercicios y Rutinas: conexión de frontend (RF007, RF008)
+
+- **Propuesta original:** conectar `RoutinesPage.tsx` (catálogo + asignaciones, hoy 100% mock) y la pestaña "Rutina" de `ClientDetailPage.tsx` a la API real.
+
+- **Decisión:** aprobada y construida.
+
+- **Por qué / detalle de cada sub-decisión:**
+  - **La pantalla de "Asignaciones" cambia de forma respecto al mock.** El mock mostraba una tabla única con TODAS las asignaciones del gimnasio sin importar cliente; el backend, por diseño (ownership por dato, mismo principio ya aplicado en todos los módulos anteriores), solo expone el historial POR cliente (`GET /routines/assignments/clients/{id}`), no un listado global. Se resolvió con un selector de cliente (alimentado por `GET /clients`, que ya viene scoped por rol — un entrenador ya solo ve ahí a los suyos) que, al elegir uno, muestra y gestiona el historial de ESE cliente. Para el rol `cliente` no hay selector: se resuelve su propio `client_id` vía `GET /clients/me` directo.
+  - **Alta inline de ejercicios y rutinas** (`POST /exercises`, `POST /routines`, `POST /routines/{id}/exercises`), visible para `admin`/`entrenador` — sin esto el catálogo nunca podría poblarse desde la UI, ya que no hay seed de ejercicios/rutinas en ninguna migración (mismo problema ya resuelto con el alta inline de planes en el módulo de Membresías).
+  - **Carga de ejercicios por rutina: bajo demanda en el catálogo, eager en el detalle de cliente.** En `RoutinesPage.tsx` los ejercicios de cada rutina se cargan solo al expandir su `<details>` (evita N+1 si el catálogo crece); en la pestaña "Rutina" de `ClientDetailPage.tsx` se cargan de inmediato porque ahí solo son las pocas rutinas asignadas a UN cliente, no el catálogo completo — mismo criterio de "no sobre-construir" aplicado en direcciones distintas según el volumen real de datos de cada pantalla.
+  - **El control de cambio de `status` (`PATCH /routines/assignments/{id}`) se muestra para `admin`/`entrenador` sin un chequeo de ownership adicional en el frontend** — como el selector de clientes de un entrenador ya viene scoped a los suyos por el propio backend, cualquier cliente que aparece ahí ya es uno que puede editar; el backend sigue siendo la autoridad final (403 si de todos modos no corresponde).
+
+- **Alternativa aplicada:**
+  - `frontend/src/types/api.ts`: tipos de Ejercicios/Rutinas/Asignaciones (`ApiExercise`, `ApiRoutine`, `ApiRoutineExercise`, `ApiRoutineAssignment` y sus payloads de creación/actualización).
+  - `frontend/src/pages/RoutinesPage.tsx`/`.css`: reescrita completa — catálogo con alta inline + selector de cliente para asignaciones.
+  - `frontend/src/pages/ClientDetailPage.tsx`: pestaña "Rutina" conectada, con asignación desde `EmptyState` cuando el cliente no tiene ninguna.
+  - **Verificación de cierre (en navegador, stack real):** login admin → alta de ejercicio → alta de rutina → agregar el ejercicio a la rutina (catálogo bajo demanda confirmado al expandir) → asignar la rutina a un cliente desde `RoutinesPage` → confirmada en el historial del cliente (selector) y en la pestaña "Rutina" de `ClientDetailPage` → cambio de estado a "Completada" vía `PATCH` reflejado en ambos lugares. Sin errores en consola del navegador en ningún paso (pestaña nueva, sin ruido de sesiones anteriores).
+
+---
