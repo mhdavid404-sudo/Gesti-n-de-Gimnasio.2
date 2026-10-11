@@ -231,3 +231,172 @@ Registro de decisiones de arquitectura tomadas por Isai (revisor de diseño) dur
   - Tipografía: `body` 15px→16px, `.section-title` 24px→26px, `.topbar__title` 30px→32px, `StatNumber` y demás texto de tablas/tarjetas subidos proporcionalmente (incrementos de 0.5–2px) — verificado que el `clamp()` de `StatNumber` sigue sin desbordar el grid de 4 columnas del Dashboard tras el cambio.
 
 ---
+
+### 2026-10-10 — Arranque de Entrega 2: alcance y decisiones de ambigüedad resueltas antes de codear
+
+- **Propuesta original:** desarrollar los 15 RF completos (lógica de negocio real, auth JWT, conexión frontend↔backend), un rediseño de UX/UI del panel (feedback de la profesora: "no tiene buen UI/UX, necesito ver al entrar qué puedo hacer"), y la suite de pruebas CP01-CP18, en una sola corrida módulo por módulo, sin pausas de confirmación salvo por acciones irreversibles/destructivas.
+
+- **Decisión:** aprobada y en ejecución. Antes de empezar, se resuelven aquí las ambigüedades explícitamente delegadas:
+  1. **No se agrega un 4.º rol "Recepcionista".** El modelo de datos (`ROLES_VALIDOS` en `domain/users/entities.py`) y RF001/RF002 solo definen Admin/Entrenador/Cliente — el brief de negocio (Apartado I) describe recepcionistas como personas que *operan* el sistema, no como un rol de control de acceso distinto. Se resuelve asignando a las recepcionistas la cuenta con `role="admin"` (mismo nivel de permisos que ya pedían las HU03-HU06, que hablan de "Admin/Recepcionista" indistintamente). Revisable si una entrega futura pide permisos distintos entre ambos.
+  2. **El backlog de 11 inconsistencias de modelo (ver entrada "Backlog de alineación de modelo para Entrega 2") se resuelve en una migración nueva (`0002_*`), no editando `0001_initial_schema.py`.** En Entrega 1 se editaba el archivo 0001 directamente porque no había base de datos viva. En Entrega 2 el stack corre contra Postgres real vía `docker compose`, así que el patrón correcto es una migración aditiva.
+  3. **Librerías nuevas para auth:** `bcrypt` (hash de contraseña, directo, sin la capa de compatibilidad de `passlib` que tiene historial de fricción con versiones recientes de `bcbrypt`) y `PyJWT` (tokens JWT, más simple que `python-jose` para lo que necesita este proyecto). Se agregan a `backend/requirements.txt`.
+  4. **Paleta "verde oliva como color principal"** sustituye el principio de "acento en reserva" adaptado de UFC Gym (entrada "Taste DNA de UFC Gym…") — esa entrada sigue siendo válida como registro histórico de por qué se llegó al verde/negro actual, pero esta instrucción explícita del dueño del proyecto (y el feedback de UI/UX de la profesora) tiene prioridad: ahora se quiere una paleta de sistema de diseño convencional (primario con variantes claras/oscuras, neutros, estados), no un acento ultra-escaso. Detalle de la paleta nueva en la entrada correspondiente a la Parte A (rediseño UX/UI), una vez construida.
+  5. **No se hace push** — todo el trabajo de Entrega 2 queda en commits locales, confirmado explícitamente por el dueño del proyecto.
+  6. **Ningún nombre de agente/herramienta de IA aparece en código, commits o documentación** desde esta entrada en adelante (ya era la regla de `CLAUDE.md`; se reitera aquí porque esta entrega involucra más superficie de código que cualquier anterior).
+
+- **Por qué:** instrucción explícita y exhaustiva del dueño del proyecto, con autorización previa para decidir ambigüedades menores sin pausar.
+
+- **Alternativa aplicada:** ninguna — se documentan las decisiones arriba y se procede.
+
+---
+
+### 2026-10-10 — Resolución del backlog de alineación de modelo (B0)
+
+- **Propuesta original:** resolver, uno por uno, los 11 puntos listados en la entrada "2026-09-12 — Backlog de alineación de modelo para Entrega 2", decidiendo en cada caso si el backend (fuente de verdad del esquema real) se extiende, si el frontend se corrige, o si ambos lados se alinean a un nombre/tipo/nulabilidad común.
+
+- **Decisión:** los 11 puntos se resuelven así:
+  1. **`Notification.title`** — el backend ya lo tenía `NOT NULL` desde la migración `0001`. Se agrega `title: string` a `frontend/src/types/models.ts` y a los 6 registros mock de `notifications` en `mocks/data.ts`. Sin cambio de esquema.
+  2. **`RoutineExercise.order` vs `order_index`** — se unifica al nombre del backend (`order_index`), que ya es la columna real desde `0001`. Se renombra en `models.ts`, en los 16 registros mock de `routineExercises` y en el `.sort()` de `getRoutineExercises`. Sin cambio de esquema.
+  3. **`DietPlan.daily_calories` vs `calories_target`** — mismo criterio: se unifica al nombre del backend (`calories_target`). Se renombra en `models.ts`, en los 3 registros mock de `dietPlans`, y en los dos lugares del frontend que lo leían (`ClientDetailPage.tsx`, `DietsPage.tsx`). Sin cambio de esquema.
+  4. **`RoutineAssignment.notes` / `DietAssignment.notes`** — el frontend ya los modelaba (y los usaba en los formularios de asignación de `RoutinesPage.tsx`/`DietsPage.tsx`) sin respaldo en el backend. Tienen sentido de negocio real (nota del entrenador/admin al asignar) y son consistentes con el `notes` que ya existe en `payments` y `body_progress` — se agregan ambas columnas (`TEXT NULLABLE`) al backend vía migración `0002`.
+  5. **`MembershipPlan.benefits`** — mismo criterio que el punto 4: ya se usaba en el frontend (tarjetas de plan en `MembershipsPage`/landing) sin respaldo en el backend. Se agrega como columna `JSON NOT NULL DEFAULT '[]'` vía migración `0002` (lista de texto libre, no amerita tabla puente). **`MembershipPlan.created_at`** ya existía en el backend desde `0001`; se agrega a `models.ts` y a los 3 registros mock. Sin inventar un valor "bonito": se usa la misma fecha arbitraria de alta (`2026-01-01T08:00:00Z`) para los 3 planes del catálogo mock.
+  6. **`AuditLog.entity_id`** — el backend es la fuente de verdad (`VARCHAR(50)`, ya así desde `0001` y ya reflejado correctamente como `str | None` en la entidad de dominio `domain/notifications/entities.py`). Se corrige el frontend de `number | null` a `string | null`, y los 4 registros mock de `auditLogs` pasan sus `entity_id` de número a string (`900` -> `'900'`, etc.). Sin cambio de esquema.
+  7. **`users.updated_at` / `client_profiles.updated_at`** — ya existían `NOT NULL` en el backend desde `0001`. Se agregan a `User`/`ClientProfile` en `models.ts` y a los 9 + 6 registros mock respectivos (mismo valor que `created_at`, consistente con que en Entrega 1 ningún registro mock ha sido editado todavía).
+  8. **`Payment.created_at` / `Exercise.created_at`** — mismo caso: ya existían en el backend desde `0001`. Se agregan a los tipos y a los 7 + 10 registros mock respectivos.
+  9. **`Exercise.equipment`** — mismo criterio que los puntos 4/5: ya se usaba en el catálogo mock de ejercicios sin respaldo en el backend. Se agrega como columna `VARCHAR(100) NULLABLE` vía migración `0002` (nullable porque ejercicios de peso corporal, ej. plancha abdominal, no requieren equipo).
+  10. **Nulabilidad relajada en el frontend** (`ClientProfile.phone/birth_date/address`, `Exercise.muscle_group/description`, `Routine.description`, `BodyProgress.height_cm`) — el backend es la fuente de verdad (todas son `NULLABLE` desde `0001`). Se corrigen los 7 campos a `| null` en `models.ts`. Esto obligó dos ajustes en cascada: `ClientListRow.phone` (tipo derivado en `mocks/data.ts`) pasa a `string | null`, y `ProgressPage.tsx` agrega un guard `latest?.height_cm != null` antes de pasar el valor a `<StatNumber>` (que no acepta `null`).
+  11. **`AuditLog.entity_type`** — el backend es la fuente de verdad (`NULLABLE` desde `0001`). Se corrige el frontend de `string` a `string | null`.
+
+- **Por qué:** en los 7 puntos (1, 2, 3, 6, 7, 8, 11) donde el backend ya tenía la columna/tipo/nulabilidad correcta desde la migración `0001` de Entrega 1, la única causa de la divergencia era que el frontend se escribió sin volver a comparar contra el DDL real — ahí el backend manda y el frontend se corrige. En los 4 puntos restantes (4, 5, 9) el frontend había modelado un campo con respaldo de negocio real (nota de asignación, beneficios de plan, equipo de ejercicio) que el backend nunca tuvo — ahí se amplía el backend en vez de borrar el campo del frontend, siguiendo el mismo criterio que el arbitraje anterior de `registered_by`/`notes` en `Payment` (ver entrada "2026-09-12 — Arbitraje de desalineación de modelo backend↔frontend").
+
+- **Alternativa aplicada:**
+  - Migración nueva `backend/src/infrastructure/migrations/versions/0002_backlog_alineacion_modelo.py` (aditiva, `upgrade`/`downgrade` completos): agrega `membership_plans.benefits` (JSON NOT NULL DEFAULT '[]'), `exercises.equipment` (VARCHAR(100) NULLABLE), `routine_assignments.notes` y `diet_assignments.notes` (TEXT NULLABLE). Aplicada con `alembic upgrade head` corrido en local (venv con `DATABASE_URL` apuntando a `localhost:5432`, base levantada con `docker compose up -d db`) — se eligió este método sobre `docker compose exec backend alembic upgrade head` porque no fue necesario reconstruir la imagen del contenedor `backend` solo para correr una migración.
+  - `backend/src/infrastructure/db/models/memberships.py`, `routines.py`, `diets.py`: columnas nuevas agregadas a `MembershipPlanModel`, `ExerciseModel`, `RoutineAssignmentModel`, `DietAssignmentModel`.
+  - `backend/src/domain/memberships/entities.py`, `domain/routines/entities.py`, `domain/diets/entities.py`: campos nuevos agregados a las dataclasses (`MembershipPlan.benefits`, `Exercise.equipment`, `RoutineAssignment.notes`, `DietAssignment.notes`), todos con default para no romper la construcción existente de estas entidades en otros módulos.
+  - `backend/src/infrastructure/repositories/memberships.py`, `routines.py`, `diets.py`: `_to_entity`/`add`/`update` actualizados para traducir los 4 campos nuevos.
+  - `backend/src/api/v1/schemas/memberships.py`, `routines.py`, `diets.py`: `*Create`/`*Read` actualizados con los mismos 4 campos, para que la API (aunque sus routers sigan en 501 hasta que se conecten en esta misma entrega) ya tenga el contrato correcto cuando se implementen.
+  - `backend/MODELO-DATOS.md`: las 4 columnas nuevas documentadas en sus tablas correspondientes, más una nota de cabecera y una sección final referenciando esta entrada.
+  - `frontend/src/types/models.ts`: los 11 puntos reflejados (detalle completo arriba).
+  - `frontend/src/mocks/data.ts`: todos los registros mock afectados actualizados para seguir compilando contra los tipos nuevos (sin conectar a la API real todavía — eso es una fase posterior).
+  - `frontend/src/pages/ClientDetailPage.tsx`, `DietsPage.tsx`: `.daily_calories` -> `.calories_target`. `frontend/src/pages/ProgressPage.tsx`: guard de nulabilidad agregado para `height_cm`.
+  - **Verificación de cierre:** `docker compose up -d db` + `alembic upgrade head` aplican ambas migraciones (`0001` -> `0002`) sin error contra Postgres real; `\d` de las 4 tablas confirma las columnas nuevas con el tipo/nulabilidad esperado; `cd frontend && npx tsc -b --force` compila sin errores.
+
+---
+
+### 2026-10-10 — Módulo Auth/Roles completo (B1): hashing, JWT, casos de uso reales, autorización por rol
+
+- **Propuesta original:** implementar el ciclo completo del módulo de autenticación (RF001, RF002) con hash de password real, JWT de sesión, casos de uso de dominio sin `NotImplementedError`, dependencias de FastAPI para autenticación/autorización, y la pantalla de Login conectada — sentando además la base de RF012/RF013 (acceso acotado por rol a entrenador/cliente) para cuando se conecten los módulos de Clientes/Rutinas/Dietas/Progreso en esta misma entrega.
+
+- **Decisión:** aprobada y construida.
+
+- **Por qué / detalle de cada sub-decisión:**
+  - **`bcrypt` directo, sin `passlib`** y **`PyJWT`**: ya decididos en la entrada de arranque de Entrega 2 (punto 3) — aquí solo se ejecutan. El hash vive en `backend/src/infrastructure/security/password.py` (factor de costo 12, el default de la librería) y el JWT en `backend/src/infrastructure/security/jwt.py`.
+  - **Expiración del JWT: 8 horas.** Es un sistema de staff de gimnasio que se usa por turno de trabajo, no una sesión bancaria de alto riesgo — 8 horas cubre un turno completo sin forzar un re-login a media jornada, y sigue siendo acotado (no es un token que no expira).
+  - **El dominio no genera el JWT.** `AuthenticateUserUseCase.execute` (en `application/users/use_cases.py`) solo verifica email/password/`is_active` y devuelve el `User` autenticado o lanza `InvalidCredentialsError` — emitir el token es responsabilidad exclusiva de `api/v1/routers/auth.py`, que es la única capa que debe saber que una sesión se representa como un JWT. Mismo principio aplicado a `RegisterUserUseCase` (valida unicidad de email y rol, hashea, persiste) con excepciones de dominio propias (`EmailAlreadyExistsError`, `InvalidRoleError`, `InvalidCredentialsError`, `UserNotFoundError`, nuevas en `domain/users/exceptions.py`, sin ningún import de FastAPI) que el router traduce a HTTP.
+  - **No hay alta pública de usuarios.** `POST /users` queda protegido a `role="admin"` — en un sistema de staff de gimnasio no existe un formulario de "crea tu cuenta" abierto al público; las cuentas de entrenador/cliente las crea el staff administrativo. `GET /users/{id}` y `GET /users` quedan abiertos a `admin` y `entrenador` (un entrenador necesita poder consultar información básica de otros usuarios, ej. para verificar a quién le asigna una rutina); `PATCH`/`DELETE /users/{id}` quedan solo para `admin`.
+  - **`require_role` es la base de RF012/RF013, no la implementación completa.** Esta dependencia solo resuelve el primer filtro (control de acceso por rol); RF012 (entrenador limitado a SUS clientes asignados) y RF013 (cliente solo lectura de lo propio) necesitan ademas un filtro por dato (no alcanza con "es entrenador", hace falta "es EL entrenador de este cliente") que se aplica caso por caso dentro de cada caso de uso cuando se conecten los módulos de Clientes/Rutinas/Dietas/Progreso en esta misma entrega — dejado como comentario explícito en `api/v1/dependencies.py`.
+  - **Estrategia de aislamiento de pruebas: TRUNCATE de `users` por test, no transacción-por-test.** El código de aplicación hace `commit()` explícito dentro de los routers (`register_user`, `update_user`, `delete_user`); envolver cada test en una transacción/SAVEPOINT que se revierte al final exige el patrón de SAVEPOINT + evento `after_transaction_end` de SQLAlchemy para que esos `commit()` internos no se escapen de la transacción de prueba — complejidad que no se justifica todavía con un solo módulo de integración real (`users`). Se eligió TRUNCATE (fixture `autouse` en `backend/tests/conftest.py`) por ser más simple y suficiente para este alcance; reevaluar hacia transacción-por-test si crecen los módulos con pruebas de integración reales sobre tablas relacionadas.
+  - **Emails de prueba con dominio real (`@gmail.com`), no `@algo.test`.** `email-validator` (dependencia de `EmailStr` de Pydantic) valida también que el dominio tenga registros DNS/MX reales y rechaza explícitamente TLDs reservados como `.test`/`.example`/`.invalid` (RFC 2606) con el mensaje "special-use or reserved name". Se adoptó el mismo patrón que ya usa `frontend/src/mocks/data.ts` (emails de cliente con `@gmail.com`) para los correos de prueba en `backend/tests/test_auth.py`.
+
+- **Alternativa aplicada:**
+  - Nuevo paquete `backend/src/infrastructure/security/` (`password.py`, `jwt.py`) — infraestructura pura, el dominio no lo importa directo (solo `application/`).
+  - `backend/src/domain/users/exceptions.py` (nuevo): `EmailAlreadyExistsError`, `InvalidRoleError`, `InvalidCredentialsError`, `UserNotFoundError`.
+  - `backend/src/application/users/use_cases.py`: `RegisterUserUseCase`, `AuthenticateUserUseCase`, `ListUsersByRoleUseCase` con lógica real (antes `NotImplementedError`).
+  - `backend/src/api/v1/dependencies.py` (nuevo): `get_current_user` (decodifica `Authorization: Bearer`, 401 si falta/inválido/usuario inactivo o inexistente), `require_role(*roles)` (403 si el rol no calza).
+  - `backend/src/api/v1/schemas/auth.py` (nuevo): `LoginRequest`, `TokenResponse`. `backend/src/api/v1/routers/auth.py` (nuevo): `POST /auth/login`. Montado en `backend/src/api/v1/router.py`.
+  - `backend/src/api/v1/routers/users.py`: reescrito completo (autorización por endpoint detallada arriba), traduce excepciones de dominio a 409/400/401/404 en español.
+  - `JWT_SECRET` agregado a `.env`, `.env.example` (raíz del repo) y `docker-compose.yml` (servicio `backend`), valor de desarrollo explícitamente marcado como inseguro/no-producción.
+  - `backend/tests/conftest.py` (nuevo): fixture `client` + `_clean_users_table` (TRUNCATE autouse). `backend/tests/test_auth.py` (nuevo): 7 casos (registro exitoso, email duplicado 409, login correcto, login password incorrecto 401, login usuario inexistente 401, acceso sin token 401, acceso con rol insuficiente 403) — los 7 pasan contra Postgres real.
+  - Frontend: `frontend/src/api/authStorage.ts` (nuevo, clave `smartgym_auth`), `frontend/src/api/client.ts` (nuevo, wrapper de `fetch` con `Authorization` automático y `ApiError`/`isUnauthorized`), `frontend/src/hooks/useAuth.tsx` (nuevo, `AuthProvider`/`useAuth`), montado en `frontend/src/main.tsx`. `frontend/src/pages/LoginPage.tsx` conectado a `useAuth().login`, con mensaje de error en español y navegación a `/dashboard` solo si el login fue exitoso (estructura/JSX visual intacta). `frontend/src/App.tsx`: `RequireAuth` envuelve las rutas internas (`<AppShell />`), redirige a `/login` si no hay sesión. `frontend/src/components/layout/Sidebar.tsx`: el link "Cerrar sesión" ahora llama a `logout()` además de navegar (solo la función, sin tocar estilos/estructura).
+  - **Verificación de cierre:** `pytest backend/tests/test_auth.py -v` -> 7/7 PASA contra Postgres real (`docker compose up -d db` + `alembic upgrade head`). Verificación manual con `curl`: login real contra un usuario insertado a mano devuelve JWT válido; ese JWT autoriza `GET /api/v1/users` (200) y `POST /api/v1/users` (201, solo con rol admin); sin token devuelve 401; password incorrecto devuelve 401. Grep de `import`/`from` en `backend/src/domain/` confirma cero referencias a `fastapi`, `jwt` o `bcrypt`. `cd frontend && npx tsc -b --force` compila sin errores nuevos.
+
+---
+
+### 2026-10-10 — Entrega 2, Parte A: rediseño UX/UI del panel interno (layout de 3 zonas + paleta oliva)
+
+- **Propuesta original:** responder al feedback de la profesora ("no tiene
+  buen UI/UX, necesito ver al entrar qué puedo hacer") con una revisión
+  completa contra las 10 heurísticas de Nielsen (`docs/REVISION-UX.md`),
+  reestructurar `AppShell` a un layout de 3 zonas (sidebar / "qué puedo
+  hacer" / "resultados"), y sustituir el sistema de color del panel por
+  verde oliva como color primario (no solo acento), según el punto 4 ya
+  adelantado en la entrada anterior.
+
+- **Decisión:** aprobada y construida.
+
+- **Por qué:**
+  - El hallazgo de la profesora es literal y verificable en el código de
+    Entrega 1: `DashboardPage` no tenía ningún punto de entrada a una
+    acción, solo números y tablas de solo lectura (ver `docs/REVISION-UX.md`,
+    "Hallazgo principal"). Un layout de 3 zonas con tarjetas de acción
+    verbo-primero ("Registrar cliente", no "Clientes") es la respuesta
+    directa, no una reinterpretación.
+  - El oliva como PRIMARIO (no "acento en reserva") es instrucción
+    explícita ya registrada en la entrada "Arranque de Entrega 2" (punto
+    4) — esta entrada documenta los valores finales y su verificación de
+    contraste, no reabre la decisión de fondo.
+  - La landing pública (`/`, scope `.landing`) queda explícitamente FUERA
+    de este cambio: es la identidad de marca real de Stronger Aragón
+    (verde bosque extraído del logo, ver entrada "Identidad visual real de
+    marca..."), un producto distinto del panel administrativo interno. El
+    oliva de esta entrada es un sistema de diseño de UI operativa, no una
+    revisión de marca — mezclar ambos habría sido incorrecto para los dos.
+  - El selector de rol (`RoleSwitcher.tsx`) es mock a propósito: el proceso
+    de autenticación real (JWT) se construye en paralelo a esta tarea y
+    todavía no expone un rol de sesión real al frontend. El switch deja
+    probar las 3 variantes del Dashboard sin bloquear el rediseño en espera
+    de esa integración, y queda claramente marcado como herramienta de
+    desarrollo (no es parte del producto final).
+
+- **Alternativa aplicada:**
+  - **Paleta (`frontend/src/styles/theme.css`, `:root`):** nuevas variables
+    canónicas `--color-primary` (`#7C8B3A`), `--color-primary-light`
+    (`#9AAC4E`), `--color-primary-dark` (`#5C6B28`), `--color-primary-soft`,
+    `--color-primary-text` (`#10140A`, ink para texto sobre relleno sólido
+    de primario). Se agrega `--color-info`/`--color-info-soft` (`#4C8FD1`),
+    estado que no existía en el sistema anterior. `--color-success`
+    (`#3FB6A0`), `--color-warning` (`#E08D3C`) y `--color-danger`
+    (`#D65A4A`) se recalibran para quedar separados por HUE del primario
+    oliva (~71°): éxito ~169°, alerta ~30°, error ~7°, info ~210° — mismo
+    criterio que ya exigía la entrada "Extensión de la identidad visual..."
+    para `--color-success` vs `--color-accent`, extendido a los 4 estados.
+    `--color-accent*` se CONSERVA como alias de `--color-primary*` (no se
+    borra) porque el resto del árbol de archivos (StatusPill, StatNumber,
+    Tabs, ClientFormPage, y las páginas de Clientes/Membresías/Rutinas/
+    Dietas/Progreso) sigue leyendo ese nombre y estaba fuera del alcance de
+    esta tarea — renombrar ahí habría arriesgado romper pantallas sin
+    tocarlas directamente. Contraste verificado a mano (luminancia relativa
+    WCAG) para cada color nuevo contra `--color-bg`: todos ≥4.9:1 (AA texto
+    normal), detalle completo en el comentario de cabecera de `theme.css`.
+  - **Layout (`frontend/src/components/layout/`):** `AppShell.tsx`
+    reestructurado a 3 zonas reales — sidebar (izquierda), `<Outlet/>`
+    (centro), columna "Resultados" opcional (derecha, solo se renderiza si
+    la pantalla activa registra contenido vía el nuevo
+    `AppShellContext`/`useResultsPanel`, para no forzar la zona derecha en
+    pantallas que no la construyeron todavía). Sidebar y columna de
+    Resultados pasan de "reflow horizontal" (Entrega 1, no colapsaba de
+    verdad en móvil) a drawers reales fuera de flujo con scrim compartido,
+    por debajo de 900px y 1100px respectivamente — ver
+    `docs/REVISION-UX.md`, sección "Por qué drawers".
+  - **Dashboard (`DashboardPage.tsx`/`.css`):** zona centro con tarjetas de
+    acción (`QuickActionCard`) filtradas por rol mock — Admin/Recepción
+    (registrar cliente, cobrar, ver vencimientos), Entrenador (mis
+    clientes, asignar rutina/dieta), Cliente (mi rutina/dieta/progreso/
+    membresía, solo lectura). Los 4 números que antes eran el elemento
+    principal bajan a un bloque secundario debajo. La zona derecha
+    (alertas de membresía, notificaciones recientes, última acción para
+    Admin/Entrenador; resumen de membresía/progreso/entrenador para
+    Cliente) usa un `client_id` de ejemplo fijo (100, Karla Jiménez)
+    mientras no exista sesión real de cliente — documentado en el propio
+    código como punto de integración.
+  - **Componentes nuevos (`frontend/src/components/ui/`):** `EmptyState`,
+    `LoadingState`, `ErrorMessage`, `ConfirmDialog`, `Breadcrumbs`, `Toast`,
+    `QuickActionCard` — listos para que trabajo posterior los conecte a
+    cada módulo (ninguna pantalla existente se modificó para usarlos,
+    salvo el propio Dashboard). Detalle completo de cada patrón y por qué
+    en `docs/REVISION-UX.md`, sección "Patrones documentados".
+  - **Nada de esto tocó** `LoginPage.tsx`, `App.tsx`, `types/models.ts`,
+    `mocks/data.ts`, `src/api/` ni `src/hooks/` — reservados al trabajo
+    paralelo de autenticación — ni `LandingPage.css`/el scope `.landing`.
+
+---
