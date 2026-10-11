@@ -29,8 +29,13 @@ class ExerciseRead(BaseModel):
 
 
 class RoutineCreate(BaseModel):
+    """Defecto de seguridad corregido (DECISIONES.md, mismo criterio que
+    `PaymentCreate.registered_by`): `created_by` NO viene del body -- el
+    router lo rellena siempre con `current_user.id`. Dejar que el cliente
+    HTTP decida quien "creo" la rutina permitiria falsificar la autoria.
+    """
+
     name: str = Field(min_length=1, max_length=150)
-    created_by: int
     description: str | None = None
 
 
@@ -67,11 +72,24 @@ class RoutineExerciseRead(BaseModel):
 
 
 class RoutineAssignmentCreate(BaseModel):
+    """Defecto de seguridad corregido (DECISIONES.md, mismo criterio que
+    `PaymentCreate.registered_by`/`RoutineCreate.created_by`): `assigned_by`
+    NO viene del body -- el router lo rellena siempre con `current_user.id`.
+    """
+
     routine_id: int
     client_id: int
-    assigned_by: int
     assigned_date: date
     status: AssignmentStatus = "activa"
+    notes: str | None = None
+
+
+class RoutineAssignmentUpdate(BaseModel):
+    """RF012 (nuevo, ver DECISIONES.md): el entrenador/admin puede cambiar
+    `status`/`notes` de una asignacion existente. Ambos opcionales -- solo
+    se actualiza lo que venga distinto de `None`."""
+
+    status: AssignmentStatus | None = None
     notes: str | None = None
 
 

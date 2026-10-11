@@ -40,6 +40,21 @@ independientemente de su `ON DELETE`). Verificado con
 `pytest tests/test_notifications.py` corrido dos veces seguidas sin
 colisiones de datos entre corridas.
 
+`exercises`/`routines` (modulo Ejercicios y Rutinas, Entrega 2) SI se
+agregan de forma explicita, mismo motivo que `membership_plans`:
+`exercises.name` es `UNIQUE` y la tabla no tiene NINGUNA FK hacia la
+cadena `users`/`client_profiles` -- sin truncarla de forma explicita,
+cualquier segundo test que cree un ejercicio con el mismo nombre
+colisiona. `routines.created_by` SI tiene FK hacia `users.id`
+(`ON DELETE RESTRICT`), asi que en teoria ya cascadearia al truncar
+`users`; se agrega explicito igual (mismo criterio ya aplicado a
+`client_profiles`) para que el codigo documente la dependencia sin
+depender de memorizar la cadena de FKs. `routine_exercises` (FK hacia
+`routines.id ON DELETE CASCADE`) y `routine_assignments` (FK hacia
+`routines.id`/`client_profiles.id`, ambas `ON DELETE CASCADE`) NO
+necesitan entrada propia -- caen en cascada al truncar `routines`/
+`client_profiles`.
+
 Requiere una base de datos real corriendo y con las migraciones aplicadas
 antes de correr pytest:
 
@@ -78,7 +93,8 @@ def _clean_users_table() -> None:
     with engine.begin() as conn:
         conn.execute(
             text(
-                "TRUNCATE TABLE users, client_profiles, membership_plans, memberships "
+                "TRUNCATE TABLE users, client_profiles, membership_plans, memberships, "
+                "exercises, routines "
                 "RESTART IDENTITY CASCADE"
             )
         )
@@ -86,7 +102,8 @@ def _clean_users_table() -> None:
     with engine.begin() as conn:
         conn.execute(
             text(
-                "TRUNCATE TABLE users, client_profiles, membership_plans, memberships "
+                "TRUNCATE TABLE users, client_profiles, membership_plans, memberships, "
+                "exercises, routines "
                 "RESTART IDENTITY CASCADE"
             )
         )
