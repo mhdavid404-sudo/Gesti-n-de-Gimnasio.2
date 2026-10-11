@@ -27,9 +27,13 @@
    separados por HUE (no solo por brillo) del primario.
 
    Variables nuevas, canónicas de aquí en adelante:
-     --color-primary       #7C8B3A  oliva base
-     --color-primary-light #9AAC4E  hover / estados claros
-     --color-primary-dark  #5C6B28  active / pressed
+     --color-primary       #97A947  oliva, aclarado a pedido explícito del
+                            dueño del proyecto (2026-10-11) sobre el oliva
+                            original #7C8B3A -- mismo hue (~71°), solo sube
+                            luminosidad/saturación; sigue pasando AA con
+                            margen de sobra (ver contraste abajo).
+     --color-primary-light #A8BA5A  hover / estados claros
+     --color-primary-dark  #677330  active / pressed
      --color-primary-soft  wash translúcido para fondos de estado "activo"
      --color-primary-text  #10140A  ink oscuro para texto sobre fondos de
                             --color-primary sólido (ver contraste abajo)
@@ -47,8 +51,8 @@
 
    Contraste verificado a mano (luminancia relativa WCAG, no solo lectura
    visual) contra `--color-bg` (#0B0C09, L≈0.0036) salvo donde se indica:
-     --color-primary   (#7C8B3A) como TEXTO sobre --color-bg: ratio ≈ 5.24:1 (AA texto normal)
-     --color-primary-text (#10140A) como texto sobre --color-primary sólido: ratio ≈ 4.99:1 (AA texto normal)
+     --color-primary   (#97A947) como TEXTO sobre --color-bg: ratio ≈ 7.55:1 (AA texto normal, con margen de sobra)
+     --color-primary-text (#10140A) como texto sobre --color-primary sólido: ratio ≈ 7.17:1 (AA texto normal, con margen de sobra)
      --color-text       (#F2F3EC) sobre --color-bg: ratio ≈ 17.6:1
      --color-text-muted (#ABB09C) sobre --color-bg: ratio ≈ 8.8:1
      --color-text-dim   (#7C816F) sobre --color-bg: ratio ≈ 4.9:1 (AA texto normal, el mínimo del sistema)
@@ -136,10 +140,10 @@
      rellenos sólidos, y un wash translúcido para fondos "activo/seleccionado"
      (nav activo del sidebar, chips de estado). Ver nota de contraste y de
      hue en el bloque de comentarios de arriba. */
-  --color-primary: #7c8b3a;
-  --color-primary-light: #9aac4e;
-  --color-primary-dark: #5c6b28;
-  --color-primary-soft: rgba(124, 139, 58, 0.18);
+  --color-primary: #97a947;
+  --color-primary-light: #a8ba5a;
+  --color-primary-dark: #677330;
+  --color-primary-soft: rgba(151, 169, 71, 0.18);
   --color-primary-text: #10140a;
 
   /* Alias de compatibilidad: el resto del árbol de archivos (fuera del
