@@ -9,6 +9,9 @@ entornos). La API de `bcrypt` puro es minima y no amerita esa capa extra.
 
 from __future__ import annotations
 
+import secrets
+import string
+
 import bcrypt
 
 # Factor de costo de bcrypt. 12 es el default de la libreria y un balance
@@ -16,6 +19,9 @@ import bcrypt
 # de gimnasio (no un banco) -- documentado explicitamente para que nadie lo
 # suba/baje sin medir el impacto en el login.
 _BCRYPT_ROUNDS = 12
+
+_TEMP_PASSWORD_LENGTH = 12
+_TEMP_PASSWORD_ALPHABET = string.ascii_letters + string.digits
 
 
 def hash_password(plain: str) -> str:
@@ -40,3 +46,16 @@ def verify_password(plain: str, hashed: str) -> bool:
         return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
     except ValueError:
         return False
+
+
+def generate_temporary_password(length: int = _TEMP_PASSWORD_LENGTH) -> str:
+    """Genera una password temporal aleatoria (letras + digitos, legible).
+
+    DECISIONES.md (modulo Clientes, Entrega 2): el alta de cliente
+    (`RegisterClientUseCase`) no pide password en el formulario -- se
+    genera aqui con el modulo `secrets` (criptograficamente seguro, a
+    diferencia de `random`), se hashea igual que cualquier otra password y
+    se devuelve en texto claro UNA SOLA VEZ en la respuesta de `POST
+    /clients` para que el staff la comparta con el cliente.
+    """
+    return "".join(secrets.choice(_TEMP_PASSWORD_ALPHABET) for _ in range(length))

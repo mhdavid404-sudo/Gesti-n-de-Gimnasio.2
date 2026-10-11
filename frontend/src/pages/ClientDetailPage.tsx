@@ -1,24 +1,26 @@
-import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { apiFetch, ApiError } from '../api/client'
+import { ErrorMessage } from '../components/ui/ErrorMessage'
+import { LoadingState } from '../components/ui/LoadingState'
 import { ProgressChart } from '../components/ui/ProgressChart'
 import { StatusPill } from '../components/ui/StatusPill'
 import { Tabs } from '../components/ui/Tabs'
+import { useAuth } from '../hooks/useAuth'
 import {
-  findClientProfile,
   findDietPlan,
   findExercise,
   findMembershipByClient,
   findMembershipPlan,
   findRoutine,
-  findUser,
   getBodyProgressForClient,
   getDietAssignmentsForClient,
   getMembershipDisplayStatusMock,
   getPaymentsForMembership,
   getRoutineAssignmentsForClient,
   getRoutineExercises,
-  getTrainerDisplayName,
 } from '../mocks/data'
+import type { ApiClientProfile } from '../types/api'
 import './ClientDetailPage.css'
 
 const TABS = [
@@ -33,15 +35,62 @@ const TABS = [
 export function ClientDetailPage() {
   const { id } = useParams<{ id: string }>()
   const [activeTab, setActiveTab] = useState('perfil')
+  const navigate = useNavigate()
+  const { logout } = useAuth()
   const clientProfileId = Number(id)
 
-  const profile = findClientProfile(clientProfileId)
-  const user = profile ? findUser(profile.user_id) : undefined
+  const [profile, setProfile] = useState<ApiClientProfile | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [notFound, setNotFound] = useState(false)
 
-  if (!profile || !user) {
+  useEffect(() => {
+    setIsLoading(true)
+    setErrorMessage(null)
+    setNotFound(false)
+
+    apiFetch<ApiClientProfile>(`/clients/${clientProfileId}`)
+      .then(setProfile)
+      .catch((err: unknown) => {
+        if (err instanceof ApiError) {
+          if (err.isUnauthorized) {
+            logout()
+            navigate('/login', { replace: true })
+            return
+          }
+          if (err.status === 404) {
+            setNotFound(true)
+            return
+          }
+          if (err.status === 403) {
+            setErrorMessage('No tienes permiso para ver este cliente.')
+            return
+          }
+          setErrorMessage(err.message)
+          return
+        }
+        setErrorMessage('Ocurrió un error inesperado. Intenta de nuevo.')
+      })
+      .finally(() => setIsLoading(false))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientProfileId])
+
+  if (isLoading) {
     return (
       <div className="card">
-        <p>No se encontró este cliente en los datos de ejemplo.</p>
+        <LoadingState label="Cargando cliente…" variant="skeleton" rows={6} />
+      </div>
+    )
+  }
+
+  if (errorMessage) {
+    return <ErrorMessage message={errorMessage} />
+  }
+
+  if (notFound || !profile) {
+    return (
+      <div className="card">
+        <p>No se encontró este cliente.</p>
         <Link to="/clientes" className="btn btn-ghost" style={{ marginTop: 12 }}>
           Volver a clientes
         </Link>
@@ -49,35 +98,41 @@ export function ClientDetailPage() {
     )
   }
 
-  const membership = findMembershipByClient(profile.id)
+  // TODO(módulos Membresías/Pagos/Rutinas/Dietas/Progreso, todavía no
+  // construidos): el resto de pestañas sigue usando los mismos datos mock
+  // de Entrega 1, indexados por `clientProfileId` de ejemplo -- no
+  // corresponden necesariamente al cliente real de esta pantalla. Se
+  // reemplazan por llamadas reales cuando cada módulo exista.
+  const membership = findMembershipByClient(clientProfileId)
   const plan = membership ? findMembershipPlan(membership.plan_id) : undefined
   const payments = membership ? getPaymentsForMembership(membership.id) : []
-  const routineAssignments = getRoutineAssignmentsForClient(profile.id)
-  const dietAssignments = getDietAssignmentsForClient(profile.id)
-  const progress = getBodyProgressForClient(profile.id)
+  const routineAssignments = getRoutineAssignmentsForClient(clientProfileId)
+  const dietAssignments = getDietAssignmentsForClient(clientProfileId)
+  const progress = getBodyProgressForClient(clientProfileId)
   const lastProgress = progress[progress.length - 1]
 
   return (
     <div className="client-detail">
       <div className="client-detail__header card">
         <div className="client-detail__avatar">
-          {user.full_name
+          {profile.full_name
             .split(' ')
             .slice(0, 2)
             .map((p) => p[0])
             .join('')}
         </div>
         <div className="client-detail__identity">
-          <h2 className="section-title">{user.full_name}</h2>
-          <p className="client-detail__email">{user.email}</p>
+          <h2 className="section-title">{profile.full_name}</h2>
+          <p className="client-detail__email">{profile.email}</p>
         </div>
         <div className="client-detail__header-meta">
           <div>
             <span className="eyebrow">Entrenador</span>
-            <p>{getTrainerDisplayName(profile.trainer_id)}</p>
+            <p>{profile.trainer_name ?? 'Sin asignar'}</p>
           </div>
           <div>
             <span className="eyebrow">Membresía</span>
+            {/* TODO(módulo Membresías): placeholder mock, ver nota arriba. */}
             {membership ? (
               <StatusPill status={getMembershipDisplayStatusMock(membership)} />
             ) : (
@@ -93,15 +148,15 @@ export function ClientDetailPage() {
             <dl className="client-detail__grid">
               <div>
                 <dt>Teléfono</dt>
-                <dd>{profile.phone}</dd>
+                <dd>{profile.phone ?? '—'}</dd>
               </div>
               <div>
                 <dt>Fecha de nacimiento</dt>
-                <dd>{profile.birth_date}</dd>
+                <dd>{profile.birth_date ?? '—'}</dd>
               </div>
               <div>
                 <dt>Dirección</dt>
-                <dd>{profile.address}</dd>
+                <dd>{profile.address ?? '—'}</dd>
               </div>
               <div>
                 <dt>Contacto de emergencia</dt>
@@ -111,13 +166,10 @@ export function ClientDetailPage() {
                 <dt>Cliente desde</dt>
                 <dd>{new Date(profile.created_at).toLocaleDateString('es-MX')}</dd>
               </div>
-              <div>
-                <dt>Estado de la cuenta</dt>
-                <dd>{user.is_active ? 'Activo' : 'Inactivo'}</dd>
-              </div>
             </dl>
           )}
 
+          {/* TODO(módulo Membresías, todavía no construido): pestaña mock. */}
           {activeTab === 'membresia' &&
             (membership && plan ? (
               <dl className="client-detail__grid">
@@ -156,6 +208,7 @@ export function ClientDetailPage() {
               <p className="client-detail__empty">Este cliente no tiene una membresía registrada.</p>
             ))}
 
+          {/* TODO(módulo Pagos, todavía no construido): pestaña mock. */}
           {activeTab === 'pagos' &&
             (payments.length > 0 ? (
               <table className="client-detail__table">
@@ -186,6 +239,7 @@ export function ClientDetailPage() {
               <p className="client-detail__empty">No hay pagos registrados.</p>
             ))}
 
+          {/* TODO(módulo Rutinas, todavía no construido): pestaña mock. */}
           {activeTab === 'rutina' &&
             (routineAssignments.length > 0 ? (
               <div className="client-detail__stack">
@@ -232,6 +286,7 @@ export function ClientDetailPage() {
               <p className="client-detail__empty">Este cliente no tiene rutinas asignadas.</p>
             ))}
 
+          {/* TODO(módulo Dietas, todavía no construido): pestaña mock. */}
           {activeTab === 'dieta' &&
             (dietAssignments.length > 0 ? (
               <div className="client-detail__stack">
@@ -258,6 +313,7 @@ export function ClientDetailPage() {
               <p className="client-detail__empty">Este cliente no tiene un plan de dieta asignado.</p>
             ))}
 
+          {/* TODO(módulo Progreso corporal, todavía no construido): pestaña mock. */}
           {activeTab === 'progreso' &&
             (progress.length > 0 ? (
               <div className="client-detail__progress">

@@ -1,7 +1,12 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { membershipPlans, trainers } from '../mocks/data'
+import { apiFetch, ApiError } from '../api/client'
+import { ErrorMessage } from '../components/ui/ErrorMessage'
+import { useAuth } from '../hooks/useAuth'
+import { membershipPlans } from '../mocks/data'
+import type { AuthUser } from '../api/authStorage'
+import type { ClientRegisterPayload, ClientRegisterResponse } from '../types/api'
 import type { PaymentMethod } from '../types/models'
 import './ClientFormPage.css'
 
@@ -17,24 +22,23 @@ type FormField = 'fullName' | 'email' | 'phone' | 'birthDate' | 'address'
 type FormErrors = Partial<Record<FormField, string>>
 
 /**
- * Alta de cliente + membresía + pago inicial — SOLO UI/mock (Entrega 1).
- * No hay conexión real a backend: al enviar, navega de vuelta a /clientes
- * con un mensaje de éxito viajando en el router state (ver ClientsListPage).
+ * Alta de cliente — SOLO la sección "Datos del cliente" se conecta a
+ * `POST /clients` real en esta tarea (DECISIONES.md, módulo Clientes,
+ * Entrega 2). "Membresía y pago inicial" sigue siendo SOLO UI/mock: esos
+ * módulos (Planes/Membresías, Pagos) no existen todavía, y el mensaje de
+ * éxito tras guardar NO debe insinuar que el pago se registró (solo se
+ * confirma lo que de verdad se persistió: el cliente).
  *
- * Dos secciones con "criterio de protagonista único" (ver theme.css): cada
- * bloque respira en su propia tarjeta, el único elemento verde de acento
- * en toda la pantalla es el botón de submit.
- *
- * Validación (ver CLAUDE.md tarea 4): es una capa de UI/mock, no reemplaza
- * validación de servidor real (que llegará con el backend en Entrega 2),
- * pero sí demuestra el feedback visual esperado: borde/fondo que transicionan
- * a rojo (nunca un salto instantáneo, ver .input en theme.css) y un mensaje
- * que entra con fade corto.
+ * Password del cliente nuevo (DECISIONES.md): el formulario no pide
+ * password -- el backend genera una temporal (`RegisterClientUseCase`) y
+ * la devuelve una sola vez en la respuesta; se muestra aquí en el aviso de
+ * éxito para que el staff la copie y la comparta con el cliente.
  */
 export function ClientFormPage() {
   const navigate = useNavigate()
+  const { logout } = useAuth()
 
-  // --- Datos del cliente (ClientProfile, ver types/models.ts) ---
+  // --- Datos del cliente (conectado a POST /clients real) ---
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -43,15 +47,26 @@ export function ClientFormPage() {
   const [emergencyContact, setEmergencyContact] = useState('')
   const [trainerId, setTrainerId] = useState('')
 
-  // --- Membresía y pago inicial ---
+  const [trainers, setTrainers] = useState<AuthUser[]>([])
+  const [trainersError, setTrainersError] = useState<string | null>(null)
+
+  // --- Membresía y pago inicial (SOLO UI/mock -- ver docstring arriba) ---
   const [planId, setPlanId] = useState<number>(membershipPlans[0]?.id ?? 0)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('efectivo')
   const [amount, setAmount] = useState<number>(membershipPlans[0]?.price ?? 0)
   const [paymentDate, setPaymentDate] = useState(todayIso)
 
   const [errors, setErrors] = useState<FormErrors>({})
+  const [serverError, setServerError] = useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const selectedPlan = useMemo(() => membershipPlans.find((p) => p.id === planId), [planId])
+
+  useEffect(() => {
+    apiFetch<AuthUser[]>('/users?role=entrenador')
+      .then(setTrainers)
+      .catch(() => setTrainersError('No se pudo cargar la lista de entrenadores.'))
+  }, [])
 
   const handlePlanChange = (id: number) => {
     setPlanId(id)
@@ -60,8 +75,8 @@ export function ClientFormPage() {
   }
 
   // Limpia el error de UN campo en cuanto el usuario vuelve a escribir en
-  // él — es la señal de "la interfaz escuchó" que pide CLAUDE.md tarea 4,
-  // en vez de obligar a re-enviar el formulario para ver si ya quedó bien.
+  // él — es la señal de "la interfaz escuchó" (en vez de obligar a
+  // re-enviar el formulario para ver si ya quedó bien).
   const clearError = (field: FormField) => {
     setErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev))
   }
@@ -76,8 +91,9 @@ export function ClientFormPage() {
     return next
   }
 
-  const handleSubmit = (event: FormEvent) => {
+  const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
+    setServerError(null)
 
     const nextErrors = validate()
     if (Object.keys(nextErrors).length > 0) {
@@ -85,15 +101,59 @@ export function ClientFormPage() {
       return
     }
 
-    navigate('/clientes', {
-      state: {
-        toast: `Cliente "${fullName.trim() || 'sin nombre'}" registrado con plan ${selectedPlan?.name ?? '—'}. Pago de $${amount.toLocaleString('es-MX')} (${paymentMethod}) recibido.`,
-      },
-    })
+    const payload: ClientRegisterPayload = {
+      email: email.trim(),
+      full_name: fullName.trim(),
+      trainer_id: trainerId ? Number(trainerId) : null,
+      phone: phone.trim(),
+      birth_date: birthDate,
+      address: address.trim(),
+      emergency_contact: emergencyContact.trim() || null,
+    }
+
+    setIsSubmitting(true)
+    try {
+      const response = await apiFetch<ClientRegisterResponse>('/clients', {
+        method: 'POST',
+        body: payload,
+      })
+
+      // Mensaje honesto: solo se confirma lo que realmente se persistió (el
+      // cliente) -- la membresía/pago de la otra sección NO se registró,
+      // ningún módulo real existe todavía para eso (ver docstring arriba).
+      navigate('/clientes', {
+        state: {
+          toast: `Cliente "${response.client.full_name}" registrado. Contraseña temporal para su primer inicio de sesión: ${response.temporary_password} (cópiala y compártela con el cliente; no se mostrará de nuevo).`,
+        },
+      })
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.isUnauthorized) {
+          logout()
+          navigate('/login', { replace: true })
+          return
+        }
+        if (err.status === 409) {
+          setErrors((prev) => ({ ...prev, email: err.message }))
+          return
+        }
+        if (err.status === 403) {
+          setServerError('No tienes permiso para registrar clientes.')
+          return
+        }
+        setServerError(err.message)
+        return
+      }
+      setServerError('Ocurrió un error inesperado. Intenta de nuevo.')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
     <form className="client-form" onSubmit={handleSubmit}>
+      {serverError && <ErrorMessage title="No se pudo registrar el cliente" message={serverError} />}
+
       <div className="client-form__grid">
         <section className="card client-form__section">
           <h2 className="section-title">Datos del cliente</h2>
@@ -210,6 +270,7 @@ export function ClientFormPage() {
                   </option>
                 ))}
               </select>
+              {trainersError && <p className="client-form__hint">{trainersError}</p>}
             </div>
           </div>
 
@@ -253,7 +314,10 @@ export function ClientFormPage() {
 
         <section className="card client-form__section">
           <h2 className="section-title">Membresía y pago inicial</h2>
-          <p className="client-form__hint">Alta de membresía y registro del primer pago (RF004 / RF005).</p>
+          <p className="client-form__hint">
+            Alta de membresía y registro del primer pago (RF004 / RF005) — todavía no conectado a un
+            backend real; estos módulos se construyen en una tarea posterior.
+          </p>
 
           <div className="client-form__field">
             <span className="field-label">Plan</span>
@@ -340,8 +404,8 @@ export function ClientFormPage() {
         <Link to="/clientes" className="btn btn-ghost">
           Cancelar
         </Link>
-        <button type="submit" className="btn btn-primary">
-          Registrar cliente
+        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+          {isSubmitting ? 'Registrando…' : 'Registrar cliente'}
         </button>
       </div>
     </form>
