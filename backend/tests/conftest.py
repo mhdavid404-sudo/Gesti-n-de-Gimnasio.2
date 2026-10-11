@@ -21,6 +21,14 @@ que el modulo Clientes (Entrega 2) tambien necesita aislamiento entre
 tests -- aunque TRUNCATE ... CASCADE sobre `users` ya arrastra
 `client_profiles` por la FK `client_profiles.user_id -> users.id`.
 
+`membership_plans`/`memberships` se agregan al mismo TRUNCATE (modulo
+Planes y Membresias, Entrega 2): `memberships` tambien cae en cascada al
+truncar `client_profiles` (FK `memberships.client_id -> client_profiles.id
+ON DELETE CASCADE`), pero `membership_plans` NO tiene ninguna FK hacia
+`users`/`client_profiles` -- sin truncarla de forma explicita, el `name`
+`UNIQUE` del catalogo de planes rompe cualquier segundo test que intente
+crear un plan con el mismo nombre.
+
 Requiere una base de datos real corriendo y con las migraciones aplicadas
 antes de correr pytest:
 
@@ -57,10 +65,20 @@ def _clean_users_table() -> None:
     """Deja `users`/`client_profiles` vacias antes y despues de cada test
     (ver estrategia arriba)."""
     with engine.begin() as conn:
-        conn.execute(text("TRUNCATE TABLE users, client_profiles RESTART IDENTITY CASCADE"))
+        conn.execute(
+            text(
+                "TRUNCATE TABLE users, client_profiles, membership_plans, memberships "
+                "RESTART IDENTITY CASCADE"
+            )
+        )
     yield
     with engine.begin() as conn:
-        conn.execute(text("TRUNCATE TABLE users, client_profiles RESTART IDENTITY CASCADE"))
+        conn.execute(
+            text(
+                "TRUNCATE TABLE users, client_profiles, membership_plans, memberships "
+                "RESTART IDENTITY CASCADE"
+            )
+        )
 
 
 @pytest.fixture()
