@@ -105,3 +105,13 @@ export const IconResults = ({ className }: IconProps) => (
     <circle cx="9" cy="12.4" r="0.9" fill="currentColor" stroke="none" />
   </svg>
 )
+
+/** Bitácora — hoja de registro con renglones, para distinguir de IconCard (sin reglón inferior). */
+export const IconLog = ({ className }: IconProps) => (
+  <svg {...base} className={className}>
+    <path d="M4.4 2.6h9.2v12.8H4.4z" />
+    <line x1="6.6" y1="6" x2="11.4" y2="6" />
+    <line x1="6.6" y1="9" x2="11.4" y2="9" />
+    <line x1="6.6" y1="12" x2="9.6" y2="12" />
+  </svg>
+)

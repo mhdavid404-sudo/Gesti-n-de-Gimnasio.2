@@ -1,7 +1,17 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import type { UserRole } from '../../types/models'
-import { IconBarbell, IconBowl, IconCard, IconClose, IconGrid, IconLogout, IconTrend, IconUsers } from './icons'
+import {
+  IconBarbell,
+  IconBowl,
+  IconCard,
+  IconClose,
+  IconGrid,
+  IconLog,
+  IconLogout,
+  IconTrend,
+  IconUsers,
+} from './icons'
 import './Sidebar.css'
 
 interface NavItem {
@@ -28,6 +38,10 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/rutinas', label: 'Rutinas', Icon: IconBarbell },
   { to: '/dietas', label: 'Dietas', Icon: IconBowl },
   { to: '/progreso', label: 'Progreso', Icon: IconTrend },
+  // Bitácora (RF015): vista operativa de errores/eventos de TODO el
+  // sistema, no "información propia" de ningún rol -- mismo criterio que
+  // "Clientes" y el bloque "En números" del Dashboard (ver DECISIONES.md).
+  { to: '/bitacora', label: 'Bitácora', Icon: IconLog, roles: ['admin'] },
 ]
 
 interface SidebarProps {

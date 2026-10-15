@@ -1,10 +1,8 @@
-"""Casos de uso del modulo Notifications (RF006, bases de RF015).
+"""Casos de uso del modulo Notifications (RF006, RF015).
 
-Entrega 2: `NotifyUserUseCase`/`ListUserNotificationsUseCase` tienen logica
-real (modulo "Vencimientos/Notificaciones", ver DECISIONES.md).
-`RecordAuditEventUseCase` (RF015, modulo "Bitacora (AuditLog)") sigue sin
-implementar A PROPOSITO -- ese modulo es el ULTIMO en el orden fijo de
-modulos de Entrega 2, despues de Progreso. No es un olvido.
+Entrega 2: `NotifyUserUseCase`/`ListUserNotificationsUseCase` (modulo
+"Vencimientos/Notificaciones") y `RecordAuditEventUseCase` (modulo
+"Bitacora (AuditLog)", ultimo en el orden fijo) ya tienen logica real.
 """
 
 from __future__ import annotations
@@ -64,12 +62,17 @@ class ListUserNotificationsUseCase:
 class RecordAuditEventUseCase:
     """RF015: registrar un evento/error relevante en la bitacora.
 
-    FUERA DE ALCANCE del modulo Vencimientos/Notificaciones. Pertenece al
-    modulo "Bitacora (AuditLog)" (ver DECISIONES.md, orden fijo de
-    modulos) -- se deja intencionalmente sin implementar, no es un olvido.
+    Trivial a proposito -- mismo criterio ya aplicado por
+    `GetClientProgressTimelineUseCase`/`ListUserNotificationsUseCase`: no
+    hay ninguna invariante de negocio que validar antes de insertar una
+    entrada de bitacora (a diferencia de `NotifyUserUseCase`, que si valida
+    `type` contra `TIPOS_NOTIFICACION_VALIDOS`). Quien decide QUE se
+    registra es el llamador (el manejador de excepciones de
+    `api/main.py`, o cualquier caso de uso que en el futuro quiera dejar
+    un rastro explicito de una accion relevante).
     """
 
     audit_log_repository: AuditLogRepository
 
     def execute(self, entry: AuditLog) -> AuditLog:
-        raise NotImplementedError("Entrega 2: modulo Bitacora (AuditLog), pendiente")
+        return self.audit_log_repository.add(entry)

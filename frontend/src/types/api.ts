@@ -303,6 +303,23 @@ export interface ApiBodyProgress {
   notes: string | null
 }
 
+// ---------------------------------------------------------------------------
+// Bitacora / AuditLog (RF015) -- ver backend/src/api/v1/routers/notifications.py
+// (`audit_router`). Solo lectura: las entradas se generan automaticamente
+// desde el backend (manejador de excepciones de `api/main.py`), nunca se
+// crean desde el frontend.
+// ---------------------------------------------------------------------------
+
+export interface ApiAuditLog {
+  id: number
+  user_id: number | null
+  action: string
+  entity_type: string | null
+  entity_id: string | null
+  details: string | null
+  created_at: string
+}
+
 export interface BodyProgressCreatePayload {
   client_id: number
   record_date: string

@@ -5,13 +5,13 @@ documentada en DECISIONES.md (`domain/notifications/entities.py`:
 `Notification` y `AuditLog` son ambas "eventos del sistema dirigidos a
 alguien que los consulta"):
 
-- `router` (RF006, modulo "Vencimientos/Notificaciones"): implementado en
-  esta entrega -- `GET /notifications/users/{user_id}`,
-  `POST /notifications/{notification_id}/read`.
-- `audit_router` (RF015, modulo "Bitacora (AuditLog)"): FUERA DE ALCANCE de
-  este encargo -- el modulo Bitacora es el ULTIMO en el orden fijo de
-  modulos de Entrega 2 (ver DECISIONES.md), despues de Progreso. Se deja
-  intencionalmente en 501, no es un olvido.
+- `router` (RF006, modulo "Vencimientos/Notificaciones").
+- `audit_router` (RF015, modulo "Bitacora (AuditLog)", ultimo en el orden
+  fijo de modulos de Entrega 2): `GET /audit-logs`, solo `admin`. Las
+  entradas de bitacora se registran automaticamente -- ver el manejador
+  de excepciones en `api/main.py`, que llama a `RecordAuditEventUseCase`
+  por cada error HTTP (4xx/5xx) que la API devuelve, sin que ningun
+  router individual tenga que acordarse de hacerlo.
 
 Autorizacion de cada endpoint de `router`:
 
@@ -34,17 +34,19 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from src.api.v1.dependencies import get_current_user
+from src.api.v1.dependencies import get_current_user, require_role
 from src.api.v1.schemas.notifications import AuditLogRead, NotificationRead
 from src.application.notifications.use_cases import ListUserNotificationsUseCase
 from src.domain.users.entities import User
 from src.infrastructure.db.session import get_db
-from src.infrastructure.repositories.notifications import SqlAlchemyNotificationRepository
+from src.infrastructure.repositories.notifications import (
+    SqlAlchemyAuditLogRepository,
+    SqlAlchemyNotificationRepository,
+)
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 audit_router = APIRouter(prefix="/audit-logs", tags=["notifications"])
 
-_NOT_IMPLEMENTED = "Pendiente de implementacion completa en Entrega 2 (ver DECISIONES.md)."
 _NOTIFICACION_NO_ENCONTRADA = "La notificacion solicitada no existe."
 _SIN_ACCESO_A_NOTIFICACIONES = "No tienes acceso a las notificaciones de este usuario."
 _SIN_ACCESO_A_NOTIFICACION = "No tienes acceso a esta notificacion."
@@ -91,13 +93,18 @@ def mark_notification_as_read(
     return NotificationRead.model_validate(updated)
 
 
-@audit_router.get("", response_model=list[AuditLogRead])
-def list_audit_logs(limit: int = 100) -> list[AuditLogRead]:
+@audit_router.get(
+    "",
+    response_model=list[AuditLogRead],
+    dependencies=[Depends(require_role("admin"))],
+)
+def list_audit_logs(limit: int = 100, db: Session = Depends(get_db)) -> list[AuditLogRead]:
     """RF015: bitacora de eventos/errores relevantes del sistema.
 
-    FUERA DE ALCANCE de este encargo (modulo Vencimientos/Notificaciones)
-    -- pertenece al modulo "Bitacora (AuditLog)", el ultimo en el orden
-    fijo de modulos de Entrega 2 (ver DECISIONES.md). Se deja
-    intencionalmente en 501.
+    Solo `admin` -- la bitacora es una vista operativa de todo el sistema,
+    no "informacion propia" de ningun rol (mismo criterio que el bloque
+    "En numeros" del Dashboard, ver DECISIONES.md).
     """
-    raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=_NOT_IMPLEMENTED)
+    audit_log_repository = SqlAlchemyAuditLogRepository(db)
+    entries = audit_log_repository.list_recent(limit=limit)
+    return [AuditLogRead.model_validate(e) for e in entries]

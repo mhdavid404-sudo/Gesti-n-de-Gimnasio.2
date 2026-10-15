@@ -12,7 +12,9 @@ Casos cubiertos:
     5. Acceso de cliente a su propio perfil -> 200.
     6. Acceso de cliente al perfil de otro -> 403.
     7. Reasignar entrenador con un `trainer_id` que NO es rol entrenador -> falla con mensaje correcto.
-    8. Eliminar como no-admin -> 403.
+    8. Editar un campo de un cliente existente como admin -> 200, cambio reflejado.
+    9. Eliminar como no-admin -> 403.
+    10. Eliminar un cliente existente como admin -> 204, deja de aparecer en el listado.
 """
 
 from __future__ import annotations
@@ -190,6 +192,28 @@ def test_reasignar_entrenador_con_trainer_id_invalido_falla(client: TestClient) 
     assert "entrenador" in response.json()["detail"].lower()
 
 
+def test_editar_cliente_como_admin_actualiza_datos(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.clientes8@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+
+    created = _register_client(client, admin_headers, "smartgym.qa.cliente.editar@gmail.com", "Cliente a Editar")
+    client_id = created.json()["client"]["id"]
+
+    response = client.patch(
+        f"{API}/clients/{client_id}",
+        json={"phone": "5599998888", "address": "Avenida Siempre Viva 742"},
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["phone"] == "5599998888"
+    assert body["address"] == "Avenida Siempre Viva 742"
+
+    listado = client.get(f"{API}/clients/{client_id}", headers=admin_headers)
+    assert listado.json()["phone"] == "5599998888"
+
+
 def test_eliminar_cliente_como_no_admin_devuelve_403(client: TestClient) -> None:
     admin = _seed_user("smartgym.qa.admin.clientes7@gmail.com", "AdminPass123", "admin")
     trainer = _seed_user("smartgym.qa.entrenador.clientes7@gmail.com", "ClaveEntrenador123", "entrenador")
@@ -202,3 +226,18 @@ def test_eliminar_cliente_como_no_admin_devuelve_403(client: TestClient) -> None
     response = client.delete(f"{API}/clients/{client_id}", headers=trainer_headers)
 
     assert response.status_code == 403
+
+
+def test_eliminar_cliente_como_admin_elimina_correctamente(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.clientes9@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+
+    created = _register_client(client, admin_headers, "smartgym.qa.cliente.a.borrar2@gmail.com", "Cliente a Borrar 2")
+    client_id = created.json()["client"]["id"]
+
+    response = client.delete(f"{API}/clients/{client_id}", headers=admin_headers)
+    assert response.status_code == 204
+
+    listado = client.get(f"{API}/clients", headers=admin_headers)
+    ids = [c["id"] for c in listado.json()]
+    assert client_id not in ids

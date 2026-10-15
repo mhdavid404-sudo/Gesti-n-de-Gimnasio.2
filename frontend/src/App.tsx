@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
 import { useAuth } from './hooks/useAuth'
+import { AuditLogsPage } from './pages/AuditLogsPage'
 import { ClientDetailPage } from './pages/ClientDetailPage'
 import { ClientFormPage } from './pages/ClientFormPage'
 import { ClientsListPage } from './pages/ClientsListPage'
@@ -41,6 +42,7 @@ function App() {
         <Route path="/rutinas" element={<RoutinesPage />} />
         <Route path="/dietas" element={<DietsPage />} />
         <Route path="/progreso" element={<ProgressPage />} />
+        <Route path="/bitacora" element={<AuditLogsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
