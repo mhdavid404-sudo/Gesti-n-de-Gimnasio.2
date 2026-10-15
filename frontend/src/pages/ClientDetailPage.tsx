@@ -10,8 +10,8 @@ import { StatusPill } from '../components/ui/StatusPill'
 import { Tabs } from '../components/ui/Tabs'
 import { Toast } from '../components/ui/Toast'
 import { useAuth } from '../hooks/useAuth'
-import { getBodyProgressForClient } from '../mocks/data'
 import type {
+  ApiBodyProgress,
   ApiClientProfile,
   ApiDietAssignment,
   ApiDietPlan,
@@ -23,6 +23,7 @@ import type {
   ApiRoutine,
   ApiRoutineAssignment,
   ApiRoutineExercise,
+  BodyProgressCreatePayload,
   DietAssignmentCreatePayload,
   MembershipCreatePayload,
   PaymentCreatePayload,
@@ -582,6 +583,116 @@ export function ClientDetailPage() {
     }
   }
 
+  // --- Progreso corporal (RF010/RF011, módulo Progreso Corporal) ----------
+  // Mismo patrón que "Rutina"/"Dieta" arriba: historial real vía
+  // `GET /progress/clients/{id}` (ownership por dato ya resuelto en el
+  // backend). Si es `entrenador` o `admin`, puede registrar un nuevo
+  // registro de progreso para este cliente.
+  const [progressRecords, setProgressRecords] = useState<ApiBodyProgress[] | null>(null)
+  const [progressLoading, setProgressLoading] = useState(true)
+  const [progressError, setProgressError] = useState<string | null>(null)
+
+  const loadProgress = () => {
+    setProgressLoading(true)
+    setProgressError(null)
+    apiFetch<ApiBodyProgress[]>(`/progress/clients/${clientProfileId}`)
+      .then(setProgressRecords)
+      .catch((err: unknown) => {
+        if (err instanceof ApiError) {
+          if (err.isUnauthorized) {
+            logout()
+            navigate('/login', { replace: true })
+            return
+          }
+          if (err.status === 403) {
+            setProgressError('No tienes permiso para ver el progreso de este cliente.')
+            return
+          }
+          setProgressError(err.message)
+          return
+        }
+        setProgressError('Ocurrió un error inesperado. Intenta de nuevo.')
+      })
+      .finally(() => setProgressLoading(false))
+  }
+
+  useEffect(() => {
+    loadProgress()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientProfileId])
+
+  const [showProgressForm, setShowProgressForm] = useState(false)
+  const [progressDate, setProgressDate] = useState(todayIso)
+  const [progressWeightKg, setProgressWeightKg] = useState('')
+  const [progressHeightCm, setProgressHeightCm] = useState('')
+  const [progressBodyFatPct, setProgressBodyFatPct] = useState('')
+  const [progressWaistCm, setProgressWaistCm] = useState('')
+  const [progressNotes, setProgressNotes] = useState('')
+  const [progressServerError, setProgressServerError] = useState<string | null>(null)
+  const [isSubmittingProgress, setIsSubmittingProgress] = useState(false)
+  const [progressToast, setProgressToast] = useState<string | null>(null)
+
+  const resetProgressForm = () => {
+    setProgressDate(todayIso())
+    setProgressWeightKg('')
+    setProgressHeightCm('')
+    setProgressBodyFatPct('')
+    setProgressWaistCm('')
+    setProgressNotes('')
+    setProgressServerError(null)
+  }
+
+  const handleRegisterProgressSubmit = async (event: FormEvent) => {
+    event.preventDefault()
+    setProgressServerError(null)
+
+    const weightValue = Number(progressWeightKg)
+    if (!progressWeightKg || Number.isNaN(weightValue) || weightValue <= 0) {
+      setProgressServerError('Ingresa un peso válido (mayor a 0).')
+      return
+    }
+    if (!progressDate) {
+      setProgressServerError('Selecciona la fecha del registro.')
+      return
+    }
+
+    const payload: BodyProgressCreatePayload = {
+      client_id: clientProfileId,
+      record_date: progressDate,
+      weight_kg: weightValue,
+      height_cm: progressHeightCm.trim() ? Number(progressHeightCm) : null,
+      body_fat_pct: progressBodyFatPct.trim() ? Number(progressBodyFatPct) : null,
+      waist_cm: progressWaistCm.trim() ? Number(progressWaistCm) : null,
+      notes: progressNotes.trim() || null,
+    }
+
+    setIsSubmittingProgress(true)
+    try {
+      const created = await apiFetch<ApiBodyProgress>('/progress', { method: 'POST', body: payload })
+      setProgressRecords((prev) => [...(prev ?? []), created].sort((a, b) => a.record_date.localeCompare(b.record_date)))
+      setProgressToast('Registro de progreso guardado.')
+      setShowProgressForm(false)
+      resetProgressForm()
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.isUnauthorized) {
+          logout()
+          navigate('/login', { replace: true })
+          return
+        }
+        if (err.status === 403) {
+          setProgressServerError('No tienes permiso para registrar progreso de este cliente.')
+          return
+        }
+        setProgressServerError(err.message)
+        return
+      }
+      setProgressServerError('Ocurrió un error inesperado. Intenta de nuevo.')
+    } finally {
+      setIsSubmittingProgress(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="card">
@@ -604,14 +715,6 @@ export function ClientDetailPage() {
       </div>
     )
   }
-
-  // TODO(módulo Progreso, todavía no construido): esa pestaña sigue usando
-  // datos mock de Entrega 1, indexados por `clientProfileId` de ejemplo -- no
-  // corresponde necesariamente al cliente real de esta pantalla. Se reemplaza
-  // por llamadas reales cuando ese módulo exista. El resto de pestañas
-  // ("Membresía", "Pagos", "Rutina", "Dieta") ya usan la API real.
-  const progress = getBodyProgressForClient(clientProfileId)
-  const lastProgress = progress[progress.length - 1]
 
   return (
     <div className="client-detail">
@@ -1269,45 +1372,180 @@ export function ClientDetailPage() {
             </div>
           )}
 
-          {/* TODO(módulo Progreso corporal, todavía no construido): pestaña mock. */}
-          {activeTab === 'progreso' &&
-            (progress.length > 0 ? (
-              <div className="client-detail__progress">
-                <div className="client-detail__progress-chart">
-                  <ProgressChart points={progress.map((p) => ({ date: p.record_date, value: p.weight_kg }))} unit="kg" />
-                </div>
-                <table className="client-detail__table">
-                  <thead>
-                    <tr>
-                      <th>Fecha</th>
-                      <th>Peso</th>
-                      <th>% Grasa</th>
-                      <th>Cintura</th>
-                      <th>Notas</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...progress].reverse().map((p) => (
-                      <tr key={p.id}>
-                        <td>{p.record_date}</td>
-                        <td>{p.weight_kg} kg</td>
-                        <td>{p.body_fat_pct ?? '—'}</td>
-                        <td>{p.waist_cm ? `${p.waist_cm} cm` : '—'}</td>
-                        <td>{p.notes ?? '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {lastProgress && (
-                  <p className="client-detail__footnote">
-                    Estatura registrada: {lastProgress.height_cm} cm (campo `height_cm` vive en BodyProgress, no en el
-                    perfil — ver DECISIONES.md).
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="client-detail__empty">No hay registros de progreso corporal.</p>
-            ))}
+          {activeTab === 'progreso' && (
+            <div className="client-detail__progress-tab">
+              {progressToast && <Toast message={progressToast} onDismiss={() => setProgressToast(null)} />}
+
+              {progressLoading ? (
+                <LoadingState label="Cargando progreso…" variant="skeleton" rows={3} />
+              ) : progressError ? (
+                <ErrorMessage message={progressError} onRetry={loadProgress} />
+              ) : (
+                <>
+                  {isStaff && showProgressForm && (
+                    <form className="client-detail__assign-form" onSubmit={handleRegisterProgressSubmit}>
+                      {progressServerError && (
+                        <ErrorMessage title="No se pudo guardar el registro" message={progressServerError} />
+                      )}
+                      <div className="client-detail__assign-row">
+                        <div className="client-detail__field">
+                          <label className="field-label" htmlFor="progressDate">
+                            Fecha
+                          </label>
+                          <input
+                            id="progressDate"
+                            type="date"
+                            className="input"
+                            value={progressDate}
+                            onChange={(e) => setProgressDate(e.target.value)}
+                          />
+                        </div>
+                        <div className="client-detail__field">
+                          <label className="field-label" htmlFor="progressWeightKg">
+                            Peso (kg)
+                          </label>
+                          <input
+                            id="progressWeightKg"
+                            type="number"
+                            min={0}
+                            step="0.1"
+                            className="input"
+                            value={progressWeightKg}
+                            onChange={(e) => setProgressWeightKg(e.target.value)}
+                            placeholder="78.5"
+                          />
+                        </div>
+                        <div className="client-detail__field">
+                          <label className="field-label" htmlFor="progressHeightCm">
+                            Estatura (cm, opcional)
+                          </label>
+                          <input
+                            id="progressHeightCm"
+                            type="number"
+                            min={0}
+                            step="0.1"
+                            className="input"
+                            value={progressHeightCm}
+                            onChange={(e) => setProgressHeightCm(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="client-detail__assign-row">
+                        <div className="client-detail__field">
+                          <label className="field-label" htmlFor="progressBodyFatPct">
+                            % grasa corporal (opcional)
+                          </label>
+                          <input
+                            id="progressBodyFatPct"
+                            type="number"
+                            min={0}
+                            max={100}
+                            step="0.1"
+                            className="input"
+                            value={progressBodyFatPct}
+                            onChange={(e) => setProgressBodyFatPct(e.target.value)}
+                          />
+                        </div>
+                        <div className="client-detail__field">
+                          <label className="field-label" htmlFor="progressWaistCm">
+                            Cintura (cm, opcional)
+                          </label>
+                          <input
+                            id="progressWaistCm"
+                            type="number"
+                            min={0}
+                            step="0.1"
+                            className="input"
+                            value={progressWaistCm}
+                            onChange={(e) => setProgressWaistCm(e.target.value)}
+                          />
+                        </div>
+                        <div className="client-detail__field">
+                          <label className="field-label" htmlFor="progressNotes">
+                            Notas (opcional)
+                          </label>
+                          <input
+                            id="progressNotes"
+                            className="input"
+                            value={progressNotes}
+                            onChange={(e) => setProgressNotes(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="client-detail__assign-actions">
+                        <button
+                          type="button"
+                          className="btn btn-ghost"
+                          onClick={() => {
+                            setShowProgressForm(false)
+                            resetProgressForm()
+                          }}
+                        >
+                          Cancelar
+                        </button>
+                        <button type="submit" className="btn btn-primary" disabled={isSubmittingProgress}>
+                          {isSubmittingProgress ? 'Guardando…' : 'Guardar registro'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {!progressRecords || progressRecords.length === 0 ? (
+                    !showProgressForm && (
+                      <EmptyState
+                        title="Sin registros de progreso corporal"
+                        description={
+                          isStaff
+                            ? 'Registra el primer avance de este cliente.'
+                            : 'Todavía no tienes registros de progreso corporal.'
+                        }
+                        actionLabel={isStaff ? 'Registrar progreso' : undefined}
+                        onAction={isStaff ? () => setShowProgressForm(true) : undefined}
+                      />
+                    )
+                  ) : (
+                    <div className="client-detail__progress">
+                      {isStaff && !showProgressForm && (
+                        <div className="client-detail__assign-actions">
+                          <button type="button" className="btn btn-primary" onClick={() => setShowProgressForm(true)}>
+                            + Registrar progreso
+                          </button>
+                        </div>
+                      )}
+                      <div className="client-detail__progress-chart">
+                        <ProgressChart
+                          points={progressRecords.map((p) => ({ date: p.record_date, value: Number(p.weight_kg) }))}
+                          unit="kg"
+                        />
+                      </div>
+                      <table className="client-detail__table">
+                        <thead>
+                          <tr>
+                            <th>Fecha</th>
+                            <th>Peso</th>
+                            <th>% Grasa</th>
+                            <th>Cintura</th>
+                            <th>Notas</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {[...progressRecords].reverse().map((p) => (
+                            <tr key={p.id}>
+                              <td>{p.record_date}</td>
+                              <td>{p.weight_kg} kg</td>
+                              <td>{p.body_fat_pct ?? '—'}</td>
+                              <td>{p.waist_cm ? `${p.waist_cm} cm` : '—'}</td>
+                              <td>{p.notes ?? '—'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </Tabs>
       </div>
     </div>

@@ -851,3 +851,22 @@ Registro de decisiones de arquitectura tomadas por Isai (revisor de diseño) dur
   - **Verificación de cierre (en navegador, stack real, pestaña nueva sin ruido de sesiones anteriores):** login real como cliente → sidebar sin "Clientes" → Dashboard sin "En números", resumen "Mi membresía"/"Mi progreso"/"Mi entrenador" con datos reales (membresía Básica real, 78.5 kg registrados, nombre del entrenador real asignado) → `/membresias` con los 3 planes reales y "Mi membresía" sin columna de cliente. Login como entrenador → sidebar y Dashboard sin cambios (siguen viendo "Clientes" y "En números", como corresponde). Sin errores de consola en ningún caso.
 
 ---
+
+### 2026-10-14 — Módulo Progreso Corporal: conexión de frontend (RF010, RF011, RF013)
+
+- **Propuesta original:** el dueño del proyecto probó `/progreso` como admin y reportó que el selector de clientes mostraba varias personas que no están dadas de alta en el sistema (seguía siendo el catálogo mock de Entrega 1). Pidió dejar solo el cliente demo real, que admin/entrenador puedan ver y registrar su progreso, y que el rol cliente solo pueda ver el suyo propio, nunca el de alguien más.
+
+- **Decisión:** aprobada. Esto correspondía exactamente a la tarea ya pendiente en el orden fijo del proyecto (conectar el frontend de Progreso Corporal, backend ya cerrado desde la entrada anterior) — el reporte del dueño del proyecto adelantó el mismo defecto que ya se iba a corregir al construirla: `ProgressPage.tsx` seguía 100% sobre datos mock, nunca se había conectado a la API real.
+
+- **Por qué / alcance de la corrección:**
+  - **Mismo patrón de selector de cliente ya usado en Rutinas/Dietas** (ver esas entradas) — `GET /clients` para admin/entrenador (ya scoped por rol en el backend: un entrenador solo ve ahí a sus propios clientes), resuelto directo vía `GET /clients/me` para el rol `cliente`, sin selector. El cliente nunca ve una lista de otras personas ni puede cambiar a otro `client_id` — no hay ningún control en la UI que se lo permita, y aunque lo intentara por API directa, el router de `GET /progress/clients/{id}` ya valida ownership por dato (admin cualquiera, entrenador solo los suyos, cliente solo el propio — ver entrada del módulo Progreso, backend).
+  - **No existía ningún punto de la UI para registrar progreso (`POST /progress`)** — ni en `ProgressPage.tsx` ni en la pestaña "Progreso" de `ClientDetailPage.tsx`, ambas seguían siendo solo lectura de datos mock. Se agregó un formulario de alta (fecha, peso obligatorio, el resto de medidas del modelo opcionales) visible solo para `admin`/`entrenador`, en ambas pantallas — mismo criterio de "ownership por dato, no por role-gate en el formulario" ya usado en Rutinas/Dietas/Pagos: el formulario nunca deja elegir "quién registra", el backend ya resuelve eso.
+  - **`ClientDetailPage.tsx`, pestaña "Progreso"** también seguía con el mismo mock (`getBodyProgressForClient`, indexado por un `clientProfileId` de ejemplo que no correspondía al cliente real de la pantalla) — se corrigió en el mismo cambio para no dejar dos fuentes de verdad distintas del mismo dato dentro de la misma app.
+
+- **Alternativa aplicada:**
+  - `frontend/src/pages/ProgressPage.tsx`: reescrito completo — selector de cliente (igual que `RoutinesPage.tsx`), carga de `GET /progress/clients/{id}`, formulario de alta para staff (`POST /progress`), gráfica/tarjetas/tabla de historial con datos reales. Ya no importa nada de `mocks/data`.
+  - `frontend/src/pages/ClientDetailPage.tsx`: pestaña "Progreso" conectada a `GET /progress/clients/{clientProfileId}` + formulario de alta para staff (`POST /progress`), mismo patrón de estado/errores ya usado por las pestañas "Rutina"/"Dieta" de este mismo archivo. Se quitó el import de `getBodyProgressForClient`.
+  - `frontend/src/pages/ProgressPage.css`: clases nuevas para el selector de cliente, el formulario de alta y la tabla de historial (mismo lenguaje visual que `RoutinesPage.css`).
+  - **Verificación de cierre:** `npx tsc -b` y `npm run build` limpios. En navegador, stack real: login admin → `/progreso` → el selector solo lista "Cliente Demo" (el único cliente real dado de alta); se registró un nuevo punto de progreso (77.2 kg) y la gráfica/tabla se actualizaron sin recargar. Login cliente → `/progreso` sin selector, solo su propio nombre y sus propios 2 registros, sin botón de alta (solo lectura, RF013). `/clientes/1` pestaña "Progreso" como admin también con datos reales y botón de alta. Sin errores de consola en ningún caso.
+
+---
