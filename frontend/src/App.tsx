@@ -11,6 +11,7 @@ import { DietsPage } from './pages/DietsPage'
 import { LandingPage } from './pages/LandingPage'
 import { LoginPage } from './pages/LoginPage'
 import { MembershipsPage } from './pages/MembershipsPage'
+import { PlanesServiciosPage } from './pages/PlanesServiciosPage'
 import { ProgressPage } from './pages/ProgressPage'
 import { RoutinesPage } from './pages/RoutinesPage'
 
@@ -39,6 +40,7 @@ function App() {
         <Route path="/clientes/nuevo" element={<ClientFormPage />} />
         <Route path="/clientes/:id" element={<ClientDetailPage />} />
         <Route path="/membresias" element={<MembershipsPage />} />
+        <Route path="/planes-servicios" element={<PlanesServiciosPage />} />
         <Route path="/rutinas" element={<RoutinesPage />} />
         <Route path="/dietas" element={<DietsPage />} />
         <Route path="/progreso" element={<ProgressPage />} />

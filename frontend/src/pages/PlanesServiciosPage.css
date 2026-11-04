@@ -1,0 +1,169 @@
+.plans-services-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.plans-services-page__section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.plans-services-page__toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.plans-services-page__inline-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.plans-services-page__form-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+}
+
+.plans-services-page__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.plans-services-page__form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.plans-services-page__danger-btn {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.plans-services-page__note {
+  color: var(--color-text-muted);
+  font-size: 13.5px;
+  margin-top: 10px;
+}
+
+/* --- Pestaña Planes: catálogo de tarjetas plegables --------------------- */
+
+.plans-services-page__catalog {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.plan-card summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+}
+
+.plan-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.plan-card__name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15.5px;
+}
+
+.plan-card__price {
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.plan-card__description {
+  margin-top: 10px;
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+}
+
+.plan-card__benefits {
+  margin-top: 8px;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.plan-card__actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: 14px;
+}
+
+.plan-card__services {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border-soft);
+}
+
+.plan-card__service-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 13.5px;
+}
+
+.plan-card__service-checklist label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* --- Pestaña Servicios extra: tabla --------------------------------------- */
+
+.plans-services-page__table-wrap {
+  padding: 8px 20px 4px;
+  overflow-x: auto;
+}
+
+.plans-services-page__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.plans-services-page__table th {
+  text-align: left;
+  padding: 8px 6px;
+  font-size: 12px;
+  color: var(--color-text-dim);
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.plans-services-page__table td {
+  padding: 9px 6px;
+  border-bottom: 1px solid var(--color-border-soft);
+  vertical-align: top;
+}
+
+.plans-services-page__service-description {
+  margin-top: 2px;
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}
+
+.plans-services-page__row-actions {
+  display: flex;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .plans-services-page__form-row {
+    grid-template-columns: 1fr;
+  }
+}

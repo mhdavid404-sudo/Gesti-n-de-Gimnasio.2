@@ -9,6 +9,7 @@ import {
   IconGrid,
   IconLog,
   IconLogout,
+  IconTag,
   IconTrend,
   IconUsers,
 } from './icons'
@@ -35,6 +36,10 @@ const NAV_ITEMS: NavItem[] = [
   // Dashboard.
   { to: '/clientes', label: 'Clientes', Icon: IconUsers, roles: ['admin', 'entrenador'] },
   { to: '/membresias', label: 'Membresías', Icon: IconCard },
+  // Administración completa del catálogo (Entrega 3, Fase 2) -- solo
+  // admin, mismo criterio que "Clientes"/"Bitácora": entrenador/cliente
+  // consultan planes y extras desde la ficha del cliente, no desde aquí.
+  { to: '/planes-servicios', label: 'Planes y servicios', Icon: IconTag, roles: ['admin'] },
   { to: '/rutinas', label: 'Rutinas', Icon: IconBarbell },
   { to: '/dietas', label: 'Dietas', Icon: IconBowl },
   { to: '/progreso', label: 'Progreso', Icon: IconTrend },

@@ -64,6 +64,8 @@ export interface ApiMembershipPlan {
   duration_days: number
   description: string | null
   benefits: string[]
+  /** Entrega 3: false si se "eliminó" teniendo membresías contratadas (desactivado, no borrado). */
+  is_active: boolean
   created_at: string
 }
 
@@ -75,6 +77,9 @@ export interface MembershipPlanCreatePayload {
   description?: string | null
   benefits: string[]
 }
+
+/** Igual forma que el payload de creación -- `PATCH` reemplaza el objeto completo. */
+export type MembershipPlanUpdatePayload = MembershipPlanCreatePayload
 
 export type ApiMembershipStatus = 'activa' | 'vencida' | 'cancelada' | 'pendiente'
 
@@ -97,11 +102,89 @@ export interface MembershipCreatePayload {
 }
 
 // ---------------------------------------------------------------------------
+// Planes y servicios extra (Entrega 3, Fase 2 -- amplía RF004/RF005) --
+// ver backend/src/api/v1/routers/memberships.py (`services_router`,
+// endpoints `/membership-plans/{id}/services`, `/memberships/{id}/services`).
+// ---------------------------------------------------------------------------
+
+export type ApiBillingPeriod = 'unico' | 'mensual' | 'periodo'
+export type ApiMembershipServiceStatus = 'activa' | 'vencida' | 'cancelada'
+
+export interface ApiService {
+  id: number
+  name: string
+  /** Decimal del backend serializado como string -- mismo criterio que `ApiMembershipPlan.price`. */
+  price: string
+  billing_period: ApiBillingPeriod
+  description: string | null
+  /** false si se "eliminó" teniendo contrataciones (desactivado, no borrado). */
+  is_active: boolean
+  created_at: string
+}
+
+export interface ServiceCreatePayload {
+  name: string
+  price: number
+  billing_period: ApiBillingPeriod
+  description?: string | null
+}
+
+export type ServiceUpdatePayload = ServiceCreatePayload
+
+/** `POST /membership-plans/{plan_id}/services` -- referencia un servicio existente por id. */
+export interface PlanServiceAddPayload {
+  service_id: number
+}
+
+/** Un servicio EXTRA contratado por un cliente sobre una membresía concreta
+ * (distinto de "qué incluye el plan" -- ver `ApiService` + endpoint de
+ * `plan_services` para eso). `price_at_purchase` es el precio congelado al
+ * momento de la contratación, nunca el precio actual del catálogo. */
+export interface ApiMembershipService {
+  id: number
+  membership_id: number
+  service_id: number
+  price_at_purchase: string
+  start_date: string
+  end_date: string
+  status: ApiMembershipServiceStatus
+  created_at: string
+}
+
+/** Vista del entrenador (`GET /memberships/{id}/services` como ese rol):
+ * mismo registro que `ApiMembershipService` pero sin `price_at_purchase`
+ * (regla de negocio: "ve los extras de sus clientes, no precios ni pagos"). */
+export interface ApiMembershipServiceLimited {
+  id: number
+  membership_id: number
+  service_id: number
+  start_date: string
+  end_date: string
+  status: ApiMembershipServiceStatus
+}
+
+export interface MembershipServiceCreatePayload {
+  service_id: number
+  start_date?: string
+  end_date?: string
+}
+
+// ---------------------------------------------------------------------------
 // Payments (RF005) — ver backend/src/api/v1/routers/payments.py
 // ---------------------------------------------------------------------------
 
 export type ApiPaymentMethod = 'efectivo' | 'tarjeta' | 'transferencia'
 export type ApiPaymentStatus = 'completado' | 'pendiente' | 'rechazado'
+export type ApiPaymentItemConcept = 'plan' | 'servicio'
+
+export interface ApiPaymentItem {
+  id: number
+  payment_id: number
+  concept: ApiPaymentItemConcept
+  /** Decimal del backend serializado como string. */
+  amount: string
+  service_id: number | null
+}
 
 export interface ApiPayment {
   id: number
@@ -115,6 +198,14 @@ export interface ApiPayment {
   registered_by: number
   notes: string | null
   created_at: string
+  /** Desglose (Entrega 3, Fase 2) -- vacío en un pago sin desglose, de Entrega 2. */
+  items: ApiPaymentItem[]
+}
+
+export interface PaymentItemCreatePayload {
+  concept: ApiPaymentItemConcept
+  amount: number
+  service_id?: number | null
 }
 
 export interface PaymentCreatePayload {
@@ -125,6 +216,7 @@ export interface PaymentCreatePayload {
   method: ApiPaymentMethod
   status?: ApiPaymentStatus
   notes?: string | null
+  items?: PaymentItemCreatePayload[]
 }
 
 // ---------------------------------------------------------------------------

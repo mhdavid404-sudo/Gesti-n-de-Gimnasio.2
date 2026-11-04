@@ -19,15 +19,20 @@ import type {
   ApiExercise,
   ApiMembership,
   ApiMembershipPlan,
+  ApiMembershipService,
+  ApiMembershipServiceLimited,
   ApiPayment,
   ApiPaymentMethod,
   ApiRoutine,
   ApiRoutineAssignment,
   ApiRoutineExercise,
+  ApiService,
   BodyProgressCreatePayload,
   DietAssignmentCreatePayload,
   MembershipCreatePayload,
+  MembershipServiceCreatePayload,
   PaymentCreatePayload,
+  PaymentItemCreatePayload,
   RoutineAssignmentCreatePayload,
 } from '../types/api'
 import { addDaysIso, getMembershipDisplayStatus, pickCurrentMembership } from '../utils/membership'
@@ -189,6 +194,99 @@ export function ClientDetailPage() {
     [membership, plans],
   )
 
+  // --- Servicios extra (Entrega 3, Fase 2 -- amplía RF004/RF005) ----------
+  // Dos listas distintas: qué incluye el PLAN (plan_services, catálogo) vs.
+  // qué CONTRATÓ el cliente aparte (membership_services, con precio
+  // congelado). `GET /memberships/{id}/services` ya recorta `price_at_purchase`
+  // del lado del backend para `entrenador` -- se tipa como el "or" de ambas
+  // formas en vez de asumir cuál llega.
+  const [includedServices, setIncludedServices] = useState<ApiService[]>([])
+  const [contractedServices, setContractedServices] = useState<
+    (ApiMembershipService | ApiMembershipServiceLimited)[]
+  >([])
+  const [servicesLoading, setServicesLoading] = useState(false)
+  const [allServices, setAllServices] = useState<ApiService[]>([])
+
+  useEffect(() => {
+    apiFetch<ApiService[]>('/services')
+      .then(setAllServices)
+      .catch(() => setAllServices([]))
+  }, [])
+
+  useEffect(() => {
+    if (!membership || !plan) {
+      setIncludedServices([])
+      setContractedServices([])
+      return
+    }
+    setServicesLoading(true)
+    Promise.all([
+      apiFetch<ApiService[]>(`/membership-plans/${plan.id}/services`),
+      apiFetch<(ApiMembershipService | ApiMembershipServiceLimited)[]>(`/memberships/${membership.id}/services`),
+    ])
+      .then(([included, contracted]) => {
+        setIncludedServices(included)
+        setContractedServices(contracted)
+      })
+      .catch(() => {
+        setIncludedServices([])
+        setContractedServices([])
+      })
+      .finally(() => setServicesLoading(false))
+  }, [membership?.id, plan?.id])
+
+  const includedServiceIds = useMemo(() => new Set(includedServices.map((s) => s.id)), [includedServices])
+  const contractedServiceIds = useMemo(() => new Set(contractedServices.map((ms) => ms.service_id)), [contractedServices])
+  const contractableServices = allServices.filter(
+    (s) => s.is_active && !includedServiceIds.has(s.id) && !contractedServiceIds.has(s.id),
+  )
+
+  // --- Contratar un servicio extra (solo admin) ----------------------------
+  const [showContractForm, setShowContractForm] = useState(false)
+  const [contractServiceId, setContractServiceId] = useState('')
+  const [contractServerError, setContractServerError] = useState<string | null>(null)
+  const [isContracting, setIsContracting] = useState(false)
+  const [contractToast, setContractToast] = useState<string | null>(null)
+
+  const handleContractService = async (event: FormEvent) => {
+    event.preventDefault()
+    setContractServerError(null)
+    if (!membership || !contractServiceId) {
+      setContractServerError('Selecciona un servicio.')
+      return
+    }
+
+    const payload: MembershipServiceCreatePayload = { service_id: Number(contractServiceId) }
+
+    setIsContracting(true)
+    try {
+      const created = await apiFetch<ApiMembershipService>(`/memberships/${membership.id}/services`, {
+        method: 'POST',
+        body: payload,
+      })
+      setContractedServices((prev) => [...prev, created])
+      const service = allServices.find((s) => s.id === created.service_id)
+      setContractToast(`"${service?.name ?? 'Servicio'}" contratado correctamente.`)
+      setShowContractForm(false)
+      setContractServiceId('')
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.isUnauthorized) {
+          logout()
+          navigate('/login', { replace: true })
+          return
+        }
+        setContractServerError(
+          err.status === 403 ? 'No tienes permiso para contratar servicios para este cliente.' : err.message,
+        )
+      } else {
+        setContractServerError('Ocurrió un error inesperado. Intenta de nuevo.')
+      }
+    } finally {
+      setIsContracting(false)
+    }
+  }
+
   // --- Asignar membresía (solo admin, ver docstring del router backend) ---
   const [showAssignForm, setShowAssignForm] = useState(false)
   const [assignPlanId, setAssignPlanId] = useState('')
@@ -300,6 +398,29 @@ export function ClientDetailPage() {
   const [isRegisteringPayment, setIsRegisteringPayment] = useState(false)
   const [paymentToast, setPaymentToast] = useState<string | null>(null)
 
+  // Desglose opcional (Entrega 3, Fase 2): si el admin marca el plan y/o
+  // algún extra contratado, el monto se calcula solo a partir de ahí y el
+  // pago se registra con `items`. Sin nada marcado, el formulario se
+  // comporta exactamente como en Entrega 2 (monto libre, sin desglose).
+  const [breakdownPlanChecked, setBreakdownPlanChecked] = useState(false)
+  const [breakdownServiceIds, setBreakdownServiceIds] = useState<Set<number>>(new Set())
+
+  const breakdownActive = breakdownPlanChecked || breakdownServiceIds.size > 0
+  const breakdownTotal =
+    (breakdownPlanChecked && plan ? Number(plan.price) : 0) +
+    contractedServices
+      .filter((ms) => breakdownServiceIds.has(ms.id))
+      .reduce((sum, ms) => sum + ('price_at_purchase' in ms ? Number(ms.price_at_purchase) : 0), 0)
+
+  const toggleBreakdownService = (membershipServiceId: number) => {
+    setBreakdownServiceIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(membershipServiceId)) next.delete(membershipServiceId)
+      else next.add(membershipServiceId)
+      return next
+    })
+  }
+
   const clearPaymentError = (field: PaymentFormField) => {
     setPaymentErrors((prev) => (prev[field] ? { ...prev, [field]: undefined } : prev))
   }
@@ -311,6 +432,8 @@ export function ClientDetailPage() {
     setPaymentNotes('')
     setPaymentErrors({})
     setPaymentServerError(null)
+    setBreakdownPlanChecked(false)
+    setBreakdownServiceIds(new Set())
   }
 
   const handleRegisterPayment = async (event: FormEvent) => {
@@ -318,15 +441,32 @@ export function ClientDetailPage() {
     setPaymentServerError(null)
     if (!membership) return
 
+    const amountValue = breakdownActive ? breakdownTotal : Number(paymentAmount)
+
     const nextErrors: PaymentFormErrors = {}
-    const amountValue = Number(paymentAmount)
-    if (!paymentAmount || Number.isNaN(amountValue) || amountValue <= 0) {
-      nextErrors.amount = 'Ingresa un monto mayor a 0.'
+    if (!amountValue || Number.isNaN(amountValue) || amountValue <= 0) {
+      nextErrors.amount = breakdownActive
+        ? 'El desglose seleccionado suma $0 -- marca al menos un concepto con precio.'
+        : 'Ingresa un monto mayor a 0.'
     }
     if (!paymentDate) nextErrors.paymentDate = 'Selecciona una fecha de pago.'
     if (Object.keys(nextErrors).length > 0) {
       setPaymentErrors(nextErrors)
       return
+    }
+
+    const items: PaymentItemCreatePayload[] = []
+    if (breakdownActive) {
+      if (breakdownPlanChecked && plan) {
+        items.push({ concept: 'plan', amount: Number(plan.price) })
+      }
+      contractedServices
+        .filter((ms) => breakdownServiceIds.has(ms.id))
+        .forEach((ms) => {
+          if ('price_at_purchase' in ms) {
+            items.push({ concept: 'servicio', amount: Number(ms.price_at_purchase), service_id: ms.service_id })
+          }
+        })
     }
 
     const payload: PaymentCreatePayload = {
@@ -335,6 +475,7 @@ export function ClientDetailPage() {
       payment_date: paymentDate,
       method: paymentMethod,
       notes: paymentNotes.trim() || null,
+      items,
     }
 
     setIsRegisteringPayment(true)
@@ -847,40 +988,157 @@ export function ClientDetailPage() {
               ) : membershipError ? (
                 <ErrorMessage message={membershipError} />
               ) : membership && plan ? (
-                <dl className="client-detail__grid">
-                  <div>
-                    <dt>Plan</dt>
-                    <dd>{plan.name}</dd>
-                  </div>
-                  <div>
-                    <dt>Precio</dt>
-                    <dd>${Number(plan.price).toLocaleString('es-MX')} / mes</dd>
-                  </div>
-                  <div>
-                    <dt>Vigencia</dt>
-                    <dd>
-                      {membership.start_date} — {membership.end_date}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>Estado</dt>
-                    <dd>
-                      <StatusPill status={getMembershipDisplayStatus(membership)} />
-                    </dd>
-                  </div>
-                  {plan.benefits.length > 0 && (
-                    <div className="client-detail__grid-full">
-                      <dt>Beneficios</dt>
+                <>
+                  <dl className="client-detail__grid">
+                    <div>
+                      <dt>Plan</dt>
+                      <dd>{plan.name}</dd>
+                    </div>
+                    <div>
+                      <dt>Precio</dt>
+                      <dd>${Number(plan.price).toLocaleString('es-MX')} / mes</dd>
+                    </div>
+                    <div>
+                      <dt>Vigencia</dt>
                       <dd>
-                        <ul className="client-detail__benefits">
-                          {plan.benefits.map((b) => (
-                            <li key={b}>{b}</li>
-                          ))}
-                        </ul>
+                        {membership.start_date} — {membership.end_date}
                       </dd>
                     </div>
-                  )}
-                </dl>
+                    <div>
+                      <dt>Estado</dt>
+                      <dd>
+                        <StatusPill status={getMembershipDisplayStatus(membership)} />
+                      </dd>
+                    </div>
+                    {plan.benefits.length > 0 && (
+                      <div className="client-detail__grid-full">
+                        <dt>Beneficios</dt>
+                        <dd>
+                          <ul className="client-detail__benefits">
+                            {plan.benefits.map((b) => (
+                              <li key={b}>{b}</li>
+                            ))}
+                          </ul>
+                        </dd>
+                      </div>
+                    )}
+                  </dl>
+
+                  {/* Entrega 3, Fase 2 -- amplía RF004/RF005: qué incluye el
+                      plan (catálogo) vs. qué contrató el cliente aparte
+                      (precio congelado). */}
+                  <div className="client-detail__services-section">
+                    {contractToast && <Toast message={contractToast} onDismiss={() => setContractToast(null)} />}
+
+                    {includedServices.length > 0 && (
+                      <div className="client-detail__services-block">
+                        <span className="field-label">Servicios incluidos en el plan</span>
+                        <ul className="client-detail__services-list">
+                          {includedServices.map((s) => (
+                            <li key={s.id}>{s.name}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    <div className="client-detail__services-block">
+                      <div className="client-detail__services-block-header">
+                        <span className="field-label">Extras contratados</span>
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            className="btn btn-ghost"
+                            onClick={() => setShowContractForm((prev) => !prev)}
+                          >
+                            {showContractForm ? 'Cancelar' : '+ Contratar extra'}
+                          </button>
+                        )}
+                      </div>
+
+                      {isAdmin && showContractForm && (
+                        <form className="client-detail__assign-form" onSubmit={handleContractService}>
+                          {contractServerError && (
+                            <ErrorMessage title="No se pudo contratar el servicio" message={contractServerError} />
+                          )}
+                          {contractableServices.length === 0 ? (
+                            <p className="client-detail__empty">
+                              No hay servicios disponibles para contratar aparte -- ya están todos incluidos en el
+                              plan, ya contratados, o inactivos.
+                            </p>
+                          ) : (
+                            <div className="client-detail__field">
+                              <label className="field-label" htmlFor="contractServiceId">
+                                Servicio
+                              </label>
+                              <select
+                                id="contractServiceId"
+                                className="input"
+                                value={contractServiceId}
+                                onChange={(e) => setContractServiceId(e.target.value)}
+                              >
+                                <option value="">Selecciona un servicio</option>
+                                {contractableServices.map((s) => (
+                                  <option key={s.id} value={s.id}>
+                                    {s.name} — ${Number(s.price).toLocaleString('es-MX')}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                          <div className="client-detail__assign-actions">
+                            <button
+                              type="submit"
+                              className="btn btn-primary"
+                              disabled={isContracting || contractableServices.length === 0}
+                            >
+                              {isContracting ? 'Contratando…' : 'Contratar'}
+                            </button>
+                          </div>
+                        </form>
+                      )}
+
+                      {servicesLoading ? (
+                        <LoadingState label="Cargando extras…" variant="skeleton" rows={2} />
+                      ) : contractedServices.length === 0 ? (
+                        <p className="client-detail__empty">Sin extras contratados.</p>
+                      ) : (
+                        <table className="client-detail__table">
+                          <thead>
+                            <tr>
+                              <th>Servicio</th>
+                              {isAdmin && <th>Precio</th>}
+                              <th>Vigencia</th>
+                              <th>Estado</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {contractedServices.map((ms) => {
+                              const service = allServices.find((s) => s.id === ms.service_id)
+                              return (
+                                <tr key={ms.id}>
+                                  <td>{service?.name ?? `Servicio #${ms.service_id}`}</td>
+                                  {isAdmin && (
+                                    <td>
+                                      {'price_at_purchase' in ms
+                                        ? `$${Number(ms.price_at_purchase).toLocaleString('es-MX')}`
+                                        : '—'}
+                                    </td>
+                                  )}
+                                  <td>
+                                    {ms.start_date} — {ms.end_date}
+                                  </td>
+                                  <td>
+                                    <StatusPill status={ms.status} />
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                  </div>
+                </>
               ) : showAssignForm ? (
                 <form className="client-detail__assign-form" onSubmit={handleAssignSubmit}>
                   {assignServerError && (
@@ -995,6 +1253,43 @@ export function ClientDetailPage() {
                         <ErrorMessage title="No se pudo registrar el pago" message={paymentServerError} />
                       )}
 
+                      {(plan || contractedServices.length > 0) && (
+                        <div className="client-detail__breakdown">
+                          <span className="field-label">Desglose (opcional) -- marca para calcular el monto</span>
+                          <ul className="client-detail__breakdown-list">
+                            {plan && (
+                              <li>
+                                <label>
+                                  <input
+                                    type="checkbox"
+                                    checked={breakdownPlanChecked}
+                                    onChange={(e) => setBreakdownPlanChecked(e.target.checked)}
+                                  />
+                                  Plan {plan.name} — ${Number(plan.price).toLocaleString('es-MX')}
+                                </label>
+                              </li>
+                            )}
+                            {contractedServices.map((ms) => {
+                              const service = allServices.find((s) => s.id === ms.service_id)
+                              const price = 'price_at_purchase' in ms ? Number(ms.price_at_purchase) : null
+                              if (price == null) return null
+                              return (
+                                <li key={ms.id}>
+                                  <label>
+                                    <input
+                                      type="checkbox"
+                                      checked={breakdownServiceIds.has(ms.id)}
+                                      onChange={() => toggleBreakdownService(ms.id)}
+                                    />
+                                    {service?.name ?? `Servicio #${ms.service_id}`} — ${price.toLocaleString('es-MX')}
+                                  </label>
+                                </li>
+                              )
+                            })}
+                          </ul>
+                        </div>
+                      )}
+
                       <div className="client-detail__payment-row">
                         <div className="client-detail__field">
                           <label className="field-label" htmlFor="paymentAmount">
@@ -1006,7 +1301,8 @@ export function ClientDetailPage() {
                             min={0}
                             step="0.01"
                             className="input"
-                            value={paymentAmount}
+                            value={breakdownActive ? breakdownTotal.toFixed(2) : paymentAmount}
+                            disabled={breakdownActive}
                             onChange={(e) => {
                               setPaymentAmount(e.target.value)
                               clearPaymentError('amount')
@@ -1118,6 +1414,7 @@ export function ClientDetailPage() {
                           <tr>
                             <th>Fecha</th>
                             <th>Monto</th>
+                            <th>Desglose</th>
                             <th>Método</th>
                             <th>Estado</th>
                             <th>Notas</th>
@@ -1128,6 +1425,17 @@ export function ClientDetailPage() {
                             <tr key={p.id}>
                               <td>{p.payment_date}</td>
                               <td>${Number(p.amount).toLocaleString('es-MX')}</td>
+                              <td>
+                                {p.items.length === 0
+                                  ? '—'
+                                  : p.items
+                                      .map((item) =>
+                                        item.concept === 'plan'
+                                          ? `Plan ($${Number(item.amount).toLocaleString('es-MX')})`
+                                          : `${allServices.find((s) => s.id === item.service_id)?.name ?? 'Servicio'} ($${Number(item.amount).toLocaleString('es-MX')})`,
+                                      )
+                                      .join(' + ')}
+                              </td>
                               <td className="client-detail__capitalize">{p.method}</td>
                               <td>
                                 <StatusPill status={p.status} />

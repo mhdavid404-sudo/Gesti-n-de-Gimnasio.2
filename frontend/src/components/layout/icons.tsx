@@ -106,6 +106,14 @@ export const IconResults = ({ className }: IconProps) => (
   </svg>
 )
 
+/** Planes y servicios extra — etiqueta de precio, distinta de IconCard (membresías = tarjeta, no etiqueta). */
+export const IconTag = ({ className }: IconProps) => (
+  <svg {...base} className={className}>
+    <path d="M2.6 9.4 9.4 2.6h5.2a1.2 1.2 0 0 1 1.2 1.2v5.2L8.6 15.8a1.2 1.2 0 0 1-1.7 0L2.6 11.1a1.2 1.2 0 0 1 0-1.7Z" />
+    <circle cx="12.2" cy="5.8" r="1.1" fill="currentColor" stroke="none" />
+  </svg>
+)
+
 /** Bitácora — hoja de registro con renglones, para distinguir de IconCard (sin reglón inferior). */
 export const IconLog = ({ className }: IconProps) => (
   <svg {...base} className={className}>

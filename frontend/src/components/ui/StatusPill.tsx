@@ -7,7 +7,7 @@ import './StatusPill.css'
  * (no persistido) — ver `utils/membership.ts` y DECISIONES.md, arbitraje del
  * 2026-09-12.
  */
-type Status = MembershipDisplayStatus | AssignmentStatus | PaymentStatus | 'sin_membresia'
+type Status = MembershipDisplayStatus | AssignmentStatus | PaymentStatus | 'sin_membresia' | 'inactivo'
 
 const LABELS: Record<Status, string> = {
   activa: 'Activa',
@@ -19,6 +19,9 @@ const LABELS: Record<Status, string> = {
   completado: 'Completado',
   rechazado: 'Rechazado',
   sin_membresia: 'Sin membresía',
+  // Entrega 3 (Fase 2): un plan/servicio "eliminado" con contrataciones
+  // vigentes se desactiva en vez de borrarse -- ver PlanesServiciosPage.
+  inactivo: 'Inactivo',
 }
 
 const TONES: Record<Status, 'success' | 'warning' | 'danger' | 'neutral'> = {
@@ -31,6 +34,7 @@ const TONES: Record<Status, 'success' | 'warning' | 'danger' | 'neutral'> = {
   completado: 'success',
   rechazado: 'danger',
   sin_membresia: 'neutral',
+  inactivo: 'neutral',
 }
 
 export function StatusPill({ status }: { status: Status }) {
