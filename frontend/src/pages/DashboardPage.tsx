@@ -12,13 +12,23 @@ import { QuickActionCard } from '../components/ui/QuickActionCard'
 import { StatNumber } from '../components/ui/StatNumber'
 import { StatusPill } from '../components/ui/StatusPill'
 import { useAuth } from '../hooks/useAuth'
-import { auditLogs, clients, payments } from '../mocks/data'
-import type { ApiBodyProgress, ApiClientProfile, ApiMembership, ApiMembershipPlan, ApiNotification } from '../types/api'
+import type {
+  ApiAuditLog,
+  ApiBodyProgress,
+  ApiClientProfile,
+  ApiMembership,
+  ApiMembershipPlan,
+  ApiNotification,
+  ApiPayment,
+} from '../types/api'
 import type { UserRole } from '../types/models'
 import { getMembershipDisplayStatus, isMembershipExpiringSoon, pickCurrentMembership } from '../utils/membership'
 import './DashboardPage.css'
 
-const CURRENT_MONTH_PREFIX = '2026-09'
+const MONTH_NAMES = [
+  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+]
 
 interface QuickAction {
   to: string
@@ -114,10 +124,47 @@ export function DashboardPage() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
 
-  const activeClients = clients.filter((c) => c.is_active).length
-  const monthIncome = payments
-    .filter((p) => p.payment_date.startsWith(CURRENT_MONTH_PREFIX))
-    .reduce((sum, p) => sum + p.amount, 0)
+  // --- Pagos del mes y última acción de bitácora (admin/entrenador) ------
+  // `ClientProfile` nunca tuvo un campo `is_active` -- eso era un concepto
+  // del mock de Entrega 1 sin equivalente real en el modelo de datos (ver
+  // `MODELO-DATOS.md`); "Clientes activos" se reemplaza por el conteo real
+  // del padrón ya cargado (`clientById`, ver abajo), sin inventar un estado
+  // que la base de datos no tiene.
+  const currentMonthPrefix = new Date().toISOString().slice(0, 7)
+  const currentMonthName = MONTH_NAMES[new Date().getMonth()]
+
+  const [monthPayments, setMonthPayments] = useState<ApiPayment[] | null>(null)
+  const [paymentsLoading, setPaymentsLoading] = useState(true)
+
+  // Bitácora (RF015): solo `admin` -- `GET /audit-logs` responde 403 a
+  // entrenador/cliente (ver routers/notifications.py). `limit=1` basta: el
+  // repositorio ya ordena por `created_at` descendente.
+  const [lastAuditLog, setLastAuditLog] = useState<ApiAuditLog | null>(null)
+  const [lastAuditLoading, setLastAuditLoading] = useState(false)
+
+  useEffect(() => {
+    if (mockRole === 'cliente') {
+      setPaymentsLoading(false)
+      return
+    }
+    setPaymentsLoading(true)
+    apiFetch<ApiPayment[]>('/payments')
+      .then(setMonthPayments)
+      .catch(() => setMonthPayments([]))
+      .finally(() => setPaymentsLoading(false))
+
+    if (mockRole === 'admin') {
+      setLastAuditLoading(true)
+      apiFetch<ApiAuditLog[]>('/audit-logs?limit=1')
+        .then((logs) => setLastAuditLog(logs[0] ?? null))
+        .catch(() => setLastAuditLog(null))
+        .finally(() => setLastAuditLoading(false))
+    }
+  }, [mockRole])
+
+  const monthIncome = (monthPayments ?? [])
+    .filter((p) => p.payment_date.startsWith(currentMonthPrefix))
+    .reduce((sum, p) => sum + Number(p.amount), 0)
 
   // --- Alertas de membresía reales (RF006) -------------------------------
   // `GET /memberships/expiring` ya trae mezcladas las vencidas (status
@@ -272,6 +319,8 @@ export function DashboardPage() {
         ownMembershipLoading={ownMembershipLoading}
         ownProgress={ownProgress}
         ownProgressLoading={ownProgressLoading}
+        lastAuditLog={lastAuditLog}
+        lastAuditLoading={lastAuditLoading}
       />
     ),
     [
@@ -290,6 +339,8 @@ export function DashboardPage() {
       ownMembershipLoading,
       ownProgress,
       ownProgressLoading,
+      lastAuditLog,
+      lastAuditLoading,
     ],
   )
 
@@ -318,10 +369,16 @@ export function DashboardPage() {
           <span className="eyebrow">En números</span>
           <div className="dashboard__stats">
             <div className="card dashboard__stat-card">
-              <StatNumber value={activeClients} label="Clientes activos" />
+              <StatNumber
+                value={alertClientsLoading ? '…' : clientById.size}
+                label={mockRole === 'admin' ? 'Clientes' : 'Mis clientes asignados'}
+              />
             </div>
             <div className="card dashboard__stat-card">
-              <StatNumber value={`$${monthIncome.toLocaleString('es-MX')}`} label="Ingresos de septiembre" />
+              <StatNumber
+                value={paymentsLoading ? '…' : `$${monthIncome.toLocaleString('es-MX')}`}
+                label={`Ingresos de ${currentMonthName}`}
+              />
             </div>
             <div className="card dashboard__stat-card">
               <StatNumber
@@ -367,6 +424,8 @@ function ResultsContent({
   ownMembershipLoading,
   ownProgress,
   ownProgressLoading,
+  lastAuditLog,
+  lastAuditLoading,
 }: {
   role: UserRole
   expiringSoon: ApiMembership[]
@@ -385,6 +444,8 @@ function ResultsContent({
   ownMembershipLoading: boolean
   ownProgress: ApiBodyProgress[] | null
   ownProgressLoading: boolean
+  lastAuditLog: ApiAuditLog | null
+  lastAuditLoading: boolean
 }) {
   if (role === 'cliente') {
     // Sin perfil propio: quien está previsualizando "Cliente" con el switch
@@ -450,7 +511,6 @@ function ResultsContent({
   const sectionLoading = expiringLoading || clientsLoading
   const sectionError = expiringError ?? clientsError
   const recentForList = recentNotifications.slice(0, 4)
-  const lastAction = [...auditLogs].sort((a, b) => b.created_at.localeCompare(a.created_at))[0]
 
   return (
     <div className="dashboard-results">
@@ -504,16 +564,22 @@ function ResultsContent({
         )}
       </section>
 
-      <section className="dashboard-results__section">
-        <h3 className="dashboard-results__heading">Última acción registrada</h3>
-        {lastAction ? (
-          <p className="dashboard-results__text">
-            {lastAction.details ?? `${lastAction.action} · ${lastAction.entity_type}`}
-          </p>
-        ) : (
-          <EmptyState compact title="Sin actividad" />
-        )}
-      </section>
+      {/* Bitácora (RF015): solo admin -- GET /audit-logs devuelve 403 a
+          entrenador/cliente, ver routers/notifications.py. */}
+      {role === 'admin' && (
+        <section className="dashboard-results__section">
+          <h3 className="dashboard-results__heading">Última acción registrada</h3>
+          {lastAuditLoading ? (
+            <LoadingState label="Cargando…" />
+          ) : lastAuditLog ? (
+            <p className="dashboard-results__text">
+              {lastAuditLog.details ?? `${lastAuditLog.action} · ${lastAuditLog.entity_type}`}
+            </p>
+          ) : (
+            <EmptyState compact title="Sin actividad" />
+          )}
+        </section>
+      )}
     </div>
   )
 }
