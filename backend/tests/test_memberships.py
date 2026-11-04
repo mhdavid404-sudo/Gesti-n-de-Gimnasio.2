@@ -128,6 +128,17 @@ def test_listar_planes_como_cualquier_rol_autenticado(client: TestClient) -> Non
     assert body[0]["name"] == "VIP Memb3"
 
 
+def test_listar_planes_sin_autenticacion_es_publico(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.membresias.publico@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+    _create_plan(client, admin_headers, "Publico Memb1")
+
+    response = client.get(f"{API}/membership-plans")
+
+    assert response.status_code == 200
+    assert any(p["name"] == "Publico Memb1" for p in response.json())
+
+
 def test_asignar_membresia_exitosa(client: TestClient) -> None:
     admin = _seed_user("smartgym.qa.admin.membresias4@gmail.com", "AdminPass123", "admin")
     headers = _auth_headers(client, admin.email, "AdminPass123")

@@ -6,10 +6,12 @@ del modulo Planes y Membresias, ver DECISIONES.md):
 - `POST /membership-plans` (alta de plan): solo `admin` -- son datos de
   catalogo/precio, decision administrativa/financiera, igual que el alta de
   perfil de cliente en el modulo Clientes.
-- `GET /membership-plans` (listado de catalogo): cualquier rol autenticado
-  -- es catalogo no sensible (nombre/precio/duracion/beneficios), no datos
-  personales; un entrenador o cliente tambien necesita poder leerlo (ej.
-  para mostrar opciones al asignar/consultar una membresia).
+- `GET /membership-plans` (listado de catalogo): PUBLICO, sin autenticacion
+  (Entrega 3) -- es catalogo no sensible (nombre/precio/duracion/beneficios),
+  no datos personales, y la landing publica (`/`) lo necesita para mostrar
+  los planes reales sin pedir login. Antes exigia sesion (cualquier rol
+  autenticado); se relaja a publico porque ningun dato de este endpoint deja
+  de ser apropiado para un visitante anonimo -- ver DECISIONES.md.
 - `POST /memberships` (asignar): solo `admin` -- asignar/cobrar una
   membresia es una decision administrativa/financiera, no una accion del
   propio entrenador o del cliente.
@@ -150,11 +152,8 @@ def create_membership_plan(payload: MembershipPlanCreate, db: Session = Depends(
 
 
 @plans_router.get("", response_model=list[MembershipPlanRead])
-def list_membership_plans(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> list[MembershipPlanRead]:
-    """Catalogo no sensible: cualquier rol autenticado puede listar planes."""
+def list_membership_plans(db: Session = Depends(get_db)) -> list[MembershipPlanRead]:
+    """Catalogo no sensible: publico, sin autenticacion (ver docstring del modulo)."""
     plan_repository = SqlAlchemyMembershipPlanRepository(db)
     return [MembershipPlanRead.model_validate(plan) for plan in plan_repository.list_all()]
 

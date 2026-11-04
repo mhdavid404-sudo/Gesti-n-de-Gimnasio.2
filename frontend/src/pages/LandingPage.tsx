@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { apiFetch } from '../api/client'
 import logoStronger from '../assets/logo-stronger.jpg'
 import { useScrollReveal } from '../hooks/useScrollReveal'
-import { membershipPlans } from '../mocks/data'
+import type { ApiMembershipPlan } from '../types/api'
 import './LandingPage.css'
 
 /**
@@ -54,6 +55,18 @@ const FACILITIES = [
 
 export function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false)
+
+  // Catálogo real (Entrega 3) -- antes usaba `mocks/data`. `GET
+  // /membership-plans` es público (sin login, ver DECISIONES.md): un
+  // visitante anónimo debe poder ver los planes antes de registrarse.
+  const [plans, setPlans] = useState<ApiMembershipPlan[] | null>(null)
+  const [plansError, setPlansError] = useState(false)
+
+  useEffect(() => {
+    apiFetch<ApiMembershipPlan[]>('/membership-plans', { auth: false })
+      .then(setPlans)
+      .catch(() => setPlansError(true))
+  }, [])
 
   // Scroll-reveal editorial (ver CLAUDE.md tarea 2) — el hero queda fuera
   // a propósito: ya está visible desde el primer frame, no hay "revelado"
@@ -168,36 +181,46 @@ export function LandingPage() {
             quieras en recepción.
           </p>
 
-          <div className="lp-plans__grid">
-            {membershipPlans.map((plan) => {
-              const featured = plan.name === 'VIP'
-              return (
-                <article
-                  key={plan.id}
-                  className={`lp-plan-card${featured ? ' lp-plan-card--featured' : ''}`}
-                >
-                  {featured ? <span className="lp-plan-card__badge">Más popular</span> : null}
-                  <span className="lp-plan-card__name">{plan.name}</span>
-                  <div className="lp-plan-card__price">
-                    ${plan.price.toLocaleString('es-MX')}
-                    <span>/mes</span>
-                  </div>
-                  <p className="lp-plan-card__description">{plan.description}</p>
-                  <ul className="lp-plan-card__benefits">
-                    {plan.benefits.map((benefit) => (
-                      <li key={benefit}>{benefit}</li>
-                    ))}
-                  </ul>
-                  <Link
-                    to="/login"
-                    className={`lp-btn ${featured ? 'lp-btn--brand' : 'lp-btn--ghost'} lp-plan-card__cta`}
+          {plansError ? (
+            <p className="lp-plans__status">
+              No pudimos cargar los planes en este momento. Llama al gimnasio o intenta de nuevo más tarde.
+            </p>
+          ) : !plans ? (
+            <p className="lp-plans__status">Cargando planes…</p>
+          ) : plans.length === 0 ? (
+            <p className="lp-plans__status">Todavía no hay planes publicados.</p>
+          ) : (
+            <div className="lp-plans__grid">
+              {plans.map((plan) => {
+                const featured = plan.name === 'VIP'
+                return (
+                  <article
+                    key={plan.id}
+                    className={`lp-plan-card${featured ? ' lp-plan-card--featured' : ''}`}
                   >
-                    Quiero este plan
-                  </Link>
-                </article>
-              )
-            })}
-          </div>
+                    {featured ? <span className="lp-plan-card__badge">Más popular</span> : null}
+                    <span className="lp-plan-card__name">{plan.name}</span>
+                    <div className="lp-plan-card__price">
+                      ${Number(plan.price).toLocaleString('es-MX')}
+                      <span>/mes</span>
+                    </div>
+                    <p className="lp-plan-card__description">{plan.description}</p>
+                    <ul className="lp-plan-card__benefits">
+                      {plan.benefits.map((benefit) => (
+                        <li key={benefit}>{benefit}</li>
+                      ))}
+                    </ul>
+                    <Link
+                      to="/login"
+                      className={`lp-btn ${featured ? 'lp-btn--brand' : 'lp-btn--ghost'} lp-plan-card__cta`}
+                    >
+                      Quiero este plan
+                    </Link>
+                  </article>
+                )
+              })}
+            </div>
+          )}
         </section>
 
         <section

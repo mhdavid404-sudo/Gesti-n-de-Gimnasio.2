@@ -476,6 +476,11 @@
   align-items: stretch;
 }
 
+.lp-plans__status {
+  color: var(--lp-text-muted);
+  font-size: 15px;
+}
+
 .lp-plan-card {
   position: relative;
   background: var(--lp-surface);
