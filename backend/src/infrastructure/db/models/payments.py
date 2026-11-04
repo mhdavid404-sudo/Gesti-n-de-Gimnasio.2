@@ -47,3 +47,25 @@ class PaymentModel(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class PaymentItemModel(Base):
+    """Entrega 3, Fase 2: desglose de un pago (plan vs. servicios extra)."""
+
+    __tablename__ = "payment_items"
+    __table_args__ = (
+        CheckConstraint(
+            "concept IN ('plan', 'servicio')",
+            name="ck_payment_items_concept",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    payment_id: Mapped[int] = mapped_column(
+        ForeignKey("payments.id", ondelete="CASCADE"), nullable=False
+    )
+    concept: Mapped[str] = mapped_column(String(20), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    service_id: Mapped[int | None] = mapped_column(
+        ForeignKey("services.id", ondelete="RESTRICT"), nullable=True
+    )

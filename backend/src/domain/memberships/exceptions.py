@@ -45,3 +45,52 @@ class InvalidMembershipStatusError(Exception):
     def __init__(self, status_value: str) -> None:
         self.status_value = status_value
         super().__init__(f"El estado '{status_value}' no es un estado de membresia valido")
+
+
+# --- Entrega 3, Fase 2 (Planes y servicios extra) --------------------------
+
+
+class ServiceNotFoundError(Exception):
+    """No existe un `Service` con el id solicitado."""
+
+    def __init__(self, service_id: int) -> None:
+        self.service_id = service_id
+        super().__init__(f"El servicio {service_id} no existe")
+
+
+class InactiveServiceError(Exception):
+    """No se puede contratar un `Service` con `is_active = False`."""
+
+    def __init__(self, service_id: int) -> None:
+        self.service_id = service_id
+        super().__init__(f"El servicio {service_id} ya no esta disponible")
+
+
+class ServiceAlreadyIncludedInPlanError(Exception):
+    """El servicio ya forma parte de los incluidos de ese plan."""
+
+    def __init__(self, plan_id: int, service_id: int) -> None:
+        self.plan_id = plan_id
+        self.service_id = service_id
+        super().__init__(f"El servicio {service_id} ya esta incluido en el plan {plan_id}")
+
+
+class ServiceIncludedInPlanError(Exception):
+    """RF: un servicio incluido en el plan del cliente no se cobra
+    aparte -- no tiene sentido (ni se permite) contratarlo como extra."""
+
+    def __init__(self, plan_id: int, service_id: int) -> None:
+        self.plan_id = plan_id
+        self.service_id = service_id
+        super().__init__(
+            f"El servicio {service_id} ya esta incluido en el plan {plan_id} del cliente, "
+            "no se puede contratar como extra."
+        )
+
+
+class InvalidMembershipServiceStatusError(Exception):
+    """`status` no esta en `ESTADOS_MEMBERSHIP_SERVICE_VALIDOS`."""
+
+    def __init__(self, status_value: str) -> None:
+        self.status_value = status_value
+        super().__init__(f"El estado '{status_value}' no es un estado valido para un servicio contratado")

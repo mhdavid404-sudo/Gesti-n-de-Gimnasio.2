@@ -5,9 +5,9 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from src.domain.payments.entities import Payment
-from src.domain.payments.repositories import PaymentRepository
-from src.infrastructure.db.models.payments import PaymentModel
+from src.domain.payments.entities import Payment, PaymentItem
+from src.domain.payments.repositories import PaymentItemRepository, PaymentRepository
+from src.infrastructure.db.models.payments import PaymentItemModel, PaymentModel
 
 
 def _to_entity(model: PaymentModel) -> Payment:
@@ -70,3 +70,35 @@ class SqlAlchemyPaymentRepository(PaymentRepository):
         if model is not None:
             self._session.delete(model)
             self._session.flush()
+
+
+def _item_to_entity(model: PaymentItemModel) -> PaymentItem:
+    return PaymentItem(
+        id=model.id,
+        payment_id=model.payment_id,
+        concept=model.concept,
+        amount=model.amount,
+        service_id=model.service_id,
+    )
+
+
+class SqlAlchemyPaymentItemRepository(PaymentItemRepository):
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def list_by_payment(self, payment_id: int) -> list[PaymentItem]:
+        models = self._session.execute(
+            select(PaymentItemModel).where(PaymentItemModel.payment_id == payment_id)
+        ).scalars()
+        return [_item_to_entity(m) for m in models]
+
+    def add(self, item: PaymentItem) -> PaymentItem:
+        model = PaymentItemModel(
+            payment_id=item.payment_id,
+            concept=item.concept,
+            amount=item.amount,
+            service_id=item.service_id,
+        )
+        self._session.add(model)
+        self._session.flush()
+        return _item_to_entity(model)

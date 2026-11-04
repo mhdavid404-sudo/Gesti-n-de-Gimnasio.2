@@ -4,9 +4,15 @@ conozca (usado por Alembic en `infrastructure/migrations/env.py`).
 
 from src.infrastructure.db.models.clients import ClientProfileModel
 from src.infrastructure.db.models.diets import DietAssignmentModel, DietPlanModel
-from src.infrastructure.db.models.memberships import MembershipModel, MembershipPlanModel
+from src.infrastructure.db.models.memberships import (
+    MembershipModel,
+    MembershipPlanModel,
+    MembershipServiceModel,
+    PlanServiceModel,
+    ServiceModel,
+)
 from src.infrastructure.db.models.notifications import AuditLogModel, NotificationModel
-from src.infrastructure.db.models.payments import PaymentModel
+from src.infrastructure.db.models.payments import PaymentItemModel, PaymentModel
 from src.infrastructure.db.models.progress import BodyProgressModel
 from src.infrastructure.db.models.routines import (
     ExerciseModel,
@@ -21,7 +27,11 @@ __all__ = [
     "ClientProfileModel",
     "MembershipPlanModel",
     "MembershipModel",
+    "ServiceModel",
+    "PlanServiceModel",
+    "MembershipServiceModel",
     "PaymentModel",
+    "PaymentItemModel",
     "ExerciseModel",
     "RoutineModel",
     "RoutineExerciseModel",

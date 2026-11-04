@@ -7,15 +7,19 @@ from dataclasses import dataclass
 from src.domain.memberships.exceptions import MembershipNotFoundError
 from src.domain.memberships.repositories import MembershipRepository
 from src.domain.payments.entities import (
+    CONCEPTOS_PAYMENT_ITEM_VALIDOS,
     ESTADOS_PAGO_VALIDOS,
     METODOS_PAGO_VALIDOS,
     Payment,
+    PaymentItem,
 )
 from src.domain.payments.exceptions import (
+    InvalidPaymentItemConceptError,
     InvalidPaymentMethodError,
     InvalidPaymentStatusError,
+    PaymentItemsAmountMismatchError,
 )
-from src.domain.payments.repositories import PaymentRepository
+from src.domain.payments.repositories import PaymentItemRepository, PaymentRepository
 
 
 @dataclass
@@ -39,8 +43,12 @@ class RegisterPaymentUseCase:
 
     payment_repository: PaymentRepository
     membership_repository: MembershipRepository
+    # Entrega 3 (Fase 2): opcional a proposito -- `None` para no romper el
+    # modulo Pagos de Entrega 2 (un pago sin desglose sigue siendo valido,
+    # ej. un pago en efectivo registrado sin detalle de conceptos).
+    payment_item_repository: PaymentItemRepository | None = None
 
-    def execute(self, payment: Payment) -> Payment:
+    def execute(self, payment: Payment, items: list[PaymentItem] | None = None) -> Payment:
         if self.membership_repository.get_by_id(payment.membership_id) is None:
             raise MembershipNotFoundError(payment.membership_id)
 
@@ -50,7 +58,29 @@ class RegisterPaymentUseCase:
         if payment.status not in ESTADOS_PAGO_VALIDOS:
             raise InvalidPaymentStatusError(payment.status)
 
-        return self.payment_repository.add(payment)
+        if items:
+            for item in items:
+                if item.concept not in CONCEPTOS_PAYMENT_ITEM_VALIDOS:
+                    raise InvalidPaymentItemConceptError(item.concept)
+            total = sum((item.amount for item in items), start=type(payment.amount)(0))
+            if total != payment.amount:
+                raise PaymentItemsAmountMismatchError(payment.amount, total)
+
+        created = self.payment_repository.add(payment)
+
+        if items and self.payment_item_repository is not None:
+            for item in items:
+                self.payment_item_repository.add(
+                    PaymentItem(
+                        id=None,
+                        payment_id=created.id,  # type: ignore[arg-type]
+                        concept=item.concept,
+                        amount=item.amount,
+                        service_id=item.service_id,
+                    )
+                )
+
+        return created
 
 
 @dataclass

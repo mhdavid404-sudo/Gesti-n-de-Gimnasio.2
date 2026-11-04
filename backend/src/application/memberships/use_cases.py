@@ -14,15 +14,30 @@ from datetime import date, datetime, timedelta, timezone
 from src.application.notifications.use_cases import NotifyUserUseCase
 from src.domain.clients.exceptions import ClientNotFoundError
 from src.domain.clients.repositories import ClientProfileRepository
-from src.domain.memberships.entities import ESTADOS_MEMBRESIA_VALIDOS, Membership
+from src.domain.memberships.entities import (
+    ESTADOS_MEMBRESIA_VALIDOS,
+    Membership,
+    MembershipPlan,
+    MembershipService,
+    PlanService,
+    Service,
+)
 from src.domain.memberships.exceptions import (
+    InactiveServiceError,
     InvalidMembershipDateRangeError,
     InvalidMembershipStatusError,
+    MembershipNotFoundError,
     MembershipPlanNotFoundError,
+    ServiceAlreadyIncludedInPlanError,
+    ServiceIncludedInPlanError,
+    ServiceNotFoundError,
 )
 from src.domain.memberships.repositories import (
     MembershipPlanRepository,
     MembershipRepository,
+    MembershipServiceRepository,
+    PlanServiceRepository,
+    ServiceRepository,
 )
 from src.domain.notifications.entities import Notification
 
@@ -188,4 +203,156 @@ class DetectExpiringMembershipsUseCase:
             and n.created_at is not None
             and n.created_at >= window_start
             for n in notifications
+        )
+
+
+# --- Entrega 3, Fase 2: Planes y servicios extra (amplia RF004/RF005) ------
+
+
+@dataclass
+class DeleteOrDeactivateMembershipPlanUseCase:
+    """Regla de negocio explicita del encargo: "Eliminar un plan ... con
+    contrataciones lo DESACTIVA; si no tiene ninguna, se elimina de
+    verdad." -- un `DELETE` nunca es simplemente "borrar la fila", decide
+    entre dos acciones segun si existen `Membership` sobre ese plan.
+    """
+
+    plan_repository: MembershipPlanRepository
+    membership_repository: MembershipRepository
+
+    def execute(self, plan_id: int) -> MembershipPlan:
+        plan = self.plan_repository.get_by_id(plan_id)
+        if plan is None:
+            raise MembershipPlanNotFoundError(plan_id)
+
+        if self.membership_repository.has_memberships_for_plan(plan_id):
+            plan.is_active = False
+            return self.plan_repository.update(plan)
+
+        self.plan_repository.delete(plan_id)
+        return plan
+
+
+@dataclass
+class DeleteOrDeactivateServiceUseCase:
+    """Mismo criterio que `DeleteOrDeactivateMembershipPlanUseCase`, mirado
+    desde `Service`: "contrataciones" son filas de `MembershipService`
+    (clientes que ya lo contrataron), no las filas de `plan_services`
+    (que servicios incluye un plan) -- un servicio puede quitarse de un
+    plan sin que eso cuente como "contratacion"."""
+
+    service_repository: ServiceRepository
+
+    def execute(self, service_id: int) -> Service:
+        service = self.service_repository.get_by_id(service_id)
+        if service is None:
+            raise ServiceNotFoundError(service_id)
+
+        if self.service_repository.has_contracts(service_id):
+            service.is_active = False
+            return self.service_repository.update(service)
+
+        self.service_repository.delete(service_id)
+        return service
+
+
+@dataclass
+class AddServiceToPlanUseCase:
+    """Marca que un `Service` esta incluido en un `MembershipPlan` (lo que
+    un cliente con ese plan ya no paga aparte)."""
+
+    plan_repository: MembershipPlanRepository
+    service_repository: ServiceRepository
+    plan_service_repository: PlanServiceRepository
+
+    def execute(self, plan_id: int, service_id: int):
+        if self.plan_repository.get_by_id(plan_id) is None:
+            raise MembershipPlanNotFoundError(plan_id)
+        if self.service_repository.get_by_id(service_id) is None:
+            raise ServiceNotFoundError(service_id)
+        if self.plan_service_repository.exists(plan_id, service_id):
+            raise ServiceAlreadyIncludedInPlanError(plan_id, service_id)
+
+        return self.plan_service_repository.add(PlanService(plan_id=plan_id, service_id=service_id))
+
+
+# Duracion por defecto de un servicio contratado segun su periodo de
+# facturacion, cuando la peticion no manda `end_date` explicito.
+_DIAS_POR_DEFECTO_SERVICIO_MENSUAL = 30
+
+
+@dataclass
+class ContractMembershipServiceUseCase:
+    """RF005 (Fase 2): un cliente contrata un servicio extra, NO incluido
+    en su plan, sobre una membresia concreta.
+
+    Valida, en este orden:
+    1. que `membership_id` exista -- `MembershipNotFoundError`.
+    2. que `service_id` exista -- `ServiceNotFoundError`.
+    3. que el servicio siga activo (`is_active`) -- `InactiveServiceError`:
+       un servicio desactivado (sin contrataciones nuevas) no deberia
+       poder contratarse de nuevo.
+    4. que el servicio NO este ya incluido en el plan de esa membresia --
+       `ServiceIncludedInPlanError` (regla explicita: "un servicio
+       incluido en el plan del cliente no se cobra aparte").
+
+    `price_at_purchase` se congela del `Service.price` ACTUAL al momento
+    de la contratacion (regla explicita: "un cambio de precio de plan o
+    servicio aplica solo a contrataciones nuevas; lo ya contratado
+    conserva price_at_purchase") -- un cambio de precio del catalogo
+    despues de esta llamada nunca toca esta fila.
+
+    `end_date`, si no se especifica, se calcula segun `billing_period`:
+    'unico' -> igual a `start_date` (sin vigencia que renovar); 'mensual'
+    -> `start_date` + 30 dias; 'periodo' -> el `end_date` de la propia
+    membresia (vigente mientras dure el periodo de la membresia que lo
+    contrato). Documentado como interpretacion razonable en DECISIONES.md
+    -- el encargo no especifica la duracion exacta de cada periodo.
+    """
+
+    membership_repository: MembershipRepository
+    service_repository: ServiceRepository
+    plan_service_repository: PlanServiceRepository
+    membership_service_repository: MembershipServiceRepository
+
+    def execute(
+        self,
+        membership_id: int,
+        service_id: int,
+        start_date_value: date,
+        end_date_value: date | None = None,
+    ) -> MembershipService:
+        membership = self.membership_repository.get_by_id(membership_id)
+        if membership is None:
+            raise MembershipNotFoundError(membership_id)
+
+        service = self.service_repository.get_by_id(service_id)
+        if service is None:
+            raise ServiceNotFoundError(service_id)
+
+        if not service.is_active:
+            raise InactiveServiceError(service_id)
+
+        if self.plan_service_repository.exists(membership.plan_id, service_id):
+            raise ServiceIncludedInPlanError(membership.plan_id, service_id)
+
+        if end_date_value is not None:
+            resolved_end_date = end_date_value
+        elif service.billing_period == "unico":
+            resolved_end_date = start_date_value
+        elif service.billing_period == "mensual":
+            resolved_end_date = start_date_value + timedelta(days=_DIAS_POR_DEFECTO_SERVICIO_MENSUAL)
+        else:  # 'periodo'
+            resolved_end_date = membership.end_date
+
+        return self.membership_service_repository.add(
+            MembershipService(
+                id=None,
+                membership_id=membership_id,
+                service_id=service_id,
+                price_at_purchase=service.price,
+                start_date=start_date_value,
+                end_date=resolved_end_date,
+                status="activa",
+            )
         )

@@ -9,7 +9,19 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Integer, JSON, Numeric, String, Text, func
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    JSON,
+    Numeric,
+    String,
+    Text,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.infrastructure.db.base import Base
@@ -30,6 +42,8 @@ class MembershipPlanModel(Base):
     benefits: Mapped[list[str]] = mapped_column(
         JSON, nullable=False, default=list, server_default="[]"
     )
+    # Entrega 3: antes no existia ningun concepto de activo/inactivo.
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -51,6 +65,69 @@ class MembershipModel(Base):
     plan_id: Mapped[int] = mapped_column(
         ForeignKey("membership_plans.id", ondelete="RESTRICT"), nullable=False
     )
+    start_date: Mapped[date] = mapped_column(Date, nullable=False)
+    end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class ServiceModel(Base):
+    """Entrega 3, Fase 2: catalogo de servicios extra."""
+
+    __tablename__ = "services"
+    __table_args__ = (
+        CheckConstraint(
+            "billing_period IN ('unico', 'mensual', 'periodo')",
+            name="ck_services_billing_period",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    billing_period: Mapped[str] = mapped_column(String(20), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class PlanServiceModel(Base):
+    """Tabla puente `plan_services` -- sin `id` propio, relacion pura."""
+
+    __tablename__ = "plan_services"
+
+    plan_id: Mapped[int] = mapped_column(
+        ForeignKey("membership_plans.id", ondelete="CASCADE"), primary_key=True
+    )
+    service_id: Mapped[int] = mapped_column(
+        ForeignKey("services.id", ondelete="CASCADE"), primary_key=True
+    )
+
+
+class MembershipServiceModel(Base):
+    """Entrega 3, Fase 2: un `Service` contratado por un cliente sobre una
+    `Membership` concreta."""
+
+    __tablename__ = "membership_services"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('activa', 'vencida', 'cancelada')",
+            name="ck_membership_services_status",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    membership_id: Mapped[int] = mapped_column(
+        ForeignKey("memberships.id", ondelete="CASCADE"), nullable=False
+    )
+    service_id: Mapped[int] = mapped_column(
+        ForeignKey("services.id", ondelete="RESTRICT"), nullable=False
+    )
+    price_at_purchase: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False)

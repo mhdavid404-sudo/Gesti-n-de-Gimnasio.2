@@ -7,7 +7,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from src.domain.memberships.entities import Membership, MembershipPlan
+from src.domain.memberships.entities import (
+    Membership,
+    MembershipPlan,
+    MembershipService,
+    PlanService,
+    Service,
+)
 
 
 class MembershipPlanRepository(ABC):
@@ -40,6 +46,12 @@ class MembershipRepository(ABC):
         ...
 
     @abstractmethod
+    def has_memberships_for_plan(self, plan_id: int) -> bool:
+        """True si existe al menos una `Membership` sobre este plan --
+        usado por `DeleteOrDeactivateMembershipPlanUseCase` (Entrega 3)."""
+        ...
+
+    @abstractmethod
     def add(self, membership: Membership) -> Membership: ...
 
     @abstractmethod
@@ -47,3 +59,61 @@ class MembershipRepository(ABC):
 
     @abstractmethod
     def delete(self, membership_id: int) -> None: ...
+
+
+class ServiceRepository(ABC):
+    @abstractmethod
+    def get_by_id(self, service_id: int) -> Service | None: ...
+
+    @abstractmethod
+    def list_all(self) -> list[Service]: ...
+
+    @abstractmethod
+    def add(self, service: Service) -> Service: ...
+
+    @abstractmethod
+    def update(self, service: Service) -> Service: ...
+
+    @abstractmethod
+    def delete(self, service_id: int) -> None: ...
+
+    @abstractmethod
+    def has_contracts(self, service_id: int) -> bool:
+        """True si existe al menos un `MembershipService` que referencia
+        este servicio -- usado para decidir desactivar vs. eliminar."""
+        ...
+
+
+class PlanServiceRepository(ABC):
+    """Puerto de la tabla puente `plan_services` (que `Service` incluye
+    cada `MembershipPlan`)."""
+
+    @abstractmethod
+    def list_for_plan(self, plan_id: int) -> list[PlanService]: ...
+
+    @abstractmethod
+    def exists(self, plan_id: int, service_id: int) -> bool: ...
+
+    @abstractmethod
+    def add(self, plan_service: PlanService) -> PlanService: ...
+
+    @abstractmethod
+    def remove(self, plan_id: int, service_id: int) -> None: ...
+
+
+class MembershipServiceRepository(ABC):
+    """Puerto de `membership_services` -- servicios extra CONTRATADOS por
+    un cliente sobre una membresia (distinto de `PlanServiceRepository`,
+    que solo modela "que incluye el plan")."""
+
+    @abstractmethod
+    def get_by_id(self, membership_service_id: int) -> MembershipService | None: ...
+
+    @abstractmethod
+    def list_by_membership(self, membership_id: int) -> list[MembershipService]: ...
+
+    @abstractmethod
+    def add(self, membership_service: MembershipService) -> MembershipService: ...
+
+    @abstractmethod
+    def update(self, membership_service: MembershipService) -> MembershipService: ...

@@ -31,3 +31,24 @@ class InvalidPaymentStatusError(Exception):
     def __init__(self, status_value: str) -> None:
         self.status_value = status_value
         super().__init__(f"El estado de pago '{status_value}' no es valido")
+
+
+class InvalidPaymentItemConceptError(Exception):
+    """`concept` no esta en `CONCEPTOS_PAYMENT_ITEM_VALIDOS` (Entrega 3)."""
+
+    def __init__(self, concept: str) -> None:
+        self.concept = concept
+        super().__init__(f"El concepto de pago '{concept}' no es valido")
+
+
+class PaymentItemsAmountMismatchError(Exception):
+    """Entrega 3: si se manda un desglose (`items`), la suma de sus montos
+    debe coincidir exactamente con `Payment.amount` -- de lo contrario el
+    desglose miente sobre lo realmente cobrado."""
+
+    def __init__(self, expected: object, actual: object) -> None:
+        self.expected = expected
+        self.actual = actual
+        super().__init__(
+            f"La suma del desglose ({actual}) no coincide con el monto total del pago ({expected})"
+        )

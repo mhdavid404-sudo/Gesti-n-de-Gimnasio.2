@@ -60,6 +60,35 @@ del modulo Planes y Membresias, ver DECISIONES.md):
   `GET /memberships/{id}` y `GET /memberships` -- restringir
   especificamente este endpoint a admin/entrenador seria una
   inconsistencia arbitraria frente a esos dos.
+
+Entrega 3, Fase 2 (Planes y servicios extra, amplia RF004/RF005) -- ver
+DECISIONES.md:
+
+- `PATCH`/`DELETE /membership-plans/{id}`: solo `admin`. `DELETE` no borra
+  sin mas -- usa `DeleteOrDeactivateMembershipPlanUseCase` (desactiva si
+  el plan tiene membresias contratadas, elimina de verdad si no).
+- `services_router` (`/services`): mismo criterio que `/membership-plans`
+  -- catalogo no sensible, `GET` publico, `POST`/`PATCH`/`DELETE` solo
+  `admin`. `DELETE` usa `DeleteOrDeactivateServiceUseCase` (mismo patron
+  desactivar-si-tiene-contrataciones).
+- `GET`/`POST`/`DELETE /membership-plans/{plan_id}/services`: que
+  servicios incluye un plan. Requiere sesion (cualquier rol) para `GET`;
+  `POST`/`DELETE` solo `admin`.
+- `POST /memberships/{membership_id}/services`: CONTRATAR un extra sobre
+  la membresia de un cliente. Solo `admin` -- es una decision
+  administrativa/financiera (el cliente paga), mismo criterio que
+  `POST /payments`; la regla de negocio "cualquier cliente puede
+  contratar cualquier extra no incluido en su plan" describe que NO hay
+  restriccion de elegibilidad por cliente, no que el cliente lo haga el
+  mismo desde la pantalla -- en todo el resto del sistema las acciones que
+  mueven dinero las ejecuta `admin` (recepcion), nunca el propio cliente.
+- `GET /memberships/{membership_id}/services`: ownership por dato
+  encadenado (mismo patron que `GET /payments`) + un recorte de columnas
+  por rol en vez de rechazar: `admin`/`cliente` ven el precio
+  (`MembershipServiceRead`), `entrenador` ve la misma lista sin precio
+  (`MembershipServiceReadLimited`) -- regla explicita del encargo
+  ("Entrenador ve los extras de sus clientes asignados (no precios ni
+  pagos)").
 """
 
 from __future__ import annotations
@@ -74,21 +103,38 @@ from src.api.v1.schemas.memberships import (
     MembershipCreate,
     MembershipPlanCreate,
     MembershipPlanRead,
+    MembershipPlanUpdate,
     MembershipRead,
+    MembershipServiceCreate,
+    MembershipServiceRead,
+    MembershipServiceReadLimited,
     MembershipUpdate,
+    PlanServiceAdd,
+    ServiceCreate,
+    ServiceRead,
+    ServiceUpdate,
 )
 from src.application.memberships.use_cases import (
+    AddServiceToPlanUseCase,
     AssignMembershipUseCase,
+    ContractMembershipServiceUseCase,
+    DeleteOrDeactivateMembershipPlanUseCase,
+    DeleteOrDeactivateServiceUseCase,
     DetectExpiringMembershipsUseCase,
 )
 from src.application.notifications.use_cases import NotifyUserUseCase
 from src.domain.clients.entities import ClientProfile
 from src.domain.clients.exceptions import ClientNotFoundError
-from src.domain.memberships.entities import Membership, MembershipPlan
+from src.domain.memberships.entities import Membership, MembershipPlan, Service
 from src.domain.memberships.exceptions import (
+    InactiveServiceError,
     InvalidMembershipDateRangeError,
     InvalidMembershipStatusError,
+    MembershipNotFoundError,
     MembershipPlanNotFoundError,
+    ServiceAlreadyIncludedInPlanError,
+    ServiceIncludedInPlanError,
+    ServiceNotFoundError,
 )
 from src.domain.users.entities import User
 from src.infrastructure.db.session import get_db
@@ -96,13 +142,18 @@ from src.infrastructure.repositories.clients import SqlAlchemyClientProfileRepos
 from src.infrastructure.repositories.memberships import (
     SqlAlchemyMembershipPlanRepository,
     SqlAlchemyMembershipRepository,
+    SqlAlchemyMembershipServiceRepository,
+    SqlAlchemyPlanServiceRepository,
+    SqlAlchemyServiceRepository,
 )
 from src.infrastructure.repositories.notifications import SqlAlchemyNotificationRepository
 
 router = APIRouter(prefix="/memberships", tags=["memberships"])
 plans_router = APIRouter(prefix="/membership-plans", tags=["memberships"])
+services_router = APIRouter(prefix="/services", tags=["memberships"])
 
 _PLAN_NO_ENCONTRADO = "El plan de membresia solicitado no existe."
+_SERVICIO_NO_ENCONTRADO = "El servicio solicitado no existe."
 _MEMBRESIA_NO_ENCONTRADA = "La membresia solicitada no existe."
 _SIN_ACCESO_A_MEMBRESIA = "No tienes acceso a esta membresia."
 _VENTANA_POR_VENCER_DIAS = 7
@@ -156,6 +207,213 @@ def list_membership_plans(db: Session = Depends(get_db)) -> list[MembershipPlanR
     """Catalogo no sensible: publico, sin autenticacion (ver docstring del modulo)."""
     plan_repository = SqlAlchemyMembershipPlanRepository(db)
     return [MembershipPlanRead.model_validate(plan) for plan in plan_repository.list_all()]
+
+
+@plans_router.patch(
+    "/{plan_id}",
+    response_model=MembershipPlanRead,
+    dependencies=[Depends(require_role("admin"))],
+)
+def update_membership_plan(
+    plan_id: int, payload: MembershipPlanUpdate, db: Session = Depends(get_db)
+) -> MembershipPlanRead:
+    """Editar nombre/precio/duracion/descripcion/beneficios. Solo `admin`.
+
+    No toca `is_active` -- eso solo cambia via `DELETE` (desactivar si
+    tiene contrataciones). Un cambio de precio aqui aplica unicamente a
+    contrataciones NUEVAS (ver `price_at_purchase` en
+    `MembershipService`); las ya existentes no se tocan."""
+    plan_repository = SqlAlchemyMembershipPlanRepository(db)
+
+    existing = plan_repository.get_by_id(plan_id)
+    if existing is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_PLAN_NO_ENCONTRADO)
+
+    existing.name = payload.name
+    existing.price = payload.price
+    existing.duration_days = payload.duration_days
+    existing.description = payload.description
+    existing.benefits = payload.benefits
+    updated = plan_repository.update(existing)
+
+    db.commit()
+    return MembershipPlanRead.model_validate(updated)
+
+
+@plans_router.delete(
+    "/{plan_id}",
+    response_model=MembershipPlanRead,
+    dependencies=[Depends(require_role("admin"))],
+)
+def delete_or_deactivate_membership_plan(plan_id: int, db: Session = Depends(get_db)) -> MembershipPlanRead:
+    """Solo `admin`. Desactiva el plan si tiene membresias contratadas;
+    lo elimina de verdad si no tiene ninguna -- ver
+    `DeleteOrDeactivateMembershipPlanUseCase`. Devuelve 200 (no 204) con
+    el estado resultante para que el frontend sepa cual de las dos paso."""
+    plan_repository = SqlAlchemyMembershipPlanRepository(db)
+    membership_repository = SqlAlchemyMembershipRepository(db)
+    use_case = DeleteOrDeactivateMembershipPlanUseCase(
+        plan_repository=plan_repository, membership_repository=membership_repository
+    )
+
+    try:
+        result = use_case.execute(plan_id)
+    except MembershipPlanNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    db.commit()
+    return MembershipPlanRead.model_validate(result)
+
+
+# --- Servicios incluidos en un plan (plan_services) -------------------------
+
+
+@plans_router.get("/{plan_id}/services", response_model=list[ServiceRead])
+def list_plan_services(
+    plan_id: int,
+    current_user: User = Depends(get_current_user),  # noqa: ARG001 -- requiere sesion, cualquier rol
+    db: Session = Depends(get_db),
+) -> list[ServiceRead]:
+    """Que servicios incluye este plan. Requiere sesion (cualquier rol)."""
+    plan_repository = SqlAlchemyMembershipPlanRepository(db)
+    service_repository = SqlAlchemyServiceRepository(db)
+    plan_service_repository = SqlAlchemyPlanServiceRepository(db)
+
+    if plan_repository.get_by_id(plan_id) is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_PLAN_NO_ENCONTRADO)
+
+    included = plan_service_repository.list_for_plan(plan_id)
+    services = [service_repository.get_by_id(ps.service_id) for ps in included]
+    return [ServiceRead.model_validate(s) for s in services if s is not None]
+
+
+@plans_router.post(
+    "/{plan_id}/services",
+    response_model=ServiceRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_role("admin"))],
+)
+def add_service_to_plan(
+    plan_id: int, payload: PlanServiceAdd, db: Session = Depends(get_db)
+) -> ServiceRead:
+    """Marca un servicio como incluido en este plan. Solo `admin`."""
+    plan_repository = SqlAlchemyMembershipPlanRepository(db)
+    service_repository = SqlAlchemyServiceRepository(db)
+    plan_service_repository = SqlAlchemyPlanServiceRepository(db)
+    use_case = AddServiceToPlanUseCase(
+        plan_repository=plan_repository,
+        service_repository=service_repository,
+        plan_service_repository=plan_service_repository,
+    )
+
+    try:
+        use_case.execute(plan_id, payload.service_id)
+    except MembershipPlanNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ServiceNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ServiceAlreadyIncludedInPlanError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    db.commit()
+    service = service_repository.get_by_id(payload.service_id)
+    return ServiceRead.model_validate(service)
+
+
+@plans_router.delete(
+    "/{plan_id}/services/{service_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    dependencies=[Depends(require_role("admin"))],
+)
+def remove_service_from_plan(plan_id: int, service_id: int, db: Session = Depends(get_db)) -> None:
+    """Quita un servicio de los incluidos del plan (sigue existiendo en el
+    catalogo). Solo `admin`."""
+    plan_service_repository = SqlAlchemyPlanServiceRepository(db)
+    if not plan_service_repository.exists(plan_id, service_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ese servicio no esta incluido en este plan.",
+        )
+    plan_service_repository.remove(plan_id, service_id)
+    db.commit()
+
+
+# --- Services CRUD (catalogo) ------------------------------------------------
+
+
+@services_router.post(
+    "",
+    response_model=ServiceRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_role("admin"))],
+)
+def create_service(payload: ServiceCreate, db: Session = Depends(get_db)) -> ServiceRead:
+    """RF005 (Fase 2): alta de un servicio extra del catalogo. Solo `admin`."""
+    service_repository = SqlAlchemyServiceRepository(db)
+    created = service_repository.add(
+        Service(
+            id=None,
+            name=payload.name,
+            price=payload.price,
+            billing_period=payload.billing_period,
+            description=payload.description,
+        )
+    )
+    db.commit()
+    return ServiceRead.model_validate(created)
+
+
+@services_router.get("", response_model=list[ServiceRead])
+def list_services(db: Session = Depends(get_db)) -> list[ServiceRead]:
+    """Catalogo no sensible: publico, sin autenticacion (mismo criterio
+    que `GET /membership-plans`)."""
+    service_repository = SqlAlchemyServiceRepository(db)
+    return [ServiceRead.model_validate(s) for s in service_repository.list_all()]
+
+
+@services_router.patch(
+    "/{service_id}",
+    response_model=ServiceRead,
+    dependencies=[Depends(require_role("admin"))],
+)
+def update_service(service_id: int, payload: ServiceUpdate, db: Session = Depends(get_db)) -> ServiceRead:
+    """Editar un servicio del catalogo. Solo `admin`. No toca `is_active`
+    -- mismo criterio que `update_membership_plan`."""
+    service_repository = SqlAlchemyServiceRepository(db)
+
+    existing = service_repository.get_by_id(service_id)
+    if existing is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_SERVICIO_NO_ENCONTRADO)
+
+    existing.name = payload.name
+    existing.price = payload.price
+    existing.billing_period = payload.billing_period
+    existing.description = payload.description
+    updated = service_repository.update(existing)
+
+    db.commit()
+    return ServiceRead.model_validate(updated)
+
+
+@services_router.delete(
+    "/{service_id}",
+    response_model=ServiceRead,
+    dependencies=[Depends(require_role("admin"))],
+)
+def delete_or_deactivate_service(service_id: int, db: Session = Depends(get_db)) -> ServiceRead:
+    """Solo `admin`. Desactiva el servicio si tiene contrataciones
+    (`MembershipService`); lo elimina de verdad si no tiene ninguna."""
+    service_repository = SqlAlchemyServiceRepository(db)
+    use_case = DeleteOrDeactivateServiceUseCase(service_repository=service_repository)
+
+    try:
+        result = use_case.execute(service_id)
+    except ServiceNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    db.commit()
+    return ServiceRead.model_validate(result)
 
 
 # --- Membership -------------------------------------------------------------
@@ -364,3 +622,76 @@ def update_membership_status(
 
     db.commit()
     return MembershipRead.model_validate(updated)
+
+
+# --- Servicios extra contratados sobre una membresia -------------------------
+
+
+@router.post(
+    "/{membership_id}/services",
+    response_model=MembershipServiceRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_role("admin"))],
+)
+def contract_membership_service(
+    membership_id: int, payload: MembershipServiceCreate, db: Session = Depends(get_db)
+) -> MembershipServiceRead:
+    """RF005 (Fase 2): contratar un servicio extra sobre la membresia de un
+    cliente. Solo `admin` -- ver docstring del modulo arriba."""
+    membership_repository = SqlAlchemyMembershipRepository(db)
+    service_repository = SqlAlchemyServiceRepository(db)
+    plan_service_repository = SqlAlchemyPlanServiceRepository(db)
+    membership_service_repository = SqlAlchemyMembershipServiceRepository(db)
+    use_case = ContractMembershipServiceUseCase(
+        membership_repository=membership_repository,
+        service_repository=service_repository,
+        plan_service_repository=plan_service_repository,
+        membership_service_repository=membership_service_repository,
+    )
+
+    try:
+        created = use_case.execute(
+            membership_id=membership_id,
+            service_id=payload.service_id,
+            start_date_value=payload.start_date or date.today(),
+            end_date_value=payload.end_date,
+        )
+    except MembershipNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ServiceNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except InactiveServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except ServiceIncludedInPlanError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    db.commit()
+    return MembershipServiceRead.model_validate(created)
+
+
+@router.get("/{membership_id}/services")
+def list_membership_services(
+    membership_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> list[MembershipServiceRead] | list[MembershipServiceReadLimited]:
+    """Ownership por dato (mismo patron que `GET /memberships/{id}`) +
+    recorte de columnas por rol -- ver docstring del modulo arriba:
+    `entrenador` ve la lista sin `price_at_purchase`."""
+    membership_repository = SqlAlchemyMembershipRepository(db)
+    client_repository = SqlAlchemyClientProfileRepository(db)
+    membership_service_repository = SqlAlchemyMembershipServiceRepository(db)
+
+    membership = membership_repository.get_by_id(membership_id)
+    if membership is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_MEMBRESIA_NO_ENCONTRADA)
+
+    profile = client_repository.get_by_id(membership.client_id)
+    if profile is not None:
+        _ensure_access_to_membership(current_user, profile)
+
+    contracted = membership_service_repository.list_by_membership(membership_id)
+
+    if current_user.role == "entrenador":
+        return [MembershipServiceReadLimited.model_validate(ms) for ms in contracted]
+    return [MembershipServiceRead.model_validate(ms) for ms in contracted]

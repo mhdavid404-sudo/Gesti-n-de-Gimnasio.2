@@ -32,24 +32,40 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from src.api.v1.dependencies import get_current_user, require_role
-from src.api.v1.schemas.payments import PaymentCreate, PaymentRead
+from src.api.v1.schemas.payments import PaymentCreate, PaymentItemRead, PaymentRead
 from src.application.payments.use_cases import RegisterPaymentUseCase
 from src.domain.memberships.exceptions import MembershipNotFoundError
-from src.domain.payments.entities import Payment
+from src.domain.payments.entities import Payment, PaymentItem
 from src.domain.payments.exceptions import (
+    InvalidPaymentItemConceptError,
     InvalidPaymentMethodError,
     InvalidPaymentStatusError,
+    PaymentItemsAmountMismatchError,
 )
 from src.domain.users.entities import User
 from src.infrastructure.db.session import get_db
 from src.infrastructure.repositories.clients import SqlAlchemyClientProfileRepository
 from src.infrastructure.repositories.memberships import SqlAlchemyMembershipRepository
-from src.infrastructure.repositories.payments import SqlAlchemyPaymentRepository
+from src.infrastructure.repositories.payments import (
+    SqlAlchemyPaymentItemRepository,
+    SqlAlchemyPaymentRepository,
+)
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
 _PAGO_NO_ENCONTRADO = "El pago solicitado no existe."
 _SIN_ACCESO_A_PAGO = "No tienes acceso a este pago."
+
+
+def _payment_to_read(payment: Payment, item_repository: SqlAlchemyPaymentItemRepository) -> PaymentRead:
+    """Adjunta el desglose (Entrega 3, Fase 2) -- `Payment` (entidad de
+    dominio) no tiene `items`, es una consulta aparte sobre
+    `PaymentItemRepository`, igual que `Membership`/`MembershipPlan` son
+    entidades separadas aunque `PaymentRead` no las embeba."""
+    read = PaymentRead.model_validate(payment)
+    items = item_repository.list_by_payment(payment.id)  # type: ignore[arg-type]
+    read.items = [PaymentItemRead.model_validate(i) for i in items]
+    return read
 
 
 def _resolve_own_membership_ids(
@@ -95,10 +111,17 @@ def register_payment(
     """
     payment_repository = SqlAlchemyPaymentRepository(db)
     membership_repository = SqlAlchemyMembershipRepository(db)
+    item_repository = SqlAlchemyPaymentItemRepository(db)
     use_case = RegisterPaymentUseCase(
         payment_repository=payment_repository,
         membership_repository=membership_repository,
+        payment_item_repository=item_repository,
     )
+
+    items = [
+        PaymentItem(id=None, payment_id=0, concept=item.concept, amount=item.amount, service_id=item.service_id)
+        for item in payload.items
+    ]
 
     try:
         created = use_case.execute(
@@ -111,18 +134,21 @@ def register_payment(
                 status=payload.status,
                 registered_by=current_user.id,  # type: ignore[arg-type]
                 notes=payload.notes,
-            )
+            ),
+            items=items,
         )
     except MembershipNotFoundError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"La membresia {exc.membership_id} no existe.",
         ) from exc
-    except (InvalidPaymentMethodError, InvalidPaymentStatusError) as exc:
+    except (InvalidPaymentMethodError, InvalidPaymentStatusError, InvalidPaymentItemConceptError) as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except PaymentItemsAmountMismatchError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     db.commit()
-    return PaymentRead.model_validate(created)
+    return _payment_to_read(created, item_repository)
 
 
 @router.get("", response_model=list[PaymentRead])
@@ -157,10 +183,11 @@ def list_payments(
         else:
             target_membership_ids = own_membership_ids
 
+    item_repository = SqlAlchemyPaymentItemRepository(db)
     payments = [
         p for mid in target_membership_ids for p in payment_repository.list_by_membership(mid)
     ]
-    return [PaymentRead.model_validate(p) for p in payments]
+    return [_payment_to_read(p, item_repository) for p in payments]
 
 
 @router.get("/{payment_id}", response_model=PaymentRead)
@@ -184,4 +211,5 @@ def get_payment(
     if own_membership_ids is not None and payment.membership_id not in own_membership_ids:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_SIN_ACCESO_A_PAGO)
 
-    return PaymentRead.model_validate(payment)
+    item_repository = SqlAlchemyPaymentItemRepository(db)
+    return _payment_to_read(payment, item_repository)

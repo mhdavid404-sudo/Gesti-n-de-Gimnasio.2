@@ -14,6 +14,9 @@ from decimal import Decimal
 METODOS_PAGO_VALIDOS = ("efectivo", "tarjeta", "transferencia")
 ESTADOS_PAGO_VALIDOS = ("completado", "pendiente", "rechazado")
 
+# Entrega 3 (Fase 2): desglose de un pago por concepto.
+CONCEPTOS_PAYMENT_ITEM_VALIDOS = ("plan", "servicio")
+
 
 @dataclass
 class Payment:
@@ -33,3 +36,16 @@ class Payment:
     registered_by: int
     notes: str | None = None
     created_at: datetime | None = None
+
+
+@dataclass
+class PaymentItem:
+    """Una linea del desglose de un `Payment` (Entrega 3, Fase 2): el plan
+    en si, o un servicio extra contratado aparte. `service_id` es
+    `None` para el concepto `'plan'` -- el plan no es un `Service`."""
+
+    id: int | None
+    payment_id: int
+    concept: str  # uno de CONCEPTOS_PAYMENT_ITEM_VALIDOS
+    amount: Decimal
+    service_id: int | None = None
