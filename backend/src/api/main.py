@@ -8,19 +8,23 @@ desde el directorio `backend/`:
 Ver `backend/README.md` para el detalle completo (por que `src.api.main`,
 donde debe correrse el comando, y donde queda documentado para Royer).
 
-Entrega 2: autenticacion JWT y logica de negocio completas en los 15 RF.
-Este archivo monta el router agregado de la v1, expone un health check, y
+Entrega 3: autenticacion JWT y logica de negocio completas en los 15 RF.
+Este archivo monta el router agregado de la v1, expone un health check,
 registra automaticamente en la bitacora (RF015, modulo "Bitacora
 (AuditLog)") cada error HTTP (4xx/5xx) que la API devuelve -- ver
-`_record_audit_event` abajo. Se eligio un manejador de excepciones global
-en vez de que cada router llame `RecordAuditEventUseCase` a mano: es el
-unico punto por el que pasan TODOS los errores controlados (`HTTPException`
-de cualquier router) y los de validacion de Pydantic
-(`RequestValidationError`), sin depender de que cada desarrollador se
-acuerde de instrumentar su propio endpoint.
+`_record_audit_event` abajo -- y arranca el job diario de deteccion de
+vencimientos (RF006, ver `src/infrastructure/scheduler.py`) al levantar el
+proceso. Se eligio un manejador de excepciones global en vez de que cada
+router llame `RecordAuditEventUseCase` a mano: es el unico punto por el que
+pasan TODOS los errores controlados (`HTTPException` de cualquier router) y
+los de validacion de Pydantic (`RequestValidationError`), sin depender de
+que cada desarrollador se acuerde de instrumentar su propio endpoint.
 """
 
 from __future__ import annotations
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.exception_handlers import (
@@ -35,7 +39,16 @@ from src.application.notifications.use_cases import RecordAuditEventUseCase
 from src.domain.notifications.entities import AuditLog
 from src.infrastructure.db.session import SessionLocal
 from src.infrastructure.repositories.notifications import SqlAlchemyAuditLogRepository
+from src.infrastructure.scheduler import shutdown_scheduler, start_scheduler
 from src.infrastructure.security.jwt import decode_access_token
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
+    start_scheduler()
+    yield
+    shutdown_scheduler()
+
 
 app = FastAPI(
     title="SmartGym v2 API",
@@ -43,7 +56,8 @@ app = FastAPI(
         "API REST de SmartGym v2 (Stronger Aragon) -- RF001-RF015, "
         "autenticacion JWT y logica de negocio completas."
     ),
-    version="0.2.0",
+    version="0.3.0",
+    lifespan=_lifespan,
 )
 
 

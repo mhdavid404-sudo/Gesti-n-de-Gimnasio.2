@@ -1,10 +1,12 @@
-# backend — SmartGym v2 (Entrega 1)
+# backend — SmartGym v2
 
 Backend en Python 3.13 + FastAPI + PostgreSQL, arquitectura hexagonal
-(`domain/application/infrastructure/api`). Alcance exacto de esta entrega
-en `../DECISIONES.md` y `../COORDINACION-ENTREGA1.md` (raiz del repo).
+(`domain/application/infrastructure/api`). Los 15 RF (RF001-RF015) tienen
+casos de uso reales, autenticacion JWT por rol y pruebas automatizadas --
+ver `../docs/ESTADO-ACTUAL.md` para el estado detallado y `../DECISIONES.md`
+para el historial de decisiones de arquitectura.
 
-## Para Royer (Dockerfile / docker-compose)
+## Dockerfile / docker-compose
 
 - **Gestor de dependencias:** `requirements.txt` (pip simple, no Poetry).
 - **Comando de arranque exacto** (correr con cwd = `backend/`):
@@ -73,27 +75,30 @@ Alembic compare contra ella.
 ## Modelo de datos
 
 Ver `MODELO-DATOS.md` en esta misma carpeta -- tabla plana entidad -> campo
--> tipo -> constraints, pensada para que Leo (frontend) escriba sus tipos
-TypeScript sin necesidad de leer este codigo Python/SQLAlchemy.
+-> tipo -> constraints, pensada para escribir los tipos TypeScript del
+frontend sin necesidad de leer este codigo Python/SQLAlchemy.
 
 ## Estructura (arquitectura hexagonal)
 
 ```
 src/
   domain/            entidades planas (dataclasses) + puertos (ABC), por modulo
-  application/        casos de uso (Entrega 1: firmas/esqueleto, sin logica completa)
+  application/        casos de uso (logica de negocio real, sin SQLAlchemy/FastAPI)
   infrastructure/
     db/               Base declarativa, engine/session, modelos SQLAlchemy
     repositories/      implementaciones concretas de los puertos de dominio
     migrations/        Alembic (env.py, versions/)
+    scheduler.py        job diario de deteccion de vencimientos (RF006, APScheduler)
   api/
-    main.py            entry point de FastAPI
+    main.py            entry point de FastAPI, manejo de errores y arranque del scheduler
     v1/                routers + schemas Pydantic por modulo
-tests/                 smoke tests (plan de pruebas formal es alcance de Cofi/QA)
+tests/                 plan de pruebas automatizado (pytest), un archivo por modulo
 ```
 
-## Alcance de Entrega 1 (que SI y que NO)
+## Alcance actual
 
-Ver `../DECISIONES.md` y `../SMARTGYM-V2-BRIEF.md`. En resumen: modelo de
-datos completo (13-14 entidades, ver nota en `MODELO-DATOS.md`) +
-esqueleto hexagonal, SIN casos de uso completos ni login/JWT funcional.
+Ver `../docs/ESTADO-ACTUAL.md` (estado real de cada RF, verificado contra
+el codigo) y `../DECISIONES.md` (historial completo de decisiones de
+arquitectura). En resumen: los 15 RF tienen modelo de datos, API y logica
+de negocio reales, autenticacion JWT por rol, y bitacora de auditoria
+automatica.

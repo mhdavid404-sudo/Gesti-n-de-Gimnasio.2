@@ -1,15 +1,18 @@
-# backend/Dockerfile — SmartGym v2, Entrega 1
+# backend/Dockerfile — SmartGym v2
 #
 # Imagen de desarrollo (NO multi-stage / NO optimizada para produccion:
-# eso esta explicitamente fuera de alcance en Entrega 1, ver
-# COORDINACION-ENTREGA1.md seccion 3, nota para Royer).
+# eso queda para la puesta en produccion de la entrega final).
 #
-# Entrypoint exacto confirmado por Valde en backend/README.md, corrido
-# con cwd = backend/ (que es el WORKDIR de esta imagen):
+# Entrypoint exacto, documentado en backend/README.md, corrido con
+# cwd = backend/ (que es el WORKDIR de esta imagen):
 #   uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
 #
 # Alembic (`alembic upgrade head`) NO se corre aqui a proposito -- se
 # corre a mano (docker compose exec backend alembic upgrade head).
+#
+# `pytest` va en requirements.txt (no solo instalado a mano en el
+# contenedor corriendo) para que sobreviva a un rebuild de la imagen --
+# un `docker compose build backend` sin esto se queda sin pytest.
 
 FROM python:3.13-slim
 
