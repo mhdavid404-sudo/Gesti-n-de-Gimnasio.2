@@ -72,6 +72,15 @@ crea las 14 tablas del modelo aprobado en `../DECISIONES.md`. Esta escrita
 a mano (no autogenerada) porque no hay BD viva en este entorno para que
 Alembic compare contra ella.
 
+## Datos de prueba (seed)
+
+```bash
+docker compose exec backend python seed.py
+```
+
+Destructivo e idempotente (trunca y repuebla) -- un usuario por rol, ver
+`../README.md` (raíz del repo) para las credenciales y el detalle completo.
+
 ## Modelo de datos
 
 Ver `MODELO-DATOS.md` en esta misma carpeta -- tabla plana entidad -> campo
