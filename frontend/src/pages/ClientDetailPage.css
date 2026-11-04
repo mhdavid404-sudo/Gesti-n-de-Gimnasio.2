@@ -56,6 +56,12 @@
   font-weight: 600;
 }
 
+.client-detail__delete-btn {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+  flex-shrink: 0;
+}
+
 .client-detail__grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

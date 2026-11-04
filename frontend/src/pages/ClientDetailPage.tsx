@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { apiFetch, ApiError } from '../api/client'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { EmptyState } from '../components/ui/EmptyState'
 import { ErrorMessage } from '../components/ui/ErrorMessage'
 import { LoadingState } from '../components/ui/LoadingState'
@@ -59,6 +60,46 @@ export function ClientDetailPage() {
   const { user, logout } = useAuth()
   const isAdmin = user?.role === 'admin'
   const clientProfileId = Number(id)
+
+  // --- Eliminar cliente (RF003, solo admin) ---------------------------------
+  // `DeleteClientUseCase` hace un hard delete del `ClientProfile` -- sus
+  // membresías/pagos/rutinas/dietas/progreso caen en cascada (ver FKs en
+  // `infrastructure/db/models/`). Irreversible, por eso pasa por
+  // `ConfirmDialog` (ver docstring del componente: existía desde el
+  // rediseño de UX pero ninguna pantalla lo conectaba todavía).
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  const handleDeleteClient = async () => {
+    setDeleteError(null)
+    setIsDeleting(true)
+    try {
+      await apiFetch<void>(`/clients/${clientProfileId}`, { method: 'DELETE' })
+      navigate('/clientes', {
+        replace: true,
+        state: { toast: `${profile?.full_name ?? 'El cliente'} fue eliminado correctamente.` },
+      })
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.isUnauthorized) {
+          logout()
+          navigate('/login', { replace: true })
+          return
+        }
+        setDeleteError(
+          err.status === 403
+            ? 'No tienes permiso para eliminar este cliente.'
+            : err.message,
+        )
+      } else {
+        setDeleteError('Ocurrió un error inesperado. Intenta de nuevo.')
+      }
+      setShowDeleteConfirm(false)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
 
   const [profile, setProfile] = useState<ApiClientProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -746,7 +787,27 @@ export function ClientDetailPage() {
             )}
           </div>
         </div>
+        {isAdmin && (
+          <button
+            type="button"
+            className="btn btn-ghost client-detail__delete-btn"
+            onClick={() => setShowDeleteConfirm(true)}
+          >
+            Eliminar cliente
+          </button>
+        )}
       </div>
+
+      {deleteError && <Toast message={deleteError} tone="danger" onDismiss={() => setDeleteError(null)} />}
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title={`¿Eliminar a ${profile.full_name}?`}
+        description="Se borra su perfil junto con sus membresías, pagos, rutinas, dietas y progreso registrados. Esta acción no se puede deshacer."
+        confirmLabel={isDeleting ? 'Eliminando…' : 'Eliminar'}
+        onConfirm={handleDeleteClient}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
 
       <div className="card client-detail__tabs">
         <Tabs items={TABS} activeId={activeTab} onChange={setActiveTab}>
