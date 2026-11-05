@@ -143,3 +143,37 @@ class MembershipServiceReadLimited(BaseModel):
     start_date: date
     end_date: date
     status: MembershipServiceStatus
+
+
+# ---------------------------------------------------------------------------
+# Tablero de membresias activas (Entrega 3, ajuste de UX de "Membresias") --
+# ver DECISIONES.md: el catalogo de planes/servicios se muda por completo a
+# la pantalla "Planes y servicios"; esta pantalla pasa a ser un tablero
+# operativo de membresias ACTIVAS (ni catalogo, ni vencidas).
+# ---------------------------------------------------------------------------
+
+
+class ActiveMembershipRow(BaseModel):
+    membership_id: int
+    client_id: int
+    client_name: str
+    plan_id: int
+    plan_name: str
+    active_extras: list[str]
+    start_date: date
+    end_date: date
+    days_remaining: int
+    expiring_soon: bool
+
+
+class ActiveMembershipsIndicators(BaseModel):
+    total_active: int
+    expiring_soon: int
+    # `None` para `entrenador` -- regla explicita del encargo ("sin
+    # ingresos"), no solo un valor en 0.
+    monthly_revenue: Decimal | None = None
+
+
+class ActiveMembershipsBoard(BaseModel):
+    indicators: ActiveMembershipsIndicators
+    items: list[ActiveMembershipRow]

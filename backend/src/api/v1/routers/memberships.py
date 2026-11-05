@@ -89,17 +89,45 @@ DECISIONES.md:
   (`MembershipServiceReadLimited`) -- regla explicita del encargo
   ("Entrenador ve los extras de sus clientes asignados (no precios ni
   pagos)").
+
+Entrega 3, ajuste de UX de la pantalla "Membresias" (ver DECISIONES.md) --
+la pantalla deja de mostrar el catalogo de planes (eso vive solo en
+"Planes y servicios") y pasa a ser un tablero operativo de membresias
+ACTIVAS:
+
+- `GET /memberships/board`: indicadores (total de activas, cuantas vencen
+  en los proximos 7 dias, ingresos del mes) + la tabla (cliente, plan,
+  extras activos, fechas, dias restantes), con filtros opcionales
+  `plan_id`/`q` (nombre de cliente). Solo `admin`/`entrenador` -- `cliente`
+  NUNCA llega a este tablero (403), consulta su propia membresia en
+  `GET /memberships` (ya ownership-filtrado). `entrenador` ve solo sus
+  clientes asignados (mismo `_resolve_memberships_for_user` que el resto
+  del modulo) y `monthly_revenue` siempre `None` (regla explicita: "sin
+  ingresos"). Los indicadores reflejan el total SIN filtrar (`plan_id`/`q`
+  solo acotan `items`, la tabla) -- un admin buscando a un cliente no
+  pierde de vista el total real mientras busca.
+- `POST /memberships/{membership_id}/renew`: accion "Renovar" del
+  tablero -- solo `admin`, mismo criterio que el resto de acciones que
+  comprometen dinero/contrato en este modulo (asignar membresia, registrar
+  pago). Ver `RenewMembershipUseCase` para la regla de extension de
+  `end_date`. Deliberadamente NO registra un pago -- "Cobrar" es una
+  accion distinta en la UI (navega al formulario de pago de la ficha del
+  cliente), para no asumir metodo ni monto.
 """
 
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from src.api.v1.dependencies import get_current_user, require_role
 from src.api.v1.schemas.memberships import (
+    ActiveMembershipRow,
+    ActiveMembershipsBoard,
+    ActiveMembershipsIndicators,
     MembershipCreate,
     MembershipPlanCreate,
     MembershipPlanRead,
@@ -121,6 +149,7 @@ from src.application.memberships.use_cases import (
     DeleteOrDeactivateMembershipPlanUseCase,
     DeleteOrDeactivateServiceUseCase,
     DetectExpiringMembershipsUseCase,
+    RenewMembershipUseCase,
 )
 from src.application.notifications.use_cases import NotifyUserUseCase
 from src.domain.clients.entities import ClientProfile
@@ -147,6 +176,8 @@ from src.infrastructure.repositories.memberships import (
     SqlAlchemyServiceRepository,
 )
 from src.infrastructure.repositories.notifications import SqlAlchemyNotificationRepository
+from src.infrastructure.repositories.payments import SqlAlchemyPaymentRepository
+from src.infrastructure.repositories.users import SqlAlchemyUserRepository
 
 router = APIRouter(prefix="/memberships", tags=["memberships"])
 plans_router = APIRouter(prefix="/membership-plans", tags=["memberships"])
@@ -511,11 +542,91 @@ def list_memberships(
     return [MembershipRead.model_validate(m) for m in memberships]
 
 
-# IMPORTANTE: estas dos rutas estaticas ("/expiring" y "/detect-expiring")
-# deben declararse ANTES que "/{membership_id}" -- FastAPI/Starlette
-# resuelve las rutas en el orden en que se registran, y calzarian con el
-# patron "/{membership_id}" (fallando la validacion de tipo `int`) si
-# quedaran despues.
+_VENTANA_TABLERO_DIAS = 7
+
+
+@router.get("/board", response_model=ActiveMembershipsBoard, dependencies=[Depends(require_role("admin", "entrenador"))])
+def get_active_memberships_board(
+    plan_id: int | None = None,
+    q: str | None = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ActiveMembershipsBoard:
+    """Tablero de membresias ACTIVAS -- ver docstring del modulo arriba.
+    Las vencidas no aparecen aqui (se consultan en `GET /memberships/
+    expiring` o en la ficha del cliente)."""
+    membership_repository = SqlAlchemyMembershipRepository(db)
+    client_repository = SqlAlchemyClientProfileRepository(db)
+    plan_repository = SqlAlchemyMembershipPlanRepository(db)
+    user_repository = SqlAlchemyUserRepository(db)
+    membership_service_repository = SqlAlchemyMembershipServiceRepository(db)
+    service_repository = SqlAlchemyServiceRepository(db)
+    payment_repository = SqlAlchemyPaymentRepository(db)
+
+    memberships = _resolve_memberships_for_user(current_user, membership_repository, client_repository, None)
+    active = [m for m in memberships if m.status == "activa"]
+
+    today = date.today()
+    all_rows: list[ActiveMembershipRow] = []
+    for m in active:
+        profile = client_repository.get_by_id(m.client_id)
+        owner = user_repository.get_by_id(profile.user_id) if profile is not None else None
+        plan = plan_repository.get_by_id(m.plan_id)
+        extras = [
+            service.name
+            for ms in membership_service_repository.list_by_membership(m.id)  # type: ignore[arg-type]
+            if ms.status == "activa"
+            for service in [service_repository.get_by_id(ms.service_id)]
+            if service is not None
+        ]
+        days_remaining = (m.end_date - today).days
+        all_rows.append(
+            ActiveMembershipRow(
+                membership_id=m.id,  # type: ignore[arg-type]
+                client_id=m.client_id,
+                client_name=owner.full_name if owner else "Cliente no disponible",
+                plan_id=m.plan_id,
+                plan_name=plan.name if plan else "Plan no disponible",
+                active_extras=extras,
+                start_date=m.start_date,
+                end_date=m.end_date,
+                days_remaining=days_remaining,
+                expiring_soon=0 <= days_remaining <= _VENTANA_TABLERO_DIAS,
+            )
+        )
+
+    monthly_revenue: Decimal | None = None
+    if current_user.role == "admin":
+        month_prefix = today.strftime("%Y-%m")
+        total = Decimal("0")
+        for profile in client_repository.list_all():
+            for membership in membership_repository.list_by_client(profile.id):  # type: ignore[arg-type]
+                for payment in payment_repository.list_by_membership(membership.id):  # type: ignore[arg-type]
+                    if payment.payment_date.strftime("%Y-%m") == month_prefix:
+                        total += payment.amount
+        monthly_revenue = total
+
+    indicators = ActiveMembershipsIndicators(
+        total_active=len(all_rows),
+        expiring_soon=sum(1 for r in all_rows if r.expiring_soon),
+        monthly_revenue=monthly_revenue,
+    )
+
+    items = all_rows
+    if plan_id is not None:
+        items = [r for r in items if r.plan_id == plan_id]
+    if q and q.strip():
+        needle = q.strip().lower()
+        items = [r for r in items if needle in r.client_name.lower()]
+
+    return ActiveMembershipsBoard(indicators=indicators, items=items)
+
+
+# IMPORTANTE: estas rutas estaticas ("/board", "/expiring" y
+# "/detect-expiring") deben declararse ANTES que "/{membership_id}" --
+# FastAPI/Starlette resuelve las rutas en el orden en que se registran, y
+# calzarian con el patron "/{membership_id}" (fallando la validacion de
+# tipo `int`) si quedaran despues.
 @router.get("/expiring", response_model=list[MembershipRead])
 def list_expiring_memberships(
     days_ahead: int = _VENTANA_POR_VENCER_DIAS,
@@ -622,6 +733,31 @@ def update_membership_status(
 
     db.commit()
     return MembershipRead.model_validate(updated)
+
+
+@router.post(
+    "/{membership_id}/renew",
+    response_model=MembershipRead,
+    dependencies=[Depends(require_role("admin"))],
+)
+def renew_membership(membership_id: int, db: Session = Depends(get_db)) -> MembershipRead:
+    """Accion "Renovar" del tablero de membresias activas. Solo `admin` --
+    ver `RenewMembershipUseCase` y el docstring del modulo arriba."""
+    membership_repository = SqlAlchemyMembershipRepository(db)
+    plan_repository = SqlAlchemyMembershipPlanRepository(db)
+    use_case = RenewMembershipUseCase(
+        membership_repository=membership_repository, plan_repository=plan_repository
+    )
+
+    try:
+        renewed = use_case.execute(membership_id)
+    except MembershipNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except MembershipPlanNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    db.commit()
+    return MembershipRead.model_validate(renewed)
 
 
 # --- Servicios extra contratados sobre una membresia -------------------------

@@ -210,6 +210,42 @@ class DetectExpiringMembershipsUseCase:
 
 
 @dataclass
+class RenewMembershipUseCase:
+    """Renovar una membresia desde el tablero de membresias activas
+    (Entrega 3, ajuste de UX de la pantalla "Membresias").
+
+    Extiende `end_date` por la duracion del PROPIO plan
+    (`MembershipPlan.duration_days`), a partir de la fecha de fin vigente
+    si todavia no paso, o de hoy si ya vencio -- nunca deja huecos sin
+    cobertura ni acumula sobre una fecha ya pasada. Si la membresia
+    estaba `"vencida"`, vuelve a `"activa"`.
+
+    Decision explicita (ver DECISIONES.md): NO crea una `Membership`
+    nueva ni un `Payment` automatico -- "renovar" (extender vigencia) y
+    "cobrar" (registrar el pago) son dos acciones separadas en la UI a
+    proposito, para no asumir metodo de pago ni monto cobrado.
+    """
+
+    membership_repository: MembershipRepository
+    plan_repository: MembershipPlanRepository
+
+    def execute(self, membership_id: int) -> Membership:
+        membership = self.membership_repository.get_by_id(membership_id)
+        if membership is None:
+            raise MembershipNotFoundError(membership_id)
+
+        plan = self.plan_repository.get_by_id(membership.plan_id)
+        if plan is None:
+            raise MembershipPlanNotFoundError(membership.plan_id)
+
+        today = date.today()
+        base_date = membership.end_date if membership.end_date >= today else today
+        membership.end_date = base_date + timedelta(days=plan.duration_days)
+        membership.status = "activa"
+        return self.membership_repository.update(membership)
+
+
+@dataclass
 class DeleteOrDeactivateMembershipPlanUseCase:
     """Regla de negocio explicita del encargo: "Eliminar un plan ... con
     contrataciones lo DESACTIVA; si no tiene ninguna, se elimina de
