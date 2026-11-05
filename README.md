@@ -33,8 +33,10 @@ docker compose exec backend alembic upgrade head
 
 El proyecto incluye un script de seed con un usuario por rol y datos
 realistas fechados en 2026 (membresía, progreso, rutina y dieta
-asignadas). Es destructivo e idempotente: trunca y vuelve a poblar las
-tablas de datos de prueba, se puede correr las veces que haga falta.
+asignadas, catálogo de 3 planes y 6 servicios extra con un extra ya
+contratado de ejemplo). Es destructivo e idempotente: trunca y vuelve a
+poblar las tablas de datos de prueba, se puede correr las veces que haga
+falta.
 
 ```bash
 docker compose exec backend python seed.py
