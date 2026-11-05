@@ -11,18 +11,18 @@ encontró en la auditoría y cómo se resolvió cada punto) vive en
 
 ```
 docker compose exec backend pytest -q
-88 passed, 1 warning in 255.18s (0:04:15)
+96 passed, 1 warning in 303.70s (0:05:03)
 ```
 
-88/88 casos automatizados en verde, 0 fallos, al cierre de la Entrega 3
+96/96 casos automatizados en verde, 0 fallos, al cierre de la Entrega 3
 (partía de 75/75 en la auditoría de arranque; ver desglose completo y los
-10 casos nuevos de Fase 2 en `docs/RESULTADOS-ENTREGA-3.md`).
+18 casos nuevos de Fase 2 + ajuste de UX en `docs/RESULTADOS-ENTREGA-3.md`).
 
 | Archivo | Casos |
 |---|---|
 | test_auth.py | 7 |
 | test_clients.py | 10 |
-| test_memberships.py | 11 |
+| test_memberships.py | 19 |
 | test_payments.py | 9 |
 | test_services.py | 8 |
 | test_notifications.py | 7 |
@@ -33,7 +33,7 @@ docker compose exec backend pytest -q
 | test_audit_logs.py | 5 |
 | test_cp17_documentacion_api.py | 2 |
 | test_health.py | 2 |
-| **Total** | **88** |
+| **Total** | **96** |
 
 ## Tabla RF001–RF015
 
@@ -41,7 +41,7 @@ docker compose exec backend pytest -q
 |---|---|---|---|---|
 | RF001/002 — Login, roles | Completo (JWT, bcrypt, `require_role`) | Completo (`LoginPage`, sesión real) | 7 casos (`test_auth.py`) | **Completo** |
 | RF003 — Clientes (CRUD) | Completo (`POST/GET/PATCH/DELETE /clients`) | Completo (listado, alta, edición, detalle, confirmación de borrado) | 10 casos (`test_clients.py`) | **Completo** |
-| RF004 — Membresías + Planes y servicios extra (Fase 2) | Completo, incluye catálogo de servicios, inclusión por plan y contratación de extras con precio congelado | Completo (`MembershipsPage`, `PlanesServiciosPage`, extras en `ClientDetailPage`) | 11 + 8 casos (`test_memberships.py`, `test_services.py`) | **Completo** |
+| RF004 — Membresías + Planes y servicios extra (Fase 2) | Completo, incluye catálogo de servicios, inclusión por plan, contratación de extras con precio congelado, tablero de membresías activas (`GET /memberships/board`) y renovación (`POST /memberships/{id}/renew`) | Completo (`MembershipsPage` = tablero operativo de activas; `PlanesServiciosPage` = único lugar con el catálogo; extras en `ClientDetailPage`) | 19 + 8 casos (`test_memberships.py`, `test_services.py`) | **Completo** |
 | RF005 — Pagos + desglose (Fase 2) | Completo, incluye desglose plan/extras por línea | Completo (pestaña "Pagos" en `ClientDetailPage`, con desglose opcional) | 9 casos (`test_payments.py`) | **Completo** |
 | RF006 — Vencimientos y notificaciones | Completo, con detección automática diaria (APScheduler, 06:00 CDMX) además del disparo manual | Completo (alertas, notificaciones) | 7 + 2 casos (`test_notifications.py`, `test_scheduler.py`) | **Completo** |
 | RF007/008/012 — Rutinas | Completo | Completo (`RoutinesPage`, `ClientDetailPage`) | 10 casos (`test_routines.py`) | **Completo** |
@@ -70,6 +70,20 @@ entradas: backend y frontend) para el diseño y las 4 ambigüedades resueltas.
 Verificado en navegador con datos reales del seed (catálogo, inclusión por
 plan, extras contratados, desglose de pago) — ver
 `docs/RESULTADOS-ENTREGA-3.md`.
+
+## Ajuste de UX: "Membresías" pasa de catálogo a tablero operativo
+
+La pantalla "Membresías" dejó de mostrar las tarjetas de planes (duplicaban
+el catálogo, que ahora vive SOLO en "Planes y servicios") y pasó a ser un
+tablero de membresías ACTIVAS: indicadores (total activas, por vencer en 7
+días, ingresos del mes -- solo Admin), tabla con cliente/plan/extras
+activos/fechas/días restantes resaltando lo próximo a vencer, búsqueda por
+nombre y filtro por plan, y acciones por fila (ver ficha, renovar, cobrar).
+`cliente` no accede a este tablero (403): sigue viendo su propia membresía
+en la misma ruta. Backend nuevo: `GET /memberships/board` (con filtros,
+indicadores sin filtrar) y `POST /memberships/{id}/renew`. Ver
+`DECISIONES.md`, entrada "Ajuste de UX: Membresías pasa a tablero de
+activas".
 
 ## Backlog heredado
 

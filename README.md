@@ -47,6 +47,13 @@ tablas (es la estrategia de aislamiento entre pruebas, ver
 `backend/tests/conftest.py`) -- si acabas de correr las pruebas y quieres
 volver a tener las cuentas demo, corre `seed.py` de nuevo después.
 
+**Nota sobre qué servicio incluye cada plan:** la asignación del seed
+(Básica solo incluye casillero; VIP suma clases grupales y evaluación;
+Premium incluye los 6) es **dato de ejemplo para la demo, no una decisión
+de negocio confirmada con el cliente real** -- qué servicios trae cada
+plan es 100% configurable desde la pantalla "Planes y servicios" (solo
+Admin), sin tocar código ni el seed.
+
 ### Cuentas demo
 
 Todas con contraseña `Demo2026!`.

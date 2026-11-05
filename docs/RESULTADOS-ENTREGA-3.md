@@ -8,13 +8,14 @@ manual en navegador sobre datos reales del script de seed (`backend/seed.py`).
 
 ```
 docker compose exec backend pytest -q
-88 passed, 1 warning in 255.18s (0:04:15)
+96 passed, 1 warning in 303.70s (0:05:03)
 ```
 
-88/88 casos automatizados en verde, 0 fallos, al cierre de la Entrega 3.
+96/96 casos automatizados en verde, 0 fallos, al cierre de la Entrega 3.
 (Partía de 75/75 en la auditoría de arranque — Fase 1 agregó 3 casos
 [`test_scheduler.py` ×2, `test_memberships.py::test_listar_planes_sin_autenticacion_es_publico`
-×1], Fase 2/3 agregó los 10 de abajo: 75 + 3 + 10 = 88.)
+×1], Fase 2 agregó 10 [CP19-28], el ajuste de UX de Membresías agregó 8
+más [CP29-36]: 75 + 3 + 10 + 8 = 96.)
 
 > Nota de proceso: correr dos invocaciones de `pytest` en paralelo contra la
 > misma base de desarrollo genera fallos cruzados (`TRUNCATE` de aislamiento
@@ -25,7 +26,7 @@ docker compose exec backend pytest -q
 |---|---|---|
 | test_auth.py | 7 | RF001/002 — Login, roles |
 | test_clients.py | 10 | RF003 — Clientes |
-| test_memberships.py | 11 | RF004 — Membresías |
+| test_memberships.py | 19 | RF004 — Membresías (11 Entrega 2 + CP29-36 tablero/renovar) |
 | test_payments.py | 9 | RF005 — Pagos (7 Entrega 2 + CP27-28 desglose) |
 | test_services.py | 8 | RF004/RF005 Fase 2 — Planes y servicios extra (CP19-26) |
 | test_notifications.py | 7 | RF006 — Vencimientos y notificaciones |
@@ -36,7 +37,7 @@ docker compose exec backend pytest -q
 | test_audit_logs.py | 5 | RF015 — Bitácora |
 | test_cp17_documentacion_api.py | 2 | RF014 — Documentación de la API |
 | test_health.py | 2 | Salud del servicio |
-| **Total** | **88** | |
+| **Total** | **96** | |
 
 ## CP19–CP28 — Casos nuevos de Fase 2 (Planes y servicios extra)
 
@@ -52,6 +53,19 @@ docker compose exec backend pytest -q
 | CP26 | `GET /memberships/{id}/services`: entrenador ve la lista sin `price_at_purchase`; admin/cliente sí la ven | `test_services.py` | Pasó |
 | CP27 | Desglose de pago (`items`) cuya suma no coincide con `amount` → 400 | `test_payments.py` | Pasó |
 | CP28 | Desglose de pago exitoso → cada línea se guarda y se devuelve en `items` | `test_payments.py` | Pasó |
+
+## CP29–CP36 — Tablero de membresías activas + renovar (ajuste de UX)
+
+| CP | Caso | Archivo | Resultado |
+|---|---|---|---|
+| CP29 | Tablero como admin: indicadores (total activas, por vencer en 7 días, ingresos del mes) + tabla | `test_memberships.py` | Pasó |
+| CP30 | Tablero como entrenador: solo sus clientes asignados, `monthly_revenue` siempre `null` | `test_memberships.py` | Pasó |
+| CP31 | Tablero como cliente → 403 (no accede, consulta su propia membresía en `GET /memberships`) | `test_memberships.py` | Pasó |
+| CP32 | Filtros por plan y por nombre acotan la tabla sin afectar los indicadores (totales) | `test_memberships.py` | Pasó |
+| CP33 | Renovar una membresía vigente extiende `end_date` desde la vigencia actual | `test_memberships.py` | Pasó |
+| CP34 | Renovar una membresía vencida la reactiva (`status="activa"`) desde hoy | `test_memberships.py` | Pasó |
+| CP35 | Renovar como no-admin → 403 | `test_memberships.py` | Pasó |
+| CP36 | Renovar una membresía inexistente → 404 | `test_memberships.py` | Pasó |
 
 ## CP01–CP18 — Casos heredados (Entregas 1/2)
 
@@ -85,18 +99,30 @@ No automatizada por pytest (verificación de interfaz, no de API):
 
 Resultado: los 5 pasos funcionaron sin errores en la primera corrida.
 
+## Reporte de "textos con traducciones raras" ("AVIONES", "PERSONAJE", "DE
+PRIMERA CALIDAD", "ANUNCIO", "Cajero compartido")
+
+Búsqueda exhaustiva (`grep` case-insensitive de las 5 cadenas reportadas en
+todo el repositorio, incluido `backend/seed.py`) + verificación en vivo en
+el navegador (landing pública, tablero de membresías, encabezado con
+avatar). **Ninguna de las 5 existe en el código ni en lo renderizado**: el
+avatar ya muestra las iniciales reales del usuario (`Topbar.tsx`), el seed
+ya dice "Casillero compartido", y los nombres de plan ya son
+"Básica"/"VIP"/"Premium" en todas las pantallas. No se fabricó ningún
+cambio sobre texto que no existe -- ver `DECISIONES.md`, entrada "Ajuste de
+UX: Membresías pasa a tablero de activas", punto 6.
+
 ## Bugs encontrados en esta entrega
 
 Ninguno nuevo (BUG-01 a BUG-07, de entregas anteriores, siguen cerrados —
-ver `DECISIONES.md`). La Fase 2 no introdujo ningún defecto detectado por
-pytest ni por la verificación manual en navegador.
+ver `DECISIONES.md`). Ni la Fase 2 ni el ajuste de UX de Membresías
+introdujeron ningún defecto detectado por pytest ni por la verificación
+manual en navegador.
 
 ## Resumen
 
-- **88/88 pruebas automatizadas en verde** (0 fallos) al cierre de la
-  Entrega 3.
-- **10 casos nuevos** (CP19–CP28) cubren exactamente las reglas de negocio
-  explícitas del encargo de Fase 2: desactivar-vs-eliminar, congelamiento
-  de precio, exclusión de cobro doble, permisos de catálogo, y vista
-  recortada del entrenador.
+- **96/96 pruebas automatizadas en verde** (0 fallos) al cierre de la
+  Entrega 3 (88 + 8 casos nuevos del tablero de membresías/renovar).
+- **18 casos nuevos en total**: CP19–CP28 (Fase 2, Planes y servicios
+  extra) y CP29–CP36 (tablero de membresías activas + renovar).
 - **0 bugs nuevos abiertos.**
