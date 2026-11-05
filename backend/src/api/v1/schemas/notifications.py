@@ -14,6 +14,7 @@ NotificationType = Literal[
     "rutina_asignada",
     "dieta_asignada",
     "sistema",
+    "plan_cambiado",
 ]
 
 

@@ -69,7 +69,9 @@ class MembershipRead(BaseModel):
 # ---------------------------------------------------------------------------
 
 BillingPeriod = Literal["unico", "mensual", "periodo"]
-MembershipServiceStatus = Literal["activa", "vencida", "cancelada"]
+MembershipServiceStatus = Literal[
+    "activa", "vencida", "cancelada", "cancelado_por_cambio_de_plan"
+]
 
 
 class ServiceCreate(BaseModel):
@@ -177,3 +179,45 @@ class ActiveMembershipsIndicators(BaseModel):
 class ActiveMembershipsBoard(BaseModel):
     indicators: ActiveMembershipsIndicators
     items: list[ActiveMembershipRow]
+
+
+# ---------------------------------------------------------------------------
+# Cambio de plan (amplia RF004/RF005 de nuevo) -- ver DECISIONES.md, entrada
+# "Cambio de plan: efecto en servicios extra". `PlanChangeRequest` sirve
+# para AMBOS endpoints (previsualizar y confirmar) a proposito: el mismo
+# body, el mismo calculo -- `notes` solo tiene efecto en la confirmacion.
+# ---------------------------------------------------------------------------
+
+
+class PlanChangeRequest(BaseModel):
+    new_plan_id: int
+    notes: str | None = None
+
+
+class PlanChangeExtraRow(BaseModel):
+    membership_service_id: int
+    service_id: int
+    service_name: str
+    price_at_purchase: Decimal
+
+
+class PlanChangeContractableRow(BaseModel):
+    service_id: int
+    service_name: str
+    price: Decimal
+
+
+class PlanChangePreview(BaseModel):
+    membership_id: int
+    client_id: int
+    old_plan_id: int
+    old_plan_name: str
+    old_plan_price: Decimal
+    new_plan_id: int
+    new_plan_name: str
+    new_plan_price: Decimal
+    price_difference: Decimal
+    cancelled_extras: list[PlanChangeExtraRow]
+    cancelled_extras_total: Decimal
+    kept_extras: list[PlanChangeExtraRow]
+    newly_contractable_services: list[PlanChangeContractableRow]

@@ -19,7 +19,8 @@ class NotificationModel(Base):
     __table_args__ = (
         CheckConstraint(
             "type IN ('membresia_vencida', 'membresia_por_vencer', "
-            "'pago_registrado', 'rutina_asignada', 'dieta_asignada', 'sistema')",
+            "'pago_registrado', 'rutina_asignada', 'dieta_asignada', 'sistema', "
+            "'plan_cambiado')",
             name="ck_notifications_type",
         ),
     )

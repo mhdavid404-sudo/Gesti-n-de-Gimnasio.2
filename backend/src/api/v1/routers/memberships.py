@@ -113,6 +113,26 @@ ACTIVAS:
   `end_date`. Deliberadamente NO registra un pago -- "Cobrar" es una
   accion distinta en la UI (navega al formulario de pago de la ficha del
   cliente), para no asumir metodo ni monto.
+
+Cambio de plan (amplia RF004/RF005 de nuevo, ver DECISIONES.md):
+
+- `POST /memberships/{membership_id}/change-plan/preview` y
+  `POST /memberships/{membership_id}/change-plan`: mismo body
+  (`PlanChangeRequest`) y el MISMO calculo
+  (`PreviewChangeMembershipPlanUseCase`) -- preview no escribe nada en la
+  base, confirm reusa ese calculo y lo persiste dentro de
+  `ChangeMembershipPlanUseCase` (ver su docstring para la regla completa
+  de cancelacion de extras y la nota de atomicidad). Solo `admin` --
+  cambiar el plan de un cliente es una decision administrativa/financiera,
+  mismo criterio que el resto de acciones de este tipo en el modulo.
+- `GET /memberships/{membership_id}/services` para `entrenador` ahora
+  filtra a extras con `status == "activa"` -- un extra cancelado por un
+  cambio de plan (o por cualquier otro motivo) deja de aparecerle,
+  regla explicita del encargo ("el entrenador asignado al extra cancelado
+  debe dejar de ver ese extra"). `admin`/`cliente` siguen viendo el
+  historial completo (incluidos los cancelados, con su status) -- "el
+  historial se conserva" es una regla para los datos, no para que
+  desaparezcan de la vista de quien necesita auditarlos.
 """
 
 from __future__ import annotations
@@ -137,6 +157,10 @@ from src.api.v1.schemas.memberships import (
     MembershipServiceRead,
     MembershipServiceReadLimited,
     MembershipUpdate,
+    PlanChangeContractableRow,
+    PlanChangeExtraRow,
+    PlanChangePreview,
+    PlanChangeRequest,
     PlanServiceAdd,
     ServiceCreate,
     ServiceRead,
@@ -145,10 +169,13 @@ from src.api.v1.schemas.memberships import (
 from src.application.memberships.use_cases import (
     AddServiceToPlanUseCase,
     AssignMembershipUseCase,
+    ChangeMembershipPlanUseCase,
     ContractMembershipServiceUseCase,
     DeleteOrDeactivateMembershipPlanUseCase,
     DeleteOrDeactivateServiceUseCase,
     DetectExpiringMembershipsUseCase,
+    PlanChangeImpact,
+    PreviewChangeMembershipPlanUseCase,
     RenewMembershipUseCase,
 )
 from src.application.notifications.use_cases import NotifyUserUseCase
@@ -156,11 +183,13 @@ from src.domain.clients.entities import ClientProfile
 from src.domain.clients.exceptions import ClientNotFoundError
 from src.domain.memberships.entities import Membership, MembershipPlan, Service
 from src.domain.memberships.exceptions import (
+    InactiveMembershipPlanError,
     InactiveServiceError,
     InvalidMembershipDateRangeError,
     InvalidMembershipStatusError,
     MembershipNotFoundError,
     MembershipPlanNotFoundError,
+    SamePlanChangeError,
     ServiceAlreadyIncludedInPlanError,
     ServiceIncludedInPlanError,
     ServiceNotFoundError,
@@ -175,7 +204,10 @@ from src.infrastructure.repositories.memberships import (
     SqlAlchemyPlanServiceRepository,
     SqlAlchemyServiceRepository,
 )
-from src.infrastructure.repositories.notifications import SqlAlchemyNotificationRepository
+from src.infrastructure.repositories.notifications import (
+    SqlAlchemyAuditLogRepository,
+    SqlAlchemyNotificationRepository,
+)
 from src.infrastructure.repositories.payments import SqlAlchemyPaymentRepository
 from src.infrastructure.repositories.users import SqlAlchemyUserRepository
 
@@ -760,6 +792,127 @@ def renew_membership(membership_id: int, db: Session = Depends(get_db)) -> Membe
     return MembershipRead.model_validate(renewed)
 
 
+def _build_plan_change_preview(
+    impact: PlanChangeImpact, service_repository: SqlAlchemyServiceRepository
+) -> PlanChangePreview:
+    """Traduce `PlanChangeImpact` (ids/entidades de dominio) a la
+    respuesta HTTP (con nombres de servicio resueltos) -- usado por los
+    dos endpoints de cambio de plan, que comparten el mismo calculo."""
+
+    def _extra_row(extra) -> PlanChangeExtraRow:  # noqa: ANN001
+        service = service_repository.get_by_id(extra.service_id)
+        return PlanChangeExtraRow(
+            membership_service_id=extra.id,  # type: ignore[arg-type]
+            service_id=extra.service_id,
+            service_name=service.name if service else f"Servicio #{extra.service_id}",
+            price_at_purchase=extra.price_at_purchase,
+        )
+
+    def _contractable_row(service_id: int) -> PlanChangeContractableRow:
+        service = service_repository.get_by_id(service_id)
+        return PlanChangeContractableRow(
+            service_id=service_id,
+            service_name=service.name if service else f"Servicio #{service_id}",
+            price=service.price if service else Decimal("0"),
+        )
+
+    return PlanChangePreview(
+        membership_id=impact.membership_id,
+        client_id=impact.client_id,
+        old_plan_id=impact.old_plan_id,
+        old_plan_name=impact.old_plan_name,
+        old_plan_price=impact.old_plan_price,
+        new_plan_id=impact.new_plan_id,
+        new_plan_name=impact.new_plan_name,
+        new_plan_price=impact.new_plan_price,
+        price_difference=impact.price_difference,
+        cancelled_extras=[_extra_row(e) for e in impact.cancelled_extras],
+        cancelled_extras_total=impact.cancelled_extras_total,
+        kept_extras=[_extra_row(e) for e in impact.kept_extras],
+        newly_contractable_services=[
+            _contractable_row(sid) for sid in impact.newly_contractable_service_ids
+        ],
+    )
+
+
+@router.post(
+    "/{membership_id}/change-plan/preview",
+    response_model=PlanChangePreview,
+    dependencies=[Depends(require_role("admin"))],
+)
+def preview_change_membership_plan(
+    membership_id: int, payload: PlanChangeRequest, db: Session = Depends(get_db)
+) -> PlanChangePreview:
+    """Previsualiza el efecto de cambiar el plan SIN guardar nada -- mismo
+    calculo que la confirmacion, ver docstring del modulo arriba y de
+    `PreviewChangeMembershipPlanUseCase`. Solo `admin`."""
+    use_case = PreviewChangeMembershipPlanUseCase(
+        membership_repository=SqlAlchemyMembershipRepository(db),
+        plan_repository=SqlAlchemyMembershipPlanRepository(db),
+        plan_service_repository=SqlAlchemyPlanServiceRepository(db),
+        membership_service_repository=SqlAlchemyMembershipServiceRepository(db),
+    )
+
+    try:
+        impact = use_case.execute(membership_id, payload.new_plan_id)
+    except MembershipNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except MembershipPlanNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except SamePlanChangeError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except InactiveMembershipPlanError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    return _build_plan_change_preview(impact, SqlAlchemyServiceRepository(db))
+
+
+@router.post(
+    "/{membership_id}/change-plan",
+    response_model=PlanChangePreview,
+    dependencies=[Depends(require_role("admin"))],
+)
+def change_membership_plan(
+    membership_id: int,
+    payload: PlanChangeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> PlanChangePreview:
+    """Confirma el cambio de plan -- reusa el mismo calculo que el preview
+    y lo persiste en una sola transaccion (ver `ChangeMembershipPlanUseCase`).
+    Solo `admin`."""
+    preview_use_case = PreviewChangeMembershipPlanUseCase(
+        membership_repository=SqlAlchemyMembershipRepository(db),
+        plan_repository=SqlAlchemyMembershipPlanRepository(db),
+        plan_service_repository=SqlAlchemyPlanServiceRepository(db),
+        membership_service_repository=SqlAlchemyMembershipServiceRepository(db),
+    )
+    use_case = ChangeMembershipPlanUseCase(
+        preview_use_case=preview_use_case,
+        membership_repository=SqlAlchemyMembershipRepository(db),
+        membership_service_repository=SqlAlchemyMembershipServiceRepository(db),
+        client_repository=SqlAlchemyClientProfileRepository(db),
+        audit_log_repository=SqlAlchemyAuditLogRepository(db),
+        notify_use_case=NotifyUserUseCase(notification_repository=SqlAlchemyNotificationRepository(db)),
+    )
+
+    try:
+        impact = use_case.execute(
+            membership_id, payload.new_plan_id, current_user.id, payload.notes  # type: ignore[arg-type]
+        )
+    except MembershipNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except MembershipPlanNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except SamePlanChangeError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except InactiveMembershipPlanError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    db.commit()
+    return _build_plan_change_preview(impact, SqlAlchemyServiceRepository(db))
+
+
 # --- Servicios extra contratados sobre una membresia -------------------------
 
 
@@ -829,5 +982,11 @@ def list_membership_services(
     contracted = membership_service_repository.list_by_membership(membership_id)
 
     if current_user.role == "entrenador":
-        return [MembershipServiceReadLimited.model_validate(ms) for ms in contracted]
+        # Solo extras VIGENTES -- un extra cancelado (manualmente o por un
+        # cambio de plan, ver `ChangeMembershipPlanUseCase`) deja de
+        # aparecerle (regla explicita del encargo). `admin`/`cliente` ven
+        # el historial completo mas abajo -- "se conserva" es para los
+        # datos, no para ocultarlo de quien necesita auditarlo.
+        active_only = [ms for ms in contracted if ms.status == "activa"]
+        return [MembershipServiceReadLimited.model_validate(ms) for ms in active_only]
     return [MembershipServiceRead.model_validate(ms) for ms in contracted]

@@ -17,7 +17,17 @@ ESTADOS_MEMBRESIA_VALIDOS = ("activa", "vencida", "cancelada", "pendiente")
 # que un cliente contrata sobre su membresia. Persistidos como VARCHAR +
 # CHECK, mismo criterio que el resto del modelo.
 PERIODOS_FACTURACION_VALIDOS = ("unico", "mensual", "periodo")
-ESTADOS_MEMBERSHIP_SERVICE_VALIDOS = ("activa", "vencida", "cancelada")
+# "cancelado_por_cambio_de_plan": agregado para el cambio de plan (amplia
+# RF004/RF005 de nuevo) -- distinto de "cancelada" (cancelacion manual) para
+# que quede trazable EN EL PROPIO STATUS por que se cancelo un extra, sin
+# tener que leer la bitacora para saberlo. Ver
+# `ChangeMembershipPlanUseCase`.
+ESTADOS_MEMBERSHIP_SERVICE_VALIDOS = (
+    "activa",
+    "vencida",
+    "cancelada",
+    "cancelado_por_cambio_de_plan",
+)
 
 
 @dataclass

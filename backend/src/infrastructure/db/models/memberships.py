@@ -115,7 +115,7 @@ class MembershipServiceModel(Base):
     __tablename__ = "membership_services"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('activa', 'vencida', 'cancelada')",
+            "status IN ('activa', 'vencida', 'cancelada', 'cancelado_por_cambio_de_plan')",
             name="ck_membership_services_status",
         ),
     )
@@ -130,7 +130,9 @@ class MembershipServiceModel(Base):
     price_at_purchase: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     start_date: Mapped[date] = mapped_column(Date, nullable=False)
     end_date: Mapped[date] = mapped_column(Date, nullable=False)
-    status: Mapped[str] = mapped_column(String(20), nullable=False)
+    # String(40), no 20: "cancelado_por_cambio_de_plan" (29 caracteres) no
+    # entraba en VARCHAR(20) -- ver migracion 0004.
+    status: Mapped[str] = mapped_column(String(40), nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

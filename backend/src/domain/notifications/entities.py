@@ -25,6 +25,9 @@ TIPOS_NOTIFICACION_VALIDOS = (
     "rutina_asignada",
     "dieta_asignada",
     "sistema",
+    # Cambio de plan (amplia RF004/RF005 de nuevo) -- ver
+    # `ChangeMembershipPlanUseCase`.
+    "plan_cambiado",
 )
 
 

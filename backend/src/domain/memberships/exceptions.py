@@ -94,3 +94,25 @@ class InvalidMembershipServiceStatusError(Exception):
     def __init__(self, status_value: str) -> None:
         self.status_value = status_value
         super().__init__(f"El estado '{status_value}' no es un estado valido para un servicio contratado")
+
+
+# --- Cambio de plan (amplia RF004/RF005 de nuevo) ---------------------------
+
+
+class SamePlanChangeError(Exception):
+    """El plan nuevo es el mismo que ya tiene la membresia -- no hay nada
+    que cambiar (evita un "cambio" sin efecto que confundiria el resumen)."""
+
+    def __init__(self, plan_id: int) -> None:
+        self.plan_id = plan_id
+        super().__init__(f"La membresia ya tiene asignado el plan {plan_id}")
+
+
+class InactiveMembershipPlanError(Exception):
+    """No se puede cambiar una membresia a un plan desactivado -- mismo
+    criterio que `InactiveServiceError` (un plan desactivado ya no se
+    ofrece para contrataciones nuevas)."""
+
+    def __init__(self, plan_id: int) -> None:
+        self.plan_id = plan_id
+        super().__init__(f"El plan {plan_id} esta desactivado, no se puede asignar")

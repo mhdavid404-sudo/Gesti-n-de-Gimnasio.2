@@ -8,8 +8,9 @@ fijo de modulos, va DESPUES de Pagos) tienen logica real.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
+from decimal import Decimal
 
 from src.application.notifications.use_cases import NotifyUserUseCase
 from src.domain.clients.exceptions import ClientNotFoundError
@@ -23,11 +24,13 @@ from src.domain.memberships.entities import (
     Service,
 )
 from src.domain.memberships.exceptions import (
+    InactiveMembershipPlanError,
     InactiveServiceError,
     InvalidMembershipDateRangeError,
     InvalidMembershipStatusError,
     MembershipNotFoundError,
     MembershipPlanNotFoundError,
+    SamePlanChangeError,
     ServiceAlreadyIncludedInPlanError,
     ServiceIncludedInPlanError,
     ServiceNotFoundError,
@@ -39,7 +42,8 @@ from src.domain.memberships.repositories import (
     PlanServiceRepository,
     ServiceRepository,
 )
-from src.domain.notifications.entities import Notification
+from src.domain.notifications.entities import AuditLog, Notification
+from src.domain.notifications.repositories import AuditLogRepository
 
 
 @dataclass
@@ -392,3 +396,218 @@ class ContractMembershipServiceUseCase:
                 status="activa",
             )
         )
+
+
+# --- Cambio de plan (amplia RF004/RF005 de nuevo) ---------------------------
+
+
+@dataclass
+class PlanChangeImpact:
+    """Resultado del calculo de un cambio de plan -- objeto de aplicacion
+    (no una entidad de dominio persistida), compartido EXACTAMENTE por
+    `PreviewChangeMembershipPlanUseCase` (no persiste nada) y
+    `ChangeMembershipPlanUseCase` (persiste esto mismo), para que la
+    pantalla de resumen y el resultado final de la confirmacion sean
+    siempre el mismo calculo, nunca dos logicas separadas que puedan
+    desincronizarse."""
+
+    membership_id: int
+    client_id: int
+    old_plan_id: int
+    old_plan_name: str
+    old_plan_price: Decimal
+    new_plan_id: int
+    new_plan_name: str
+    new_plan_price: Decimal
+    price_difference: Decimal
+    # Extras ACTIVOS que el plan nuevo ya incluye -- se cancelan.
+    cancelled_extras: list[MembershipService] = field(default_factory=list)
+    cancelled_extras_total: Decimal = Decimal("0")
+    # Extras ACTIVOS que el plan nuevo NO incluye -- se conservan tal cual.
+    kept_extras: list[MembershipService] = field(default_factory=list)
+    # Servicios que el plan VIEJO incluia y el NUEVO no (bajada de plan) --
+    # pasan a poder contratarse como extra; esta lista es solo informativa,
+    # el caso de uso NUNCA crea una fila `MembershipService` para ellos.
+    newly_contractable_service_ids: list[int] = field(default_factory=list)
+
+
+@dataclass
+class PreviewChangeMembershipPlanUseCase:
+    """Calcula el efecto de cambiar el plan de una membresia SIN escribir
+    nada en la base -- de solo lectura a proposito, para que la pantalla
+    de resumen (antes de confirmar) pueda llamarse las veces que haga
+    falta sin ningun efecto secundario.
+
+    Regla de negocio (ver DECISIONES.md, entrada "Cambio de plan: efecto
+    en servicios extra"):
+    1. Compara los servicios incluidos en el plan NUEVO (`PlanService`)
+       contra los extras ACTIVOS de la membresia (`MembershipService`).
+    2. Todo extra activo que el plan nuevo YA INCLUYE se marca para
+       cancelar (`cancelled_extras`) -- un servicio incluido en el plan
+       nunca se cobra aparte (mismo criterio que
+       `ContractMembershipServiceUseCase`/`ServiceIncludedInPlanError`).
+    3. Los extras que el plan nuevo NO incluye se conservan tal cual
+       (`kept_extras`).
+    4. Los servicios que el plan VIEJO incluia y el nuevo no (bajada de
+       plan) se reportan como "ahora contratables"
+       (`newly_contractable_service_ids`) -- NUNCA se agregan solos ni se
+       cobran sin que el admin los contrate explicitamente despues, como
+       cualquier otro extra.
+    """
+
+    membership_repository: MembershipRepository
+    plan_repository: MembershipPlanRepository
+    plan_service_repository: PlanServiceRepository
+    membership_service_repository: MembershipServiceRepository
+
+    def execute(self, membership_id: int, new_plan_id: int) -> PlanChangeImpact:
+        membership = self.membership_repository.get_by_id(membership_id)
+        if membership is None:
+            raise MembershipNotFoundError(membership_id)
+
+        if membership.plan_id == new_plan_id:
+            raise SamePlanChangeError(new_plan_id)
+
+        old_plan = self.plan_repository.get_by_id(membership.plan_id)
+        if old_plan is None:
+            raise MembershipPlanNotFoundError(membership.plan_id)
+
+        new_plan = self.plan_repository.get_by_id(new_plan_id)
+        if new_plan is None:
+            raise MembershipPlanNotFoundError(new_plan_id)
+
+        if not new_plan.is_active:
+            raise InactiveMembershipPlanError(new_plan_id)
+
+        old_plan_service_ids = {
+            ps.service_id for ps in self.plan_service_repository.list_for_plan(membership.plan_id)
+        }
+        new_plan_service_ids = {
+            ps.service_id for ps in self.plan_service_repository.list_for_plan(new_plan_id)
+        }
+
+        active_extras = [
+            ms
+            for ms in self.membership_service_repository.list_by_membership(membership_id)
+            if ms.status == "activa"
+        ]
+        cancelled_extras = [ms for ms in active_extras if ms.service_id in new_plan_service_ids]
+        kept_extras = [ms for ms in active_extras if ms.service_id not in new_plan_service_ids]
+        newly_contractable_ids = sorted(old_plan_service_ids - new_plan_service_ids)
+
+        cancelled_total = sum(
+            (ms.price_at_purchase for ms in cancelled_extras), start=Decimal("0")
+        )
+
+        return PlanChangeImpact(
+            membership_id=membership_id,
+            client_id=membership.client_id,
+            old_plan_id=old_plan.id,  # type: ignore[arg-type]
+            old_plan_name=old_plan.name,
+            old_plan_price=old_plan.price,
+            new_plan_id=new_plan.id,  # type: ignore[arg-type]
+            new_plan_name=new_plan.name,
+            new_plan_price=new_plan.price,
+            price_difference=new_plan.price - old_plan.price,
+            cancelled_extras=cancelled_extras,
+            cancelled_extras_total=cancelled_total,
+            kept_extras=kept_extras,
+            newly_contractable_service_ids=newly_contractable_ids,
+        )
+
+
+@dataclass
+class ChangeMembershipPlanUseCase:
+    """Ejecuta el cambio de plan calculado por
+    `PreviewChangeMembershipPlanUseCase` (reusa el MISMO calculo, nunca una
+    logica separada) y lo persiste:
+
+    1. Actualiza `Membership.plan_id`.
+    2. Cada extra en `impact.cancelled_extras` pasa a
+       `status = "cancelado_por_cambio_de_plan"`, `end_date = hoy` -- NO se
+       borra, NO se toca `price_at_purchase` (el historial y los pagos ya
+       hechos se conservan intactos, regla explicita del encargo).
+    3. Los extras en `impact.kept_extras` NO se tocan.
+    4. Los servicios de `impact.newly_contractable_service_ids` NO generan
+       ninguna fila nueva -- quedan disponibles para contratarse despues
+       como cualquier otro extra, nunca automaticamente.
+    5. Deja una entrada en la bitacora (`AuditLog`) y notifica al cliente
+       (`Notification`, tipo `plan_cambiado`).
+
+    Atomico por construccion: todas las escrituras (`update`/`add` de los
+    repositorios) comparten la MISMA `Session` inyectada desde el router;
+    el router hace un unico `db.commit()` despues de que `execute()`
+    retorna sin excepcion. Si cualquier paso de aqui levanta una
+    excepcion, el router nunca llega a comitear -- nada de lo escrito con
+    `flush()` queda persistido (mismo patron de atomicidad "por sesion
+    compartida" que ya usa el resto de la API, ver `get_db`).
+
+    Reembolso o saldo a favor del extra cancelado: decision pendiente de
+    validar con el cliente real (ver DECISIONES.md) -- por default NO se
+    calcula ningun prorrateo ni reembolso automatico; `notes` (opcional)
+    es donde el admin deja registrado el acuerdo comercial, y
+    `cancelled_extras_total` del resultado ya le dice cuanto habia pagado
+    de cada extra cancelado para que decida con esa cifra en mano.
+    """
+
+    preview_use_case: PreviewChangeMembershipPlanUseCase
+    membership_repository: MembershipRepository
+    membership_service_repository: MembershipServiceRepository
+    client_repository: ClientProfileRepository
+    audit_log_repository: AuditLogRepository
+    notify_use_case: NotifyUserUseCase
+
+    def execute(
+        self,
+        membership_id: int,
+        new_plan_id: int,
+        changed_by_user_id: int,
+        notes: str | None = None,
+    ) -> PlanChangeImpact:
+        impact = self.preview_use_case.execute(membership_id, new_plan_id)
+
+        membership = self.membership_repository.get_by_id(membership_id)
+        assert membership is not None  # ya lo valido preview_use_case arriba
+        membership.plan_id = new_plan_id
+        self.membership_repository.update(membership)
+
+        today = date.today()
+        for extra in impact.cancelled_extras:
+            extra.status = "cancelado_por_cambio_de_plan"
+            extra.end_date = today
+            self.membership_service_repository.update(extra)
+
+        self.audit_log_repository.add(
+            AuditLog(
+                id=None,
+                user_id=changed_by_user_id,
+                action="cambio_de_plan",
+                entity_type="membership",
+                entity_id=str(membership_id),
+                details=(
+                    f"Plan '{impact.old_plan_name}' (#{impact.old_plan_id}) -> "
+                    f"'{impact.new_plan_name}' (#{impact.new_plan_id}). "
+                    f"Extras cancelados por inclusion en el plan nuevo: "
+                    f"{[extra.id for extra in impact.cancelled_extras]} "
+                    f"(total ya pagado: ${impact.cancelled_extras_total}). "
+                    f"Notas del admin: {notes or '(sin notas)'}"
+                ),
+            )
+        )
+
+        profile = self.client_repository.get_by_id(membership.client_id)
+        if profile is not None:
+            self.notify_use_case.execute(
+                Notification(
+                    id=None,
+                    user_id=profile.user_id,
+                    type="plan_cambiado",
+                    title="Tu plan cambió",
+                    message=(
+                        f"Tu membresía pasó del plan {impact.old_plan_name} "
+                        f"al plan {impact.new_plan_name}."
+                    ),
+                )
+            )
+
+        return impact
