@@ -34,7 +34,13 @@ from sqlalchemy import text  # noqa: E402
 
 from src.domain.clients.entities import ClientProfile  # noqa: E402
 from src.domain.diets.entities import DietAssignment, DietPlan  # noqa: E402
-from src.domain.memberships.entities import Membership, MembershipPlan  # noqa: E402
+from src.domain.memberships.entities import (  # noqa: E402
+    Membership,
+    MembershipPlan,
+    MembershipService,
+    PlanService,
+    Service,
+)
 from src.domain.notifications.entities import Notification  # noqa: E402
 from src.domain.payments.entities import Payment  # noqa: E402
 from src.domain.progress.entities import BodyProgress  # noqa: E402
@@ -49,6 +55,9 @@ from src.infrastructure.repositories.diets import (  # noqa: E402
 from src.infrastructure.repositories.memberships import (  # noqa: E402
     SqlAlchemyMembershipPlanRepository,
     SqlAlchemyMembershipRepository,
+    SqlAlchemyMembershipServiceRepository,
+    SqlAlchemyPlanServiceRepository,
+    SqlAlchemyServiceRepository,
 )
 from src.infrastructure.repositories.notifications import SqlAlchemyNotificationRepository  # noqa: E402
 from src.infrastructure.repositories.payments import SqlAlchemyPaymentRepository  # noqa: E402
@@ -74,7 +83,8 @@ def _truncate_all(session) -> None:
     session.execute(
         text(
             "TRUNCATE TABLE users, client_profiles, membership_plans, memberships, "
-            "payments, exercises, routines, routine_exercises, routine_assignments, "
+            "payments, payment_items, services, plan_services, membership_services, "
+            "exercises, routines, routine_exercises, routine_assignments, "
             "diet_plans, diet_assignments, body_progress, notifications, audit_logs "
             "RESTART IDENTITY CASCADE"
         )
@@ -100,6 +110,9 @@ def run() -> None:
         diet_assignment_repo = SqlAlchemyDietAssignmentRepository(session)
         progress_repo = SqlAlchemyBodyProgressRepository(session)
         notification_repo = SqlAlchemyNotificationRepository(session)
+        service_repo = SqlAlchemyServiceRepository(session)
+        plan_service_repo = SqlAlchemyPlanServiceRepository(session)
+        membership_service_repo = SqlAlchemyMembershipServiceRepository(session)
 
         # --- Un usuario por rol -------------------------------------------
         print("Creando cuentas demo (una por rol)...")
@@ -175,7 +188,7 @@ def run() -> None:
                 ],
             )
         )
-        plan_repo.add(
+        plan_premium = plan_repo.add(
             MembershipPlan(
                 id=None,
                 name="Premium",
@@ -191,6 +204,85 @@ def run() -> None:
                 ],
             )
         )
+        session.commit()
+
+        # --- Catálogo de servicios extra (Entrega 3, Fase 2) ---------------
+        # Precios de ejemplo, marcados como dato de prueba en el propio
+        # nombre/README -- no son tarifario real del gimnasio.
+        print("Creando catálogo de servicios extra (dato de prueba)...")
+        servicio_rutina = service_repo.add(
+            Service(
+                id=None,
+                name="Rutinas personalizadas",
+                price=Decimal("250.00"),
+                billing_period="mensual",
+                description="Rutina diseñada y ajustada por un entrenador (precio de prueba).",
+            )
+        )
+        servicio_casillero = service_repo.add(
+            Service(
+                id=None,
+                name="Casillero individual",
+                price=Decimal("120.00"),
+                billing_period="mensual",
+                description="Casillero con llave asignado de forma individual (precio de prueba).",
+            )
+        )
+        servicio_clases = service_repo.add(
+            Service(
+                id=None,
+                name="Clases grupales",
+                price=Decimal("180.00"),
+                billing_period="mensual",
+                description="Acceso a clases grupales (spinning, funcional, etc.) (precio de prueba).",
+            )
+        )
+        servicio_dieta = service_repo.add(
+            Service(
+                id=None,
+                name="Plan de dieta personalizado",
+                price=Decimal("300.00"),
+                billing_period="unico",
+                description="Plan de alimentación diseñado por un entrenador (precio de prueba).",
+            )
+        )
+        servicio_entrenador = service_repo.add(
+            Service(
+                id=None,
+                name="Entrenador asignado",
+                price=Decimal("450.00"),
+                billing_period="mensual",
+                description="Seguimiento personal de un entrenador durante el mes (precio de prueba).",
+            )
+        )
+        servicio_evaluacion = service_repo.add(
+            Service(
+                id=None,
+                name="Evaluación de progreso quincenal",
+                price=Decimal("150.00"),
+                billing_period="periodo",
+                description="Medición y evaluación corporal cada quince días (precio de prueba).",
+            )
+        )
+        session.commit()
+
+        # --- Inclusión de servicios por plan -------------------------------
+        # Básica: solo el casillero. VIP: suma clases grupales + evaluación.
+        # Premium: todos los servicios incluidos (justifica su precio más alto).
+        print("Asignando servicios incluidos por plan...")
+        for service_id in (servicio_casillero.id,):
+            plan_service_repo.add(PlanService(plan_id=plan_basica.id, service_id=service_id))  # type: ignore[arg-type]
+        for service_id in (servicio_casillero.id, servicio_clases.id, servicio_evaluacion.id):
+            plan_service_repo.add(PlanService(plan_id=plan_vip.id, service_id=service_id))  # type: ignore[arg-type]
+        for service_id in (
+            servicio_rutina.id,
+            servicio_casillero.id,
+            servicio_clases.id,
+            servicio_dieta.id,
+            servicio_entrenador.id,
+            servicio_evaluacion.id,
+        ):
+            plan_service_repo.add(PlanService(plan_id=plan_premium.id, service_id=service_id))  # type: ignore[arg-type]
         session.commit()
 
         # --- Membresía del cliente demo: vence en 4 días (demuestra RF006) -
@@ -230,6 +322,24 @@ def run() -> None:
                 type="pago_registrado",
                 title="Pago registrado",
                 message=f"Se registró tu pago del plan {plan_basica.name} por ${plan_basica.price}.",
+            )
+        )
+        session.commit()
+
+        # --- Extra contratado por el cliente demo (no incluido en su plan) -
+        # Básica solo incluye casillero -- el cliente contrata "Entrenador
+        # asignado" por su cuenta, para que la ficha tenga un ejemplo real
+        # de "Extras contratados" con price_at_purchase propio.
+        print("Contratando un servicio extra para el cliente demo...")
+        membership_service_repo.add(
+            MembershipService(
+                id=None,
+                membership_id=membership.id,  # type: ignore[arg-type]
+                service_id=servicio_entrenador.id,  # type: ignore[arg-type]
+                price_at_purchase=servicio_entrenador.price,
+                start_date=membership_start,
+                end_date=membership_start + timedelta(days=30),
+                status="activa",
             )
         )
         session.commit()
