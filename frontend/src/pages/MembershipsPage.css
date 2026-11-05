@@ -11,97 +11,73 @@
   margin-bottom: 16px;
 }
 
-.memberships-page__plans {
+/* ---------------------------------------------------------------------------
+   Tablero de membresías activas (Entrega 3, ajuste de UX) -- el catálogo de
+   planes/servicios se mudó por completo a PlanesServiciosPage, esta pantalla
+   ya no conoce `.plan-card`/`.plan-form`.
+--------------------------------------------------------------------------- */
+
+.memberships-page__indicators {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 18px;
 }
 
-.plan-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  border-top: 3px solid var(--color-border);
-  /* Lift sutil en hover: comunica "esto es contenido para comparar", no un
-     botón — por eso NO lleva :active/scale (no hay click real que
-     confirmar, ver CLAUDE.md tarea 1, pregunta 1). Reutiliza la sombra
-     "poster" del sistema (--shadow-card) en vez de inventar una nueva. */
-  transition: transform 0.18s var(--ease-in-out), box-shadow 0.18s ease;
+.memberships-page__indicator-label {
+  font-size: 12.5px;
+  color: var(--color-text-dim);
+  margin-bottom: 6px;
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .plan-card:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-card);
-  }
-}
-
-.plan-card[data-plan='Básica'] {
-  border-top-color: var(--color-neutral);
-}
-.plan-card[data-plan='VIP'] {
-  border-top-color: var(--color-warning);
-}
-.plan-card[data-plan='Premium'] {
-  /* Blanco en vez de verde: es un borde decorativo de jerarquía entre
-     planes, no un CTA (ver theme.css, nota de adaptación punto 1). */
-  border-top-color: var(--color-text);
-}
-
-.plan-card__name {
-  font-family: var(--font-display);
-  font-size: 21px;
-  letter-spacing: 0.02em;
-}
-
-.plan-card__price {
-  /* Precio = número protagonista, mismo tratamiento tipográfico que
-     StatNumber: el trazo de marcador + el tamaño cargan la jerarquía. */
+.memberships-page__indicator-value {
   font-family: var(--font-display-brush);
-  font-size: 40px;
+  font-size: 34px;
   font-weight: 400;
   color: var(--color-text);
 }
 
-.plan-card__price span {
-  font-family: var(--font-body);
-  font-size: 13.5px;
-  color: var(--color-text-muted);
-  font-weight: 500;
-  margin-left: 4px;
+.memberships-page__indicator-value[data-tone='warning'] {
+  color: var(--color-warning);
 }
 
-.plan-card__description {
-  font-size: 14px;
-  color: var(--color-text-muted);
-  line-height: 1.5;
-}
-
-.plan-card__benefits {
-  margin: 0;
-  padding: 0;
-  list-style: none;
+.memberships-page__toolbar {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.memberships-page__search {
+  flex: 1;
+  min-width: 220px;
+}
+
+.memberships-page__plan-filter {
+  min-width: 180px;
+}
+
+.memberships-page__toolbar-spacer {
+  flex: 1;
+}
+
+.memberships-page__extras {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.memberships-page__row-actions {
+  display: flex;
   gap: 8px;
+  justify-content: flex-end;
 }
 
-.plan-card__benefits li {
-  font-size: 13.5px;
-  padding-left: 16px;
-  position: relative;
+.memberships-page__row--expiring td {
+  background: color-mix(in srgb, var(--color-warning) 8%, transparent);
 }
 
-.plan-card__benefits li::before {
-  /* Viñeta decorativa, no un CTA: neutro en vez de verde de marca. */
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 6px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--color-text-dim);
+.memberships-page__days-remaining[data-tone='warning'] {
+  color: var(--color-warning);
+  font-weight: 600;
 }
 
 .memberships-page__table-wrap {
@@ -139,47 +115,14 @@
 }
 
 @media (max-width: 900px) {
-  .memberships-page__plans {
+  .memberships-page__indicators {
     grid-template-columns: 1fr;
   }
 }
 
-/* ---------------------------------------------------------------------------
-   Alta de plan (solo admin) — formulario inline, mismo lenguaje de
-   validación en línea que ClientFormPage (.input[data-invalid], .field-error).
---------------------------------------------------------------------------- */
-.plan-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  margin-bottom: 18px;
-}
-
-.plan-form__row {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
-  gap: var(--space-3);
-}
-
-.plan-form__field {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.plan-form__benefits-input {
-  resize: vertical;
-  font-family: var(--font-body);
-  min-height: 72px;
-}
-
-.plan-form__actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
 @media (max-width: 700px) {
-  .plan-form__row {
-    grid-template-columns: 1fr;
+  .memberships-page__toolbar {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

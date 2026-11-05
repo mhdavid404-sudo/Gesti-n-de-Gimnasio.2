@@ -102,6 +102,36 @@ export interface MembershipCreatePayload {
 }
 
 // ---------------------------------------------------------------------------
+// Tablero de membresías activas (Entrega 3, ajuste de UX de "Membresías") --
+// ver `GET /memberships/board` en backend/src/api/v1/routers/memberships.py.
+// ---------------------------------------------------------------------------
+
+export interface ApiActiveMembershipRow {
+  membership_id: number
+  client_id: number
+  client_name: string
+  plan_id: number
+  plan_name: string
+  active_extras: string[]
+  start_date: string
+  end_date: string
+  days_remaining: number
+  expiring_soon: boolean
+}
+
+export interface ApiActiveMembershipsIndicators {
+  total_active: number
+  expiring_soon: number
+  /** `null` para `entrenador` -- regla de negocio explícita ("sin ingresos"), no un valor en 0. */
+  monthly_revenue: string | null
+}
+
+export interface ApiActiveMembershipsBoard {
+  indicators: ApiActiveMembershipsIndicators
+  items: ApiActiveMembershipRow[]
+}
+
+// ---------------------------------------------------------------------------
 // Planes y servicios extra (Entrega 3, Fase 2 -- amplía RF004/RF005) --
 // ver backend/src/api/v1/routers/memberships.py (`services_router`,
 // endpoints `/membership-plans/{id}/services`, `/memberships/{id}/services`).

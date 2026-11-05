@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { apiFetch, ApiError } from '../api/client'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -58,9 +58,18 @@ const TABS = [
   { id: 'progreso', label: 'Progreso' },
 ]
 
+const TAB_IDS = TABS.map((t) => t.id)
+
 export function ClientDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const [activeTab, setActiveTab] = useState('perfil')
+  const [searchParams] = useSearchParams()
+  // `?tab=pagos` -- usado por la acción "Cobrar" del tablero de membresías
+  // activas para llegar directo a la pestaña de Pagos, en vez de dejar al
+  // admin reabrir "Perfil" y volver a hacer clic.
+  const initialTab = searchParams.get('tab')
+  const [activeTab, setActiveTab] = useState(
+    initialTab && TAB_IDS.includes(initialTab) ? initialTab : 'perfil',
+  )
   const navigate = useNavigate()
   const { user, logout } = useAuth()
   const isAdmin = user?.role === 'admin'

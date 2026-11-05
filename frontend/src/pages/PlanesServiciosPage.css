@@ -58,6 +58,17 @@
   gap: 14px;
 }
 
+/* Base de `.plan-card` (antes vivía en MembershipsPage.css -- Entrega 3
+   movió el catálogo completo a esta pantalla, ver DECISIONES.md). Se deja
+   autocontenida aquí para no depender de que otra página haya cargado su
+   propio CSS. */
+.plan-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 3px solid var(--color-border);
+}
+
 .plan-card summary {
   display: flex;
   align-items: center;
