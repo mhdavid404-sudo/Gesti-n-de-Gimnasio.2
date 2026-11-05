@@ -72,6 +72,15 @@ ninguna columna `UNIQUE`, asi que `TRUNCATE ... CASCADE` sobre
 `client_profiles` ya la arrastra automaticamente sin necesidad de
 listarla aparte.
 
+`services` (Entrega 3, Fase 2: Planes y servicios extra) SI se agrega de
+forma explicita -- `services.name` es `UNIQUE` y la tabla no tiene
+ninguna FK hacia la cadena `users`/`client_profiles`/`memberships`, mismo
+caso que `membership_plans`/`exercises`. `plan_services` (FK hacia
+`membership_plans.id`), `membership_services` (FK hacia `memberships.id`)
+y `payments`/`payment_items` (FK hacia `memberships.id`/`payments.id`,
+todas `ON DELETE CASCADE`) NO necesitan entrada propia -- caen en cascada
+al truncar `membership_plans`/`memberships`.
+
 Requiere una base de datos real corriendo y con las migraciones aplicadas
 antes de correr pytest:
 
@@ -111,7 +120,7 @@ def _clean_users_table() -> None:
         conn.execute(
             text(
                 "TRUNCATE TABLE users, client_profiles, membership_plans, memberships, "
-                "exercises, routines, diet_plans "
+                "exercises, routines, diet_plans, services "
                 "RESTART IDENTITY CASCADE"
             )
         )
@@ -120,7 +129,7 @@ def _clean_users_table() -> None:
         conn.execute(
             text(
                 "TRUNCATE TABLE users, client_profiles, membership_plans, memberships, "
-                "exercises, routines, diet_plans "
+                "exercises, routines, diet_plans, services "
                 "RESTART IDENTITY CASCADE"
             )
         )

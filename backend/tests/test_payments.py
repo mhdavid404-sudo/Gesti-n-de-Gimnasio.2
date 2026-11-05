@@ -15,6 +15,10 @@ Casos cubiertos:
     4. Listado como admin ve todos los pagos.
     5. Listado como entrenador ve solo los de sus clientes.
     6. Cliente accede a su propio pago, pero no al de otro -> 403.
+
+CP27-28 (Entrega 3, Fase 2 -- amplia RF005):
+    27. Desglose (`items`) cuya suma no coincide con `amount` -> 400.
+    28. Desglose exitoso -> se guarda cada linea y se devuelve en `items`.
 """
 
 from __future__ import annotations
@@ -249,3 +253,51 @@ def test_cliente_accede_a_su_propio_pago_pero_no_al_de_otro(client: TestClient) 
 
     other = client.get(f"{API}/payments/{payment_b_id}", headers=client_a_headers)
     assert other.status_code == 403
+
+
+def test_registrar_pago_con_desglose_que_no_coincide_con_el_monto_falla(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.pagos8@gmail.com", "AdminPass123", "admin")
+    headers = _auth_headers(client, admin.email, "AdminPass123")
+
+    plan_id = _create_plan(client, headers, "Basica Pago8").json()["id"]
+    client_id = _register_client(client, headers, "smartgym.qa.cliente.pagos8@gmail.com").json()["client"]["id"]
+    membership_id = _assign_membership(client, headers, client_id, plan_id)["id"]
+
+    payload = _payment_payload(membership_id)
+    payload["amount"] = "500.00"
+    payload["items"] = [{"concept": "plan", "amount": "399.00"}]  # no suma 500.00
+
+    response = client.post(f"{API}/payments", json=payload, headers=headers)
+
+    assert response.status_code == 400
+
+
+def test_registrar_pago_con_desglose_exitoso_guarda_items(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.pagos9@gmail.com", "AdminPass123", "admin")
+    headers = _auth_headers(client, admin.email, "AdminPass123")
+
+    plan_id = _create_plan(client, headers, "Basica Pago9").json()["id"]
+    service = client.post(
+        f"{API}/services",
+        json={"name": "Casillero Pago9", "price": "120.00", "billing_period": "mensual"},
+        headers=headers,
+    ).json()
+    client_id = _register_client(client, headers, "smartgym.qa.cliente.pagos9@gmail.com").json()["client"]["id"]
+    membership_id = _assign_membership(client, headers, client_id, plan_id)["id"]
+
+    payload = _payment_payload(membership_id)
+    payload["amount"] = "519.00"
+    payload["items"] = [
+        {"concept": "plan", "amount": "399.00"},
+        {"concept": "servicio", "amount": "120.00", "service_id": service["id"]},
+    ]
+
+    response = client.post(f"{API}/payments", json=payload, headers=headers)
+
+    assert response.status_code == 201
+    body = response.json()
+    assert len(body["items"]) == 2
+    assert {i["concept"] for i in body["items"]} == {"plan", "servicio"}
+
+    fetched = client.get(f"{API}/payments/{body['id']}", headers=headers)
+    assert len(fetched.json()["items"]) == 2
