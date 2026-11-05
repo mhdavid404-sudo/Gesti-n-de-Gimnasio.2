@@ -23,6 +23,7 @@ import type {
   ApiMembershipServiceLimited,
   ApiPayment,
   ApiPaymentMethod,
+  ApiPlanChangePreview,
   ApiRoutine,
   ApiRoutineAssignment,
   ApiRoutineExercise,
@@ -159,7 +160,7 @@ export function ClientDetailPage() {
   const [membershipLoading, setMembershipLoading] = useState(true)
   const [membershipError, setMembershipError] = useState<string | null>(null)
 
-  useEffect(() => {
+  const loadMembership = () => {
     setMembershipLoading(true)
     setMembershipError(null)
 
@@ -182,6 +183,10 @@ export function ClientDetailPage() {
         setMembershipError('Ocurrió un error inesperado. Intenta de nuevo.')
       })
       .finally(() => setMembershipLoading(false))
+  }
+
+  useEffect(() => {
+    loadMembership()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientProfileId])
 
@@ -202,6 +207,86 @@ export function ClientDetailPage() {
     () => (membership ? plans.find((p) => p.id === membership.plan_id) : undefined),
     [membership, plans],
   )
+
+  // --- Cambiar plan (amplía RF004/RF005 de nuevo) --------------------------
+  // Flujo en dos pasos sobre el MISMO endpoint-pareja: "Ver resumen" pide
+  // `/change-plan/preview` (no persiste nada) y guarda el resultado en
+  // `changePlanPreview`; mientras ese estado exista, el panel muestra el
+  // resumen en vez del selector. "Confirmar cambio" reenvía el mismo
+  // `new_plan_id` a `/change-plan` (ahí sí persiste) -- nunca se arma un
+  // segundo cálculo del lado del cliente, siempre se confía en lo que
+  // devolvió el backend.
+  const [showChangePlanForm, setShowChangePlanForm] = useState(false)
+  const [changePlanTargetId, setChangePlanTargetId] = useState('')
+  const [changePlanNotes, setChangePlanNotes] = useState('')
+  const [changePlanPreview, setChangePlanPreview] = useState<ApiPlanChangePreview | null>(null)
+  const [isPreviewingPlanChange, setIsPreviewingPlanChange] = useState(false)
+  const [isConfirmingPlanChange, setIsConfirmingPlanChange] = useState(false)
+  const [changePlanError, setChangePlanError] = useState<string | null>(null)
+  const [changePlanToast, setChangePlanToast] = useState<string | null>(null)
+
+  const changeablePlans = plans.filter((p) => p.is_active && p.id !== membership?.plan_id)
+
+  const resetChangePlanFlow = () => {
+    setShowChangePlanForm(false)
+    setChangePlanTargetId('')
+    setChangePlanNotes('')
+    setChangePlanPreview(null)
+    setChangePlanError(null)
+  }
+
+  const handleChangePlanApiError = (err: unknown) => {
+    if (err instanceof ApiError) {
+      if (err.isUnauthorized) {
+        logout()
+        navigate('/login', { replace: true })
+        return
+      }
+      setChangePlanError(err.message)
+      return
+    }
+    setChangePlanError('Ocurrió un error inesperado. Intenta de nuevo.')
+  }
+
+  const handlePreviewChangePlan = async (event: FormEvent) => {
+    event.preventDefault()
+    if (!membership || !changePlanTargetId) {
+      setChangePlanError('Selecciona un plan.')
+      return
+    }
+    setChangePlanError(null)
+    setIsPreviewingPlanChange(true)
+    try {
+      const preview = await apiFetch<ApiPlanChangePreview>(`/memberships/${membership.id}/change-plan/preview`, {
+        method: 'POST',
+        body: { new_plan_id: Number(changePlanTargetId) },
+      })
+      setChangePlanPreview(preview)
+    } catch (err) {
+      handleChangePlanApiError(err)
+    } finally {
+      setIsPreviewingPlanChange(false)
+    }
+  }
+
+  const handleConfirmChangePlan = async () => {
+    if (!membership || !changePlanPreview) return
+    setChangePlanError(null)
+    setIsConfirmingPlanChange(true)
+    try {
+      await apiFetch<ApiPlanChangePreview>(`/memberships/${membership.id}/change-plan`, {
+        method: 'POST',
+        body: { new_plan_id: changePlanPreview.new_plan_id, notes: changePlanNotes.trim() || null },
+      })
+      setChangePlanToast(`Plan cambiado a "${changePlanPreview.new_plan_name}".`)
+      resetChangePlanFlow()
+      loadMembership()
+    } catch (err) {
+      handleChangePlanApiError(err)
+    } finally {
+      setIsConfirmingPlanChange(false)
+    }
+  }
 
   // --- Servicios extra (Entrega 3, Fase 2 -- amplía RF004/RF005) ----------
   // Dos listas distintas: qué incluye el PLAN (plan_services, catálogo) vs.
@@ -244,8 +329,19 @@ export function ClientDetailPage() {
       .finally(() => setServicesLoading(false))
   }, [membership?.id, plan?.id])
 
+  // Solo los extras VIGENTES bloquean una nueva contratación o se ofrecen
+  // para cobrar -- uno cancelado (manualmente o por un cambio de plan, ver
+  // flujo "Cambiar plan" más abajo) no debe impedir recontratar ese mismo
+  // servicio después, ni seguir apareciendo como cobrable.
+  const activeContractedServices = useMemo(
+    () => contractedServices.filter((ms) => ms.status === 'activa'),
+    [contractedServices],
+  )
   const includedServiceIds = useMemo(() => new Set(includedServices.map((s) => s.id)), [includedServices])
-  const contractedServiceIds = useMemo(() => new Set(contractedServices.map((ms) => ms.service_id)), [contractedServices])
+  const contractedServiceIds = useMemo(
+    () => new Set(activeContractedServices.map((ms) => ms.service_id)),
+    [activeContractedServices],
+  )
   const contractableServices = allServices.filter(
     (s) => s.is_active && !includedServiceIds.has(s.id) && !contractedServiceIds.has(s.id),
   )
@@ -998,6 +1094,153 @@ export function ClientDetailPage() {
                 <ErrorMessage message={membershipError} />
               ) : membership && plan ? (
                 <>
+                  {changePlanToast && <Toast message={changePlanToast} onDismiss={() => setChangePlanToast(null)} />}
+
+                  {isAdmin && (
+                    <div className="client-detail__membership-header">
+                      <button
+                        type="button"
+                        className="btn btn-ghost"
+                        onClick={() => {
+                          if (showChangePlanForm) {
+                            resetChangePlanFlow()
+                          } else {
+                            setShowChangePlanForm(true)
+                          }
+                        }}
+                      >
+                        {showChangePlanForm ? 'Cancelar cambio de plan' : 'Cambiar plan'}
+                      </button>
+                    </div>
+                  )}
+
+                  {isAdmin && showChangePlanForm && !changePlanPreview && (
+                    <form className="card client-detail__change-plan-form" onSubmit={handlePreviewChangePlan}>
+                      {changePlanError && (
+                        <ErrorMessage title="No se pudo calcular el cambio" message={changePlanError} />
+                      )}
+                      {changeablePlans.length === 0 ? (
+                        <p className="client-detail__empty">
+                          No hay otro plan activo disponible para cambiarse.
+                        </p>
+                      ) : (
+                        <div className="client-detail__field">
+                          <label className="field-label" htmlFor="changePlanTarget">
+                            Nuevo plan
+                          </label>
+                          <select
+                            id="changePlanTarget"
+                            className="input"
+                            value={changePlanTargetId}
+                            onChange={(e) => setChangePlanTargetId(e.target.value)}
+                          >
+                            <option value="">Selecciona un plan</option>
+                            {changeablePlans.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name} — ${Number(p.price).toLocaleString('es-MX')}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                      <div className="client-detail__assign-actions">
+                        <button
+                          type="submit"
+                          className="btn btn-primary"
+                          disabled={isPreviewingPlanChange || changeablePlans.length === 0}
+                        >
+                          {isPreviewingPlanChange ? 'Calculando…' : 'Ver resumen'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {isAdmin && changePlanPreview && (
+                    <div className="card client-detail__change-plan-summary">
+                      {changePlanError && (
+                        <ErrorMessage title="No se pudo confirmar el cambio" message={changePlanError} />
+                      )}
+                      <p className="client-detail__change-plan-headline">
+                        {changePlanPreview.old_plan_name} (${Number(changePlanPreview.old_plan_price).toLocaleString('es-MX')})
+                        {' → '}
+                        {changePlanPreview.new_plan_name} (${Number(changePlanPreview.new_plan_price).toLocaleString('es-MX')})
+                        <span className="client-detail__change-plan-diff">
+                          {Number(changePlanPreview.price_difference) >= 0 ? ' +' : ' '}
+                          ${Number(changePlanPreview.price_difference).toLocaleString('es-MX')} / mes
+                        </span>
+                      </p>
+
+                      {changePlanPreview.cancelled_extras.length > 0 && (
+                        <div className="client-detail__change-plan-block">
+                          <span className="field-label">
+                            Se cancelarán por estar incluidos en el nuevo plan
+                          </span>
+                          <ul className="client-detail__services-list">
+                            {changePlanPreview.cancelled_extras.map((e) => (
+                              <li key={e.membership_service_id}>
+                                {e.service_name} — ya pagado: ${Number(e.price_at_purchase).toLocaleString('es-MX')}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {changePlanPreview.kept_extras.length > 0 && (
+                        <div className="client-detail__change-plan-block">
+                          <span className="field-label">Se conservan</span>
+                          <ul className="client-detail__services-list">
+                            {changePlanPreview.kept_extras.map((e) => (
+                              <li key={e.membership_service_id}>{e.service_name}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {changePlanPreview.newly_contractable_services.length > 0 && (
+                        <div className="client-detail__change-plan-block">
+                          <span className="field-label">
+                            Dejarán de estar incluidos (se podrán contratar como extra)
+                          </span>
+                          <ul className="client-detail__services-list">
+                            {changePlanPreview.newly_contractable_services.map((s) => (
+                              <li key={s.service_id}>
+                                {s.service_name} — ${Number(s.price).toLocaleString('es-MX')}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      <div className="client-detail__field">
+                        <label className="field-label" htmlFor="changePlanNotes">
+                          Notas (acuerdo de reembolso o saldo a favor, opcional)
+                        </label>
+                        <textarea
+                          id="changePlanNotes"
+                          className="input"
+                          rows={2}
+                          value={changePlanNotes}
+                          onChange={(e) => setChangePlanNotes(e.target.value)}
+                          placeholder="Ej. se acuerda saldo a favor de $450 para el próximo pago"
+                        />
+                      </div>
+
+                      <div className="client-detail__assign-actions">
+                        <button type="button" className="btn btn-ghost" onClick={resetChangePlanFlow}>
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={handleConfirmChangePlan}
+                          disabled={isConfirmingPlanChange}
+                        >
+                          {isConfirmingPlanChange ? 'Confirmando…' : 'Confirmar cambio'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <dl className="client-detail__grid">
                     <div>
                       <dt>Plan</dt>
@@ -1278,7 +1521,7 @@ export function ClientDetailPage() {
                                 </label>
                               </li>
                             )}
-                            {contractedServices.map((ms) => {
+                            {activeContractedServices.map((ms) => {
                               const service = allServices.find((s) => s.id === ms.service_id)
                               const price = 'price_at_purchase' in ms ? Number(ms.price_at_purchase) : null
                               if (price == null) return null

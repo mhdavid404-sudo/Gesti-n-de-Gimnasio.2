@@ -281,6 +281,45 @@
   justify-content: flex-end;
 }
 
+/* --- Cambiar plan (amplía RF004/RF005 de nuevo) ------------------------- */
+
+.client-detail__membership-header {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.client-detail__change-plan-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.client-detail__change-plan-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.client-detail__change-plan-headline {
+  font-size: 15.5px;
+  font-weight: 600;
+}
+
+.client-detail__change-plan-diff {
+  margin-left: 8px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.client-detail__change-plan-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border-soft);
+}
+
 @media (max-width: 700px) {
   .client-detail__grid {
     grid-template-columns: 1fr;

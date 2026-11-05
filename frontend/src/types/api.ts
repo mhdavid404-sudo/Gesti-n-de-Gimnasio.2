@@ -138,7 +138,12 @@ export interface ApiActiveMembershipsBoard {
 // ---------------------------------------------------------------------------
 
 export type ApiBillingPeriod = 'unico' | 'mensual' | 'periodo'
-export type ApiMembershipServiceStatus = 'activa' | 'vencida' | 'cancelada'
+export type ApiMembershipServiceStatus =
+  | 'activa'
+  | 'vencida'
+  | 'cancelada'
+  /** Cancelado automáticamente por un cambio de plan -- ver `ApiPlanChangePreview`. */
+  | 'cancelado_por_cambio_de_plan'
 
 export interface ApiService {
   id: number
@@ -197,6 +202,47 @@ export interface MembershipServiceCreatePayload {
   service_id: number
   start_date?: string
   end_date?: string
+}
+
+// ---------------------------------------------------------------------------
+// Cambio de plan (amplía RF004/RF005 de nuevo) -- mismo body y misma forma
+// de respuesta para previsualizar (`/change-plan/preview`, no persiste) y
+// confirmar (`/change-plan`, persiste); ver
+// backend/src/api/v1/routers/memberships.py.
+// ---------------------------------------------------------------------------
+
+export interface PlanChangeRequestPayload {
+  new_plan_id: number
+  notes?: string | null
+}
+
+export interface ApiPlanChangeExtraRow {
+  membership_service_id: number
+  service_id: number
+  service_name: string
+  price_at_purchase: string
+}
+
+export interface ApiPlanChangeContractableRow {
+  service_id: number
+  service_name: string
+  price: string
+}
+
+export interface ApiPlanChangePreview {
+  membership_id: number
+  client_id: number
+  old_plan_id: number
+  old_plan_name: string
+  old_plan_price: string
+  new_plan_id: number
+  new_plan_name: string
+  new_plan_price: string
+  price_difference: string
+  cancelled_extras: ApiPlanChangeExtraRow[]
+  cancelled_extras_total: string
+  kept_extras: ApiPlanChangeExtraRow[]
+  newly_contractable_services: ApiPlanChangeContractableRow[]
 }
 
 // ---------------------------------------------------------------------------
@@ -260,6 +306,7 @@ export type ApiNotificationType =
   | 'rutina_asignada'
   | 'dieta_asignada'
   | 'sistema'
+  | 'plan_cambiado'
 
 export interface ApiNotification {
   id: number
