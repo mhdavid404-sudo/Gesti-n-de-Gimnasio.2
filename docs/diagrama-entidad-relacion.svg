@@ -1,0 +1,360 @@
+<svg viewBox="0 0 1270 1278" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial, sans-serif">
+<rect x="0" y="0" width="1270" height="1278" fill="#0B0C09"/>
+<text x="60" y="30" fill="#F2F3EC" font-size="22" font-weight="bold">SmartGym v2 — Diagrama entidad-relacion (18 tablas, esquema real)</text>
+<line x1="185" y1="389" x2="185" y2="139" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="185" y="264" fill="#9A9DAA" font-size="9">N:1  user_id</text>
+<text x="185" y="359" fill="#7C816F" font-size="11">N</text>
+<text x="185" y="169" fill="#7C816F" font-size="11">1</text>
+<line x1="185" y1="389" x2="185" y2="139" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="185" y="264" fill="#9A9DAA" font-size="9">N:1  trainer_id</text>
+<text x="185" y="359" fill="#7C816F" font-size="11">N</text>
+<text x="185" y="169" fill="#7C816F" font-size="11">1</text>
+<line x1="485" y1="379" x2="185" y2="389" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="335" y="384" fill="#9A9DAA" font-size="9">N:1  client_id</text>
+<text x="449" y="380" fill="#7C816F" font-size="11">N</text>
+<text x="221" y="388" fill="#7C816F" font-size="11">1</text>
+<line x1="485" y1="379" x2="485" y2="139" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="485" y="259" fill="#9A9DAA" font-size="9">N:1  plan_id</text>
+<text x="485" y="350" fill="#7C816F" font-size="11">N</text>
+<text x="485" y="168" fill="#7C816F" font-size="11">1</text>
+<line x1="785" y1="339" x2="485" y2="139" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="635" y="239" fill="#9A9DAA" font-size="9">N:1  plan_id</text>
+<text x="749" y="315" fill="#7C816F" font-size="11">N</text>
+<text x="521" y="163" fill="#7C816F" font-size="11">1</text>
+<line x1="785" y1="339" x2="785" y2="129" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="785" y="234" fill="#9A9DAA" font-size="9">N:1  service_id</text>
+<text x="785" y="314" fill="#7C816F" font-size="11">N</text>
+<text x="785" y="154" fill="#7C816F" font-size="11">1</text>
+<line x1="485" y1="609" x2="485" y2="379" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="485" y="494" fill="#9A9DAA" font-size="9">N:1  membership_id</text>
+<text x="485" y="581" fill="#7C816F" font-size="11">N</text>
+<text x="485" y="407" fill="#7C816F" font-size="11">1</text>
+<line x1="485" y1="609" x2="785" y2="129" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="635" y="369" fill="#9A9DAA" font-size="9">N:1  service_id</text>
+<text x="521" y="551" fill="#7C816F" font-size="11">N</text>
+<text x="749" y="187" fill="#7C816F" font-size="11">1</text>
+<line x1="1085" y1="139" x2="485" y2="379" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="785" y="259" fill="#9A9DAA" font-size="9">N:1  membership_id</text>
+<text x="1013" y="168" fill="#7C816F" font-size="11">N</text>
+<text x="557" y="350" fill="#7C816F" font-size="11">1</text>
+<line x1="1085" y1="139" x2="185" y2="139" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="635" y="139" fill="#9A9DAA" font-size="9">N:1  registered_by</text>
+<text x="977" y="139" fill="#7C816F" font-size="11">N</text>
+<text x="293" y="139" fill="#7C816F" font-size="11">1</text>
+<line x1="1085" y1="369" x2="1085" y2="139" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="1085" y="254" fill="#9A9DAA" font-size="9">N:1  payment_id</text>
+<text x="1085" y="341" fill="#7C816F" font-size="11">N</text>
+<text x="1085" y="167" fill="#7C816F" font-size="11">1</text>
+<line x1="1085" y1="369" x2="785" y2="129" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="935" y="249" fill="#9A9DAA" font-size="9">N:1  service_id</text>
+<text x="1049" y="340" fill="#7C816F" font-size="11">N</text>
+<text x="821" y="158" fill="#7C816F" font-size="11">1</text>
+<line x1="485" y1="839" x2="185" y2="139" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="335" y="489" fill="#9A9DAA" font-size="9">N:1  created_by</text>
+<text x="449" y="755" fill="#7C816F" font-size="11">N</text>
+<text x="221" y="223" fill="#7C816F" font-size="11">1</text>
+<line x1="785" y1="619" x2="485" y2="839" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="635" y="729" fill="#9A9DAA" font-size="9">N:1  routine_id</text>
+<text x="749" y="645" fill="#7C816F" font-size="11">N</text>
+<text x="521" y="813" fill="#7C816F" font-size="11">1</text>
+<line x1="785" y1="619" x2="185" y2="839" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="485" y="729" fill="#9A9DAA" font-size="9">N:1  exercise_id</text>
+<text x="713" y="645" fill="#7C816F" font-size="11">N</text>
+<text x="257" y="813" fill="#7C816F" font-size="11">1</text>
+<line x1="785" y1="849" x2="485" y2="839" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="635" y="844" fill="#9A9DAA" font-size="9">N:1  routine_id</text>
+<text x="749" y="848" fill="#7C816F" font-size="11">N</text>
+<text x="521" y="840" fill="#7C816F" font-size="11">1</text>
+<line x1="785" y1="849" x2="185" y2="389" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="485" y="619" fill="#9A9DAA" font-size="9">N:1  client_id</text>
+<text x="713" y="794" fill="#7C816F" font-size="11">N</text>
+<text x="257" y="444" fill="#7C816F" font-size="11">1</text>
+<line x1="485" y1="1089" x2="185" y2="1079" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="335" y="1084" fill="#9A9DAA" font-size="9">N:1  diet_plan_id</text>
+<text x="449" y="1088" fill="#7C816F" font-size="11">N</text>
+<text x="221" y="1080" fill="#7C816F" font-size="11">1</text>
+<line x1="485" y1="1089" x2="185" y2="389" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="335" y="739" fill="#9A9DAA" font-size="9">N:1  client_id</text>
+<text x="449" y="1005" fill="#7C816F" font-size="11">N</text>
+<text x="221" y="473" fill="#7C816F" font-size="11">1</text>
+<line x1="785" y1="1099" x2="185" y2="389" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="485" y="744" fill="#9A9DAA" font-size="9">N:1  client_id</text>
+<text x="713" y="1014" fill="#7C816F" font-size="11">N</text>
+<text x="257" y="474" fill="#7C816F" font-size="11">1</text>
+<line x1="1085" y1="849" x2="185" y2="139" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="635" y="494" fill="#9A9DAA" font-size="9">N:1  user_id</text>
+<text x="977" y="764" fill="#7C816F" font-size="11">N</text>
+<text x="293" y="224" fill="#7C816F" font-size="11">1</text>
+<line x1="1085" y1="1089" x2="185" y2="139" stroke="#4A4D42" stroke-width="1.5" opacity="0.55"/>
+<text x="635" y="614" fill="#9A9DAA" font-size="9">N:1  user_id (opcional)</text>
+<text x="977" y="975" fill="#7C816F" font-size="11">N</text>
+<text x="293" y="253" fill="#7C816F" font-size="11">1</text>
+<g>
+<rect x="60" y="60" width="250" height="158" rx="6" fill="#181A13" stroke="#6B7280" stroke-width="2"/>
+<rect x="60" y="60" width="250" height="28" rx="6" fill="#6B7280"/>
+<rect x="60" y="82" width="250" height="6" fill="#6B7280"/>
+<text x="70" y="79" fill="#0B0C09" font-size="13" font-weight="bold">users</text>
+<text x="70" y="103" fill="#97A947" font-size="11" font-weight="bold">id</text>
+<text x="300" y="103" fill="#7C816F" font-size="9" text-anchor="end">PK</text>
+<text x="70" y="123" fill="#F2F3EC" font-size="11" font-weight="normal">email</text>
+<text x="70" y="143" fill="#F2F3EC" font-size="11" font-weight="normal">password_hash</text>
+<text x="70" y="163" fill="#F2F3EC" font-size="11" font-weight="normal">full_name</text>
+<text x="70" y="183" fill="#97A947" font-size="11" font-weight="normal">role</text>
+<text x="300" y="183" fill="#7C816F" font-size="9" text-anchor="end">CHECK</text>
+<text x="70" y="203" fill="#F2F3EC" font-size="11" font-weight="normal">is_active</text>
+</g>
+<g>
+<rect x="60" y="300" width="250" height="178" rx="6" fill="#181A13" stroke="#2563EB" stroke-width="2"/>
+<rect x="60" y="300" width="250" height="28" rx="6" fill="#2563EB"/>
+<rect x="60" y="322" width="250" height="6" fill="#2563EB"/>
+<text x="70" y="319" fill="#0B0C09" font-size="13" font-weight="bold">client_profiles</text>
+<text x="70" y="343" fill="#97A947" font-size="11" font-weight="bold">id</text>
+<text x="300" y="343" fill="#7C816F" font-size="9" text-anchor="end">PK</text>
+<text x="70" y="363" fill="#E08D3C" font-size="11" font-weight="normal">user_id</text>
+<text x="300" y="363" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="70" y="383" fill="#E08D3C" font-size="11" font-weight="normal">trainer_id</text>
+<text x="300" y="383" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="70" y="403" fill="#F2F3EC" font-size="11" font-weight="normal">phone</text>
+<text x="70" y="423" fill="#F2F3EC" font-size="11" font-weight="normal">birth_date</text>
+<text x="70" y="443" fill="#F2F3EC" font-size="11" font-weight="normal">address</text>
+<text x="70" y="463" fill="#F2F3EC" font-size="11" font-weight="normal">emergency_contact</text>
+</g>
+<g>
+<rect x="360" y="60" width="250" height="158" rx="6" fill="#181A13" stroke="#97A947" stroke-width="2"/>
+<rect x="360" y="60" width="250" height="28" rx="6" fill="#97A947"/>
+<rect x="360" y="82" width="250" height="6" fill="#97A947"/>
+<text x="370" y="79" fill="#0B0C09" font-size="13" font-weight="bold">membership_plans</text>
+<text x="370" y="103" fill="#97A947" font-size="11" font-weight="bold">id</text>
+<text x="600" y="103" fill="#7C816F" font-size="9" text-anchor="end">PK</text>
+<text x="370" y="123" fill="#F2F3EC" font-size="11" font-weight="normal">name</text>
+<text x="370" y="143" fill="#F2F3EC" font-size="11" font-weight="normal">price</text>
+<text x="370" y="163" fill="#F2F3EC" font-size="11" font-weight="normal">duration_days</text>
+<text x="370" y="183" fill="#F2F3EC" font-size="11" font-weight="normal">benefits</text>
+<text x="370" y="203" fill="#F2F3EC" font-size="11" font-weight="normal">is_active</text>
+</g>
+<g>
+<rect x="360" y="300" width="250" height="158" rx="6" fill="#181A13" stroke="#97A947" stroke-width="2"/>
+<rect x="360" y="300" width="250" height="28" rx="6" fill="#97A947"/>
+<rect x="360" y="322" width="250" height="6" fill="#97A947"/>
+<text x="370" y="319" fill="#0B0C09" font-size="13" font-weight="bold">memberships</text>
+<text x="370" y="343" fill="#97A947" font-size="11" font-weight="bold">id</text>
+<text x="600" y="343" fill="#7C816F" font-size="9" text-anchor="end">PK</text>
+<text x="370" y="363" fill="#E08D3C" font-size="11" font-weight="normal">client_id</text>
+<text x="600" y="363" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="370" y="383" fill="#E08D3C" font-size="11" font-weight="normal">plan_id</text>
+<text x="600" y="383" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="370" y="403" fill="#F2F3EC" font-size="11" font-weight="normal">start_date</text>
+<text x="370" y="423" fill="#F2F3EC" font-size="11" font-weight="normal">end_date</text>
+<text x="370" y="443" fill="#97A947" font-size="11" font-weight="normal">status</text>
+<text x="600" y="443" fill="#7C816F" font-size="9" text-anchor="end">CHECK</text>
+</g>
+<g>
+<rect x="660" y="60" width="250" height="138" rx="6" fill="#181A13" stroke="#97A947" stroke-width="2"/>
+<rect x="660" y="60" width="250" height="28" rx="6" fill="#97A947"/>
+<rect x="660" y="82" width="250" height="6" fill="#97A947"/>
+<text x="670" y="79" fill="#0B0C09" font-size="13" font-weight="bold">services</text>
+<text x="670" y="103" fill="#97A947" font-size="11" font-weight="bold">id</text>
+<text x="900" y="103" fill="#7C816F" font-size="9" text-anchor="end">PK</text>
+<text x="670" y="123" fill="#F2F3EC" font-size="11" font-weight="normal">name</text>
+<text x="670" y="143" fill="#F2F3EC" font-size="11" font-weight="normal">price</text>
+<text x="670" y="163" fill="#97A947" font-size="11" font-weight="normal">billing_period</text>
+<text x="900" y="163" fill="#7C816F" font-size="9" text-anchor="end">CHECK</text>
+<text x="670" y="183" fill="#F2F3EC" font-size="11" font-weight="normal">is_active</text>
+</g>
+<g>
+<rect x="660" y="300" width="250" height="78" rx="6" fill="#181A13" stroke="#97A947" stroke-width="2"/>
+<rect x="660" y="300" width="250" height="28" rx="6" fill="#97A947"/>
+<rect x="660" y="322" width="250" height="6" fill="#97A947"/>
+<text x="670" y="319" fill="#0B0C09" font-size="13" font-weight="bold">plan_services</text>
+<text x="670" y="343" fill="#97A947" font-size="11" font-weight="bold">plan_id</text>
+<text x="900" y="343" fill="#7C816F" font-size="9" text-anchor="end">PK/FK</text>
+<text x="670" y="363" fill="#97A947" font-size="11" font-weight="bold">service_id</text>
+<text x="900" y="363" fill="#7C816F" font-size="9" text-anchor="end">PK/FK</text>
+</g>
+<g>
+<rect x="360" y="540" width="250" height="138" rx="6" fill="#181A13" stroke="#97A947" stroke-width="2"/>
+<rect x="360" y="540" width="250" height="28" rx="6" fill="#97A947"/>
+<rect x="360" y="562" width="250" height="6" fill="#97A947"/>
+<text x="370" y="559" fill="#0B0C09" font-size="13" font-weight="bold">membership_services</text>
+<text x="370" y="583" fill="#97A947" font-size="11" font-weight="bold">id</text>
+<text x="600" y="583" fill="#7C816F" font-size="9" text-anchor="end">PK</text>
+<text x="370" y="603" fill="#E08D3C" font-size="11" font-weight="normal">membership_id</text>
+<text x="600" y="603" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="370" y="623" fill="#E08D3C" font-size="11" font-weight="normal">service_id</text>
+<text x="600" y="623" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="370" y="643" fill="#F2F3EC" font-size="11" font-weight="normal">price_at_purchase</text>
+<text x="370" y="663" fill="#97A947" font-size="11" font-weight="normal">status</text>
+<text x="600" y="663" fill="#7C816F" font-size="9" text-anchor="end">CHECK</text>
+</g>
+<g>
+<rect x="960" y="60" width="250" height="158" rx="6" fill="#181A13" stroke="#D98E3E" stroke-width="2"/>
+<rect x="960" y="60" width="250" height="28" rx="6" fill="#D98E3E"/>
+<rect x="960" y="82" width="250" height="6" fill="#D98E3E"/>
+<text x="970" y="79" fill="#0B0C09" font-size="13" font-weight="bold">payments</text>
+<text x="970" y="103" fill="#97A947" font-size="11" font-weight="bold">id</text>
+<text x="1200" y="103" fill="#7C816F" font-size="9" text-anchor="end">PK</text>
+<text x="970" y="123" fill="#E08D3C" font-size="11" font-weight="normal">membership_id</text>
+<text x="1200" y="123" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="970" y="143" fill="#F2F3EC" font-size="11" font-weight="normal">amount</text>
+<text x="970" y="163" fill="#97A947" font-size="11" font-weight="normal">method</text>
+<text x="1200" y="163" fill="#7C816F" font-size="9" text-anchor="end">CHECK</text>
+<text x="970" y="183" fill="#97A947" font-size="11" font-weight="normal">status</text>
+<text x="1200" y="183" fill="#7C816F" font-size="9" text-anchor="end">CHECK</text>
+<text x="970" y="203" fill="#E08D3C" font-size="11" font-weight="normal">registered_by</text>
+<text x="1200" y="203" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+</g>
+<g>
+<rect x="960" y="300" width="250" height="138" rx="6" fill="#181A13" stroke="#D98E3E" stroke-width="2"/>
+<rect x="960" y="300" width="250" height="28" rx="6" fill="#D98E3E"/>
+<rect x="960" y="322" width="250" height="6" fill="#D98E3E"/>
+<text x="970" y="319" fill="#0B0C09" font-size="13" font-weight="bold">payment_items</text>
+<text x="970" y="343" fill="#97A947" font-size="11" font-weight="bold">id</text>
+<text x="1200" y="343" fill="#7C816F" font-size="9" text-anchor="end">PK</text>
+<text x="970" y="363" fill="#E08D3C" font-size="11" font-weight="normal">payment_id</text>
+<text x="1200" y="363" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="970" y="383" fill="#97A947" font-size="11" font-weight="normal">concept</text>
+<text x="1200" y="383" fill="#7C816F" font-size="9" text-anchor="end">CHECK</text>
+<text x="970" y="403" fill="#F2F3EC" font-size="11" font-weight="normal">amount</text>
+<text x="970" y="423" fill="#E08D3C" font-size="11" font-weight="normal">service_id</text>
+<text x="1200" y="423" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+</g>
+<g>
+<rect x="60" y="780" width="250" height="118" rx="6" fill="#181A13" stroke="#8B5CF6" stroke-width="2"/>
+<rect x="60" y="780" width="250" height="28" rx="6" fill="#8B5CF6"/>
+<rect x="60" y="802" width="250" height="6" fill="#8B5CF6"/>
+<text x="70" y="799" fill="#0B0C09" font-size="13" font-weight="bold">exercises</text>
+<text x="70" y="823" fill="#97A947" font-size="11" font-weight="bold">id</text>
+<text x="300" y="823" fill="#7C816F" font-size="9" text-anchor="end">PK</text>
+<text x="70" y="843" fill="#F2F3EC" font-size="11" font-weight="normal">name</text>
+<text x="70" y="863" fill="#F2F3EC" font-size="11" font-weight="normal">muscle_group</text>
+<text x="70" y="883" fill="#F2F3EC" font-size="11" font-weight="normal">equipment</text>
+</g>
+<g>
+<rect x="360" y="780" width="250" height="118" rx="6" fill="#181A13" stroke="#8B5CF6" stroke-width="2"/>
+<rect x="360" y="780" width="250" height="28" rx="6" fill="#8B5CF6"/>
+<rect x="360" y="802" width="250" height="6" fill="#8B5CF6"/>
+<text x="370" y="799" fill="#0B0C09" font-size="13" font-weight="bold">routines</text>
+<text x="370" y="823" fill="#97A947" font-size="11" font-weight="bold">id</text>
+<text x="600" y="823" fill="#7C816F" font-size="9" text-anchor="end">PK</text>
+<text x="370" y="843" fill="#F2F3EC" font-size="11" font-weight="normal">name</text>
+<text x="370" y="863" fill="#E08D3C" font-size="11" font-weight="normal">created_by</text>
+<text x="600" y="863" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="370" y="883" fill="#F2F3EC" font-size="11" font-weight="normal">description</text>
+</g>
+<g>
+<rect x="660" y="540" width="250" height="158" rx="6" fill="#181A13" stroke="#8B5CF6" stroke-width="2"/>
+<rect x="660" y="540" width="250" height="28" rx="6" fill="#8B5CF6"/>
+<rect x="660" y="562" width="250" height="6" fill="#8B5CF6"/>
+<text x="670" y="559" fill="#0B0C09" font-size="13" font-weight="bold">routine_exercises</text>
+<text x="670" y="583" fill="#97A947" font-size="11" font-weight="bold">id</text>
+<text x="900" y="583" fill="#7C816F" font-size="9" text-anchor="end">PK</text>
+<text x="670" y="603" fill="#E08D3C" font-size="11" font-weight="normal">routine_id</text>
+<text x="900" y="603" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="670" y="623" fill="#E08D3C" font-size="11" font-weight="normal">exercise_id</text>
+<text x="900" y="623" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="670" y="643" fill="#F2F3EC" font-size="11" font-weight="normal">sets</text>
+<text x="670" y="663" fill="#F2F3EC" font-size="11" font-weight="normal">reps</text>
+<text x="670" y="683" fill="#F2F3EC" font-size="11" font-weight="normal">order_index</text>
+</g>
+<g>
+<rect x="660" y="780" width="250" height="138" rx="6" fill="#181A13" stroke="#8B5CF6" stroke-width="2"/>
+<rect x="660" y="780" width="250" height="28" rx="6" fill="#8B5CF6"/>
+<rect x="660" y="802" width="250" height="6" fill="#8B5CF6"/>
+<text x="670" y="799" fill="#0B0C09" font-size="13" font-weight="bold">routine_assignments</text>
+<text x="670" y="823" fill="#97A947" font-size="11" font-weight="bold">id</text>
+<text x="900" y="823" fill="#7C816F" font-size="9" text-anchor="end">PK</text>
+<text x="670" y="843" fill="#E08D3C" font-size="11" font-weight="normal">routine_id</text>
+<text x="900" y="843" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="670" y="863" fill="#E08D3C" font-size="11" font-weight="normal">client_id</text>
+<text x="900" y="863" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="670" y="883" fill="#E08D3C" font-size="11" font-weight="normal">assigned_by</text>
+<text x="900" y="883" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="670" y="903" fill="#97A947" font-size="11" font-weight="normal">status</text>
+<text x="900" y="903" fill="#7C816F" font-size="9" text-anchor="end">CHECK</text>
+</g>
+<g>
+<rect x="60" y="1020" width="250" height="118" rx="6" fill="#181A13" stroke="#EC4899" stroke-width="2"/>
+<rect x="60" y="1020" width="250" height="28" rx="6" fill="#EC4899"/>
+<rect x="60" y="1042" width="250" height="6" fill="#EC4899"/>
+<text x="70" y="1039" fill="#0B0C09" font-size="13" font-weight="bold">diet_plans</text>
+<text x="70" y="1063" fill="#97A947" font-size="11" font-weight="bold">id</text>
+<text x="300" y="1063" fill="#7C816F" font-size="9" text-anchor="end">PK</text>
+<text x="70" y="1083" fill="#F2F3EC" font-size="11" font-weight="normal">name</text>
+<text x="70" y="1103" fill="#E08D3C" font-size="11" font-weight="normal">created_by</text>
+<text x="300" y="1103" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="70" y="1123" fill="#F2F3EC" font-size="11" font-weight="normal">calories_target</text>
+</g>
+<g>
+<rect x="360" y="1020" width="250" height="138" rx="6" fill="#181A13" stroke="#EC4899" stroke-width="2"/>
+<rect x="360" y="1020" width="250" height="28" rx="6" fill="#EC4899"/>
+<rect x="360" y="1042" width="250" height="6" fill="#EC4899"/>
+<text x="370" y="1039" fill="#0B0C09" font-size="13" font-weight="bold">diet_assignments</text>
+<text x="370" y="1063" fill="#97A947" font-size="11" font-weight="bold">id</text>
+<text x="600" y="1063" fill="#7C816F" font-size="9" text-anchor="end">PK</text>
+<text x="370" y="1083" fill="#E08D3C" font-size="11" font-weight="normal">diet_plan_id</text>
+<text x="600" y="1083" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="370" y="1103" fill="#E08D3C" font-size="11" font-weight="normal">client_id</text>
+<text x="600" y="1103" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="370" y="1123" fill="#E08D3C" font-size="11" font-weight="normal">assigned_by</text>
+<text x="600" y="1123" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="370" y="1143" fill="#97A947" font-size="11" font-weight="normal">status</text>
+<text x="600" y="1143" fill="#7C816F" font-size="9" text-anchor="end">CHECK</text>
+</g>
+<g>
+<rect x="660" y="1020" width="250" height="158" rx="6" fill="#181A13" stroke="#3FB6A0" stroke-width="2"/>
+<rect x="660" y="1020" width="250" height="28" rx="6" fill="#3FB6A0"/>
+<rect x="660" y="1042" width="250" height="6" fill="#3FB6A0"/>
+<text x="670" y="1039" fill="#0B0C09" font-size="13" font-weight="bold">body_progress</text>
+<text x="670" y="1063" fill="#97A947" font-size="11" font-weight="bold">id</text>
+<text x="900" y="1063" fill="#7C816F" font-size="9" text-anchor="end">PK</text>
+<text x="670" y="1083" fill="#E08D3C" font-size="11" font-weight="normal">client_id</text>
+<text x="900" y="1083" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="670" y="1103" fill="#F2F3EC" font-size="11" font-weight="normal">record_date</text>
+<text x="670" y="1123" fill="#F2F3EC" font-size="11" font-weight="normal">weight_kg</text>
+<text x="670" y="1143" fill="#F2F3EC" font-size="11" font-weight="normal">height_cm</text>
+<text x="670" y="1163" fill="#F2F3EC" font-size="11" font-weight="normal">waist_cm</text>
+</g>
+<g>
+<rect x="960" y="780" width="250" height="138" rx="6" fill="#181A13" stroke="#D65A4A" stroke-width="2"/>
+<rect x="960" y="780" width="250" height="28" rx="6" fill="#D65A4A"/>
+<rect x="960" y="802" width="250" height="6" fill="#D65A4A"/>
+<text x="970" y="799" fill="#0B0C09" font-size="13" font-weight="bold">notifications</text>
+<text x="970" y="823" fill="#97A947" font-size="11" font-weight="bold">id</text>
+<text x="1200" y="823" fill="#7C816F" font-size="9" text-anchor="end">PK</text>
+<text x="970" y="843" fill="#E08D3C" font-size="11" font-weight="normal">user_id</text>
+<text x="1200" y="843" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="970" y="863" fill="#97A947" font-size="11" font-weight="normal">type</text>
+<text x="1200" y="863" fill="#7C816F" font-size="9" text-anchor="end">CHECK</text>
+<text x="970" y="883" fill="#F2F3EC" font-size="11" font-weight="normal">title</text>
+<text x="970" y="903" fill="#F2F3EC" font-size="11" font-weight="normal">is_read</text>
+</g>
+<g>
+<rect x="960" y="1020" width="250" height="138" rx="6" fill="#181A13" stroke="#D65A4A" stroke-width="2"/>
+<rect x="960" y="1020" width="250" height="28" rx="6" fill="#D65A4A"/>
+<rect x="960" y="1042" width="250" height="6" fill="#D65A4A"/>
+<text x="970" y="1039" fill="#0B0C09" font-size="13" font-weight="bold">audit_logs</text>
+<text x="970" y="1063" fill="#97A947" font-size="11" font-weight="bold">id</text>
+<text x="1200" y="1063" fill="#7C816F" font-size="9" text-anchor="end">PK</text>
+<text x="970" y="1083" fill="#E08D3C" font-size="11" font-weight="normal">user_id</text>
+<text x="1200" y="1083" fill="#7C816F" font-size="9" text-anchor="end">FK</text>
+<text x="970" y="1103" fill="#F2F3EC" font-size="11" font-weight="normal">action</text>
+<text x="970" y="1123" fill="#F2F3EC" font-size="11" font-weight="normal">entity_type</text>
+<text x="970" y="1143" fill="#F2F3EC" font-size="11" font-weight="normal">entity_id</text>
+</g>
+<rect x="60" y="1248" width="12" height="12" fill="#6B7280"/>
+<text x="76" y="1258" fill="#ABB09C" font-size="10">auth</text>
+<rect x="170" y="1248" width="12" height="12" fill="#2563EB"/>
+<text x="186" y="1258" fill="#ABB09C" font-size="10">clients</text>
+<rect x="280" y="1248" width="12" height="12" fill="#97A947"/>
+<text x="296" y="1258" fill="#ABB09C" font-size="10">memberships</text>
+<rect x="390" y="1248" width="12" height="12" fill="#D98E3E"/>
+<text x="406" y="1258" fill="#ABB09C" font-size="10">payments</text>
+<rect x="500" y="1248" width="12" height="12" fill="#8B5CF6"/>
+<text x="516" y="1258" fill="#ABB09C" font-size="10">routines</text>
+<rect x="610" y="1248" width="12" height="12" fill="#EC4899"/>
+<text x="626" y="1258" fill="#ABB09C" font-size="10">diets</text>
+<rect x="720" y="1248" width="12" height="12" fill="#3FB6A0"/>
+<text x="736" y="1258" fill="#ABB09C" font-size="10">progress</text>
+<rect x="830" y="1248" width="12" height="12" fill="#D65A4A"/>
+<text x="846" y="1258" fill="#ABB09C" font-size="10">audit</text>
+</svg>
