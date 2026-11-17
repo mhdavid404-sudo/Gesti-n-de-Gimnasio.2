@@ -1,11 +1,12 @@
-# SmartGym v2 — Frontend (Entrega 1)
+# SmartGym v2 — Frontend
 
-Prototipo de frontend "decente pero no completo" para **Stronger Aragón**,
-construido por Leo (agente de frontend) según el alcance fijado en
-`SMARTGYM-V2-BRIEF.md` y las convenciones de `COORDINACION-ENTREGA1.md`
-(raíz del repo).
+Panel de administración y landing pública de **Stronger Aragón**, construido
+con React + Vite + TypeScript. Conectado por completo a la API real (sin
+datos mock) — ver el `README.md` de la raíz del repo para el stack completo,
+cómo levantar todo el proyecto con Docker y las cuentas de demostración por
+rol.
 
-## Cómo correrlo
+## Cómo correrlo (solo este servicio, fuera de Docker)
 
 ```bash
 cd frontend
@@ -14,109 +15,46 @@ npm run dev
 ```
 
 El servidor de desarrollo corre en **http://localhost:5173** (puerto fijo en
-`vite.config.ts`, tal como exige la convención compartida con Royer/DevOps).
+`vite.config.ts`). Requiere que el backend esté corriendo (ver `README.md`
+de la raíz) y la variable `VITE_API_URL` apuntando a él (por defecto
+`http://localhost:8000`, ver `.env.example`).
 
-Instalación y build ya se verificaron en este entorno: `npm install`,
-`npx tsc -b` y `npm run build` corren sin errores. No falta ejecutar nada
-adicional.
+## Pantallas
 
-## Alcance de esta entrega
+| Ruta | Pantalla | Acceso |
+|---|---|---|
+| `/` | Landing pública | Público |
+| `/login` | Inicio de sesión | Público |
+| `/dashboard` | Panel general (resumen operativo) | Todos los roles |
+| `/clientes`, `/clientes/nuevo`, `/clientes/:id` | Padrón de clientes y ficha (membresía, extras, pagos, rutina, dieta, progreso) | Admin / Entrenador |
+| `/membresias` | Tablero de membresías activas (Admin/Entrenador) o "Mi membresía" (Cliente) | Todos los roles |
+| `/planes-servicios` | Catálogo de planes y servicios extra | Admin |
+| `/rutinas` | Catálogo y asignación de rutinas | Todos los roles |
+| `/dietas` | Planes de dieta y asignación | Todos los roles |
+| `/progreso` | Progreso corporal y gráfica de evolución | Todos los roles |
+| `/bitacora` | Bitácora de errores/eventos del sistema | Admin |
 
-- 8 pantallas con **datos mock/estáticos únicamente** — cero llamadas a un
-  backend real (todavía no existe uno funcional que consumir).
-- Navegación real entre pantallas con `react-router-dom`.
-- Login **solo de UI**: el formulario no valida nada, cualquier submit
-  navega directo a `/dashboard`.
-- TypeScript en modo estricto (`strict: true` explícito en
-  `tsconfig.app.json`, además de `noUncheckedIndexedAccess` y
-  `noImplicitReturns`).
+## Identidad visual
 
-## Pantallas construidas
-
-| Ruta | Pantalla |
-|---|---|
-| `/` | Login (solo UI) |
-| `/dashboard` | Panel general (KPIs + atención + notificaciones) |
-| `/clientes` | Lista de clientes con búsqueda |
-| `/clientes/:id` | Detalle de cliente — tabs: perfil / membresía / pagos / rutina / dieta / progreso |
-| `/membresias` | Planes (Básica/VIP/Premium) + membresías activas |
-| `/rutinas` | Catálogo de ejercicios/rutinas + asignación a clientes |
-| `/dietas` | Planes de dieta + asignación a clientes |
-| `/progreso` | Progreso corporal con gráfica de evolución (SVG propio) |
-
-## Concepto de diseño
-
-Stronger Aragón hoy administra clientes, membresías y pagos en hojas de
-Excel repartidas entre dos turnos (mañana / tarde-noche), sin cruce de
-información. El concepto visual **no es una "app de fitness genérica azul
-con ícono de pesa"**: es un tablero de control con la crudeza de un
-gimnasio real — grafito, hierro y el cobre de los discos de las barras —
-donde los números que antes vivían perdidos en columnas de Excel ahora se
-leen de un vistazo, como en el marcador de una sala de pesas.
-
-**Paleta** (definida en `src/styles/theme.css`):
+Paleta definida en `src/styles/theme.css` (tokens con contraste AA
+documentado en el propio archivo):
 
 | Token | Hex | Uso |
 |---|---|---|
-| `--color-bg` | `#14151A` | fondo general (grafito casi negro) |
-| `--color-surface` | `#1D1F26` | tarjetas |
-| `--color-border-soft` | `#2A2D36` | bordes sutiles (sin sombras genéricas de tarjeta) |
-| `--color-text` | `#F3F0E8` | texto principal (blanco tiza) |
-| `--color-text-muted` | `#9A9DAA` | texto secundario (gris acero) |
-| `--color-accent` | `#D98E3E` | cobre — color protagonista |
-| `--color-success` | `#6FB98F` | membresía al día |
-| `--color-warning` | `#E3B341` | membresía por vencer |
-| `--color-danger` | `#DD5B4F` | membresía vencida |
+| `--color-bg` | `#0B0C09` | fondo general |
+| `--color-surface` | `#181A13` | tarjetas |
+| `--color-text` | `#F2F3EC` | texto principal |
+| `--color-primary` | `#97A947` | verde oliva — acento/acción principal |
+| `--color-success` | `#3FB6A0` | estado al día |
+| `--color-warning` | `#E08D3C` | por vencer |
+| `--color-danger` | `#D65A4A` | vencido/error |
 
-**Tipografía:** *Bebas Neue* (condensada, de marcador de gimnasio) reservada
-solo para números protagonistas y títulos de sección — nunca para párrafos
-— combinada con *Inter* para todo el texto de lectura y la UI.
+Tipografía condensada (`Bebas Neue`) para títulos y números protagonistas,
+`Helvetica Neue` para el resto de la interfaz. Accesibilidad básica:
+`:focus-visible` visible en toda la UI, `prefers-reduced-motion` respetado,
+layout responsive (el menú lateral colapsa a drawer en móvil).
 
-**Protagonista visual:** los números grandes en Bebas Neue (componente
-`StatNumber`) — clientes activos, ingresos del mes, peso/estatura en
-progreso corporal, precios de planes. Es la idea central del concepto:
-convertir cifras que hoy están perdidas en una hoja de cálculo en algo que
-se lee de un vistazo. Todo lo demás (tablas, formularios, tabs) se mantiene
-disciplinado en Inter y tamaños moderados para no competir con ese
-elemento.
+## Verificación
 
-**Iconografía:** trazos de línea dibujados a mano en `components/layout/icons.tsx`
-(grid, personas, tarjeta, barra, plato, tendencia) — no un icon-pack
-genérico ni emojis.
-
-**Movimiento:** deliberadamente mínimo — transición de color/borde en hover
-de 0.12s, sin "fade-in" por default en ninguna sección.
-
-**Accesibilidad:** `:focus-visible` con contorno cobre en toda la UI,
-layout responsive con breakpoints hasta mobile (sidebar colapsa a barra
-horizontal), contraste de texto sobre fondo oscuro verificado a simple
-vista (texto principal `#F3F0E8` sobre `#14151A`/`#1D1F26`).
-
-## Modelo de datos (alineación con `DECISIONES.md`)
-
-Los tipos en `src/types/models.ts` reflejan 1:1 las 13/14 entidades
-aprobadas por Isai en `DECISIONES.md` (raíz del repo): mismos nombres de
-entidad, mismos campos, mismos valores de `role`/`status`/`method`/`type`
-modelados como *string literal unions* (equivalente TS de VARCHAR + CHECK,
-no ENUM nativo — tal como exige la corrección de Isai). Puntos verificados
-explícitamente:
-
-- `User.password_hash` existe aunque el login no sea funcional.
-- `ClientProfile.trainer_id` es `number | null` (FK 1:n simple, sin tabla
-  puente).
-- `BodyProgress.height_cm` vive en `BodyProgress`, **no** en
-  `ClientProfile` (punto menor confirmado en `DECISIONES.md`).
-- `RoutineExercise` existe como tabla puente entre `Routine` y `Exercise`
-  con `sets`/`reps`/`rest_seconds`/`order`.
-- Las 14 entidades nombradas en `DECISIONES.md` (`User`, `ClientProfile`,
-  `MembershipPlan`, `Membership`, `Payment`, `Exercise`, `Routine`,
-  `RoutineExercise`, `RoutineAssignment`, `DietPlan`, `DietAssignment`,
-  `BodyProgress`, `Notification`, `AuditLog`) tienen su interfaz
-  correspondiente.
-
-Los datos de ejemplo en `src/mocks/data.ts` usan estos tipos directamente
-(sin `any`), enlazados por ID de forma consistente (un cliente, su
-membresía, sus pagos, su rutina, su dieta y su progreso cuentan la misma
-historia). En Entrega 2 este archivo se reemplaza por llamadas a la API
-real; las pantallas no deberían necesitar reescritura, solo el swap de
-origen de datos.
+`npm install`, `npx tsc -b` (modo estricto, `noUnusedLocals`/
+`noUnusedParameters` incluidos) y `npm run build` corren sin errores.

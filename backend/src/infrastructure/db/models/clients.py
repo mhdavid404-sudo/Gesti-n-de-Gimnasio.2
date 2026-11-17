@@ -30,7 +30,7 @@ class ClientProfileModel(Base):
     phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
     birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     address: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    # Arbitraje de Isai, 2026-09-12 (DECISIONES.md): campo unico de texto
+    # Arbitraje de la revision de arquitectura, 2026-09-12 (DECISIONES.md): campo unico de texto
     # libre, igual que `address` -- no separado en nombre/telefono.
     emergency_contact: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

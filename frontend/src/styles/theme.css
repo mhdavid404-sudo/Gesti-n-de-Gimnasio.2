@@ -19,9 +19,9 @@
    El feedback de la profesora ("no tiene buen UI/UX") y la instrucción
    explícita del dueño del proyecto (ver DECISIONES.md, "2026-10-10 —
    Arranque de Entrega 2", punto 4) sustituyen el principio histórico de
-   "acento en reserva" (adaptado de UFC Gym, ver CLAUDE.md § Design Taste y
-   la entrada "Taste DNA de UFC Gym" de abajo, que queda como registro
-   histórico de por qué se llegó al verde/negro, no como regla vigente) por
+   "acento en reserva" (adaptado de UFC Gym, ver la entrada "Taste DNA de
+   UFC Gym" de abajo, que queda como registro histórico de por qué se
+   llegó al verde/negro, no como regla vigente) por
    un sistema de diseño CONVENCIONAL Y COMPLETO: un color primario con
    variantes claras/oscuras, una escala de neutros, y estados semánticos
    separados por HUE (no solo por brillo) del primario.
@@ -80,8 +80,8 @@
    inconfundibles entre sí, igual que exigía el criterio histórico.
 
    ---------------------------------------------------------------------------
-   Adaptación de patrones — Design Taste (UFC Gym, ver CLAUDE.md § Design
-   Taste), aplicada al panel interno (Entrega 1, 2026-09-13) — HISTÓRICO,
+   Adaptación de patrones — Design Taste (UFC Gym), aplicada al panel
+   interno (Entrega 1, 2026-09-13) — HISTÓRICO,
    el punto 1 (acento en reserva) ya NO aplica desde Entrega 2 Parte A, ver
    bloque de arriba. Los puntos 2-5 (tipografía, espaciado, sombra dura)
    SÍ siguen vigentes, no se tocaron en este cambio:
@@ -213,8 +213,9 @@
   --shadow-dialog: 0 16px 48px rgba(0, 0, 0, 0.5);
 
   /* -------------------------------------------------------------------------
-     Curvas de easing — Entrega 2, animación con propósito (ver CLAUDE.md
-     § "Marco obligatorio: las 4 preguntas antes de CADA animación").
+     Curvas de easing — Entrega 2, animación con propósito (cada animación
+     nueva responde primero a que comunica, por que ese movimiento y no
+     otro, y que pasa si se desactiva con prefers-reduced-motion).
      Definidas una sola vez aquí y reutilizadas en todo el sistema:
        --ease-out: entradas/salidas (elemento aparece, se revela, se monta).
                    Curva fuerte, nunca el ease-out débil de CSS por defecto.
@@ -243,10 +244,9 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-body);
-  /* 15px -> 16px: el sistema se sentía chico en tablas/formularios (ver
-     CLAUDE.md § "Aumento de tamaño de fuente"). 16px es el tamaño de
-     lectura de facto en la web — más presencia sin forzar reflow en
-     ninguna pantalla. */
+  /* 15px -> 16px: el sistema se sentía chico en tablas/formularios.
+     16px es el tamaño de lectura de facto en la web — más presencia
+     sin forzar reflow en ninguna pantalla. */
   font-size: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -328,9 +328,9 @@ button {
      marcador ya cargan la jerarquía, no el color. */
   font-family: var(--font-display-brush);
   /* 22px -> 24px en el trabajo anterior, ahora 26px: el "grito" tipográfico
-     del sistema necesitaba un poco más de presencia (ver CLAUDE.md §
-     "Aumento de tamaño de fuente"). Sigue siendo peso 400 — la jerarquía la
-     sigue cargando el tamaño + la tipografía, nunca el weight. */
+     del sistema necesitaba un poco más de presencia. Sigue siendo peso
+     400 — la jerarquía la sigue cargando el tamaño + la tipografía,
+     nunca el weight. */
   font-size: 26px;
   font-weight: 400;
   line-height: 1.2;
@@ -363,8 +363,8 @@ button {
   transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.15s var(--ease-out);
 }
 
-/* Feedback de presión real — "la interfaz escuchó al usuario" (ver
-   CLAUDE.md, tarea 1). Transición CSS (no @keyframes) porque un botón se
+/* Feedback de presión real — "la interfaz escuchó al usuario".
+   Transición CSS (no @keyframes) porque un botón se
    puede presionar rápido y repetidamente: la transición es interrumpible,
    el keyframe reiniciaría desde cero en cada click seguido. */
 .btn:active {
@@ -387,7 +387,7 @@ button {
 
 /* Hovers dentro de (hover: hover) and (pointer: fine): un botón "click
    fantasma" en touch (:hover pegado tras el tap) es peor que no tener
-   hover — ver CLAUDE.md, sección de rendimiento. */
+   hover. */
 @media (hover: hover) and (pointer: fine) {
   .btn-primary:hover {
     background: var(--color-accent-hover);
@@ -407,7 +407,7 @@ button {
   color: var(--color-text);
   width: 100%;
   /* Foco/validación son cambios de color -> `ease` a 150ms (nunca un salto
-     instantáneo a rojo/verde, ver CLAUDE.md tarea 4). */
+     instantáneo a rojo/verde). */
   transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
 }
 .input::placeholder {
@@ -445,7 +445,7 @@ button {
 }
 
 /* Mensaje de error de campo: entra con fade + micro-desplazamiento, nunca
-   de golpe (ver CLAUDE.md tarea 4). Es un evento discreto por envío de
+   de golpe. Es un evento discreto por envío de
    formulario (el nodo se monta de cero cada vez), no una interacción de
    alta frecuencia tipo hover — por eso un keyframe corto es apropiado
    aquí (mismo criterio que el stagger de filas de la tabla de clientes). */

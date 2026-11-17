@@ -22,7 +22,7 @@ CONCEPTOS_PAYMENT_ITEM_VALIDOS = ("plan", "servicio")
 class Payment:
     """Pago asociado a una membresia (RF005).
 
-    Arbitraje de Isai, 2026-09-12 (DECISIONES.md): `registered_by` (FK a
+    Arbitraje de la revision de arquitectura, 2026-09-12 (DECISIONES.md): `registered_by` (FK a
     `User`, quien registro el pago) agregado por consistencia con
     `assigned_by` en routine/diet assignments.
     """

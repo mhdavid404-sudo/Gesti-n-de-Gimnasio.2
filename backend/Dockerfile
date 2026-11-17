@@ -28,8 +28,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # fuente: esa version no publica wheel precompilado para Python 3.13,
 # asi que pip cae a build-from-source y necesita gcc + headers de
 # libpq (pg_config). No se sube la version de psycopg2-binary aqui a
-# proposito porque esta fijada en el contrato de convenciones del
-# equipo (COORDINACION-ENTREGA1.md, seccion 3).
+# proposito porque esta fijada en `requirements.txt`.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends gcc libpq-dev \
     && rm -rf /var/lib/apt/lists/*

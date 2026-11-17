@@ -1,8 +1,7 @@
-# docker-compose.yml — SmartGym v2, Entrega 1
+# docker-compose.yml — SmartGym v2
 #
-# Contrato de convenciones: COORDINACION-ENTREGA1.md, seccion 3.
 # Prioriza developer experience (hot-reload/HMR) sobre imagenes de
-# produccion, tal como pide la nota para Royer en ese documento.
+# produccion -- ver README.md para el detalle de arranque.
 # NO corre migraciones de Alembic automaticamente (se corren a mano,
 # ver backend/README.md).
 

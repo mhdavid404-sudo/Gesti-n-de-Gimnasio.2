@@ -1,8 +1,7 @@
 """esquema inicial: 14 tablas del modelo aprobado en DECISIONES.md
 
 Escrita a mano (no autogenerada) porque no hay una base de datos viva en
-este entorno de desarrollo -- ver COORDINACION-ENTREGA1.md, seccion
-"Verificacion antes de terminar". Refleja 1:1 los modelos SQLAlchemy en
+este entorno de desarrollo. Refleja 1:1 los modelos SQLAlchemy en
 `infrastructure/db/models/` y la tabla de `backend/MODELO-DATOS.md`.
 
 Regla dura aplicada en toda esta migracion (DECISIONES.md, correccion #1):
@@ -79,7 +78,7 @@ def upgrade() -> None:
         sa.Column("phone", sa.String(30), nullable=True),
         sa.Column("birth_date", sa.Date(), nullable=True),
         sa.Column("address", sa.String(255), nullable=True),
-        # Arbitraje de Isai, 2026-09-12 (DECISIONES.md): campo unico de texto
+        # Arbitraje de la revision de arquitectura, 2026-09-12 (DECISIONES.md): campo unico de texto
         # libre, igual que `address` -- no separado en nombre/telefono.
         sa.Column("emergency_contact", sa.String(255), nullable=True),
         sa.Column(
@@ -168,7 +167,7 @@ def upgrade() -> None:
         sa.Column("payment_date", sa.DateTime(timezone=True), nullable=False),
         sa.Column("method", sa.String(20), nullable=False),
         sa.Column("status", sa.String(20), nullable=False),
-        # Arbitraje de Isai, 2026-09-12 (DECISIONES.md): `payments` era la
+        # Arbitraje de la revision de arquitectura, 2026-09-12 (DECISIONES.md): `payments` era la
         # unica tabla de movimiento de dinero sin FK de "quien lo hizo"
         # (inconsistente con `assigned_by` en routine/diet assignments).
         sa.Column(
@@ -389,7 +388,7 @@ def upgrade() -> None:
         sa.Column("height_cm", sa.Numeric(5, 2), nullable=True),
         sa.Column("body_fat_pct", sa.Numeric(4, 2), nullable=True),
         sa.Column("muscle_mass_kg", sa.Numeric(5, 2), nullable=True),
-        # Arbitraje de Isai, 2026-09-12 (DECISIONES.md): RF010 pide "peso,
+        # Arbitraje de la revision de arquitectura, 2026-09-12 (DECISIONES.md): RF010 pide "peso,
         # medidas, fecha de registro" -- medidas individuales, todas
         # nullable, sin costo de integridad frente a muscle_mass_kg.
         sa.Column("chest_cm", sa.Numeric(5, 2), nullable=True),

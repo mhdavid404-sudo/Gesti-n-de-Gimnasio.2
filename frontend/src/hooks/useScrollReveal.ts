@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 
 /**
  * Entrada suave (fade + translateY) para secciones editoriales de la
- * landing al hacer scroll — ver CLAUDE.md, tarea 2.
+ * landing al hacer scroll.
  *
  * Solo tiene sentido en contenido de "primera vista" que se recorre una
  * vez (landing pública): NO se usa en las pantallas internas de gestión

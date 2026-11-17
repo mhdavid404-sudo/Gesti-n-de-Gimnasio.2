@@ -6,7 +6,7 @@ desde ese directorio con el cwd ya en el path) para que `import src...`
 funcione sin importar desde donde se dispare el comando `alembic`.
 
 La URL de conexion se toma de la variable de entorno `DATABASE_URL`
-(COORDINACION-ENTREGA1.md, seccion 3) -- nunca hardcodeada aqui.
+(ver `.env.example`) -- nunca hardcodeada aqui.
 """
 
 from __future__ import annotations

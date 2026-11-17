@@ -14,16 +14,16 @@ backlog de 11 inconsistencias registrado en `../DECISIONES.md`
 2026-10-10). Las tablas abajo ya reflejan el esquema final.
 
 **Nota sobre el conteo de entidades:** `../DECISIONES.md` titula el modelo
-como "13 entidades" pero la lista que aprobo Isai enumera 14 (incluye
-`AuditLog`, necesario para RF015). Este documento y el codigo implementan
-las 14. `AuditLog` se agrupo bajo el modulo de codigo `notifications`
-(carpeta `domain/notifications`, `infrastructure/db/models/notifications.py`)
-por afinidad ("eventos del sistema"), no porque el modelo de datos lo
-requiera asi.
+como "13 entidades" pero la lista aprobada en la revision de arquitectura
+enumera 14 (incluye `AuditLog`, necesario para RF015). Este documento y el
+codigo implementan las 14. `AuditLog` se agrupo bajo el modulo de codigo
+`notifications` (carpeta `domain/notifications`,
+`infrastructure/db/models/notifications.py`) por afinidad ("eventos del
+sistema"), no porque el modelo de datos lo requiera asi.
 
 **Regla aplicada en toda la tabla:** cualquier columna de rol/estado/metodo/
 tipo es `VARCHAR` + `CHECK constraint`, nunca `ENUM` nativo de PostgreSQL
-(DECISIONES.md, correccion #1 de Isai).
+(DECISIONES.md, correccion #1 de la revision de arquitectura).
 
 ---
 
@@ -58,10 +58,10 @@ tipo es `VARCHAR` + `CHECK constraint`, nunca `ENUM` nativo de PostgreSQL
 `application/clients`):** `trainer_id` debe apuntar a un `User` con
 `role = 'entrenador'`.
 
-**Arbitraje de Isai (DECISIONES.md, 2026-09-12 — Arbitraje de desalineacion
-backend↔frontend):** `emergency_contact` no existia en el backend (no
-implementado, no divergente). Se agrego como campo unico, no como par
-`emergency_contact_name`/`emergency_contact_phone`.
+**Arbitraje de la revision de arquitectura (DECISIONES.md, 2026-09-12 —
+Arbitraje de desalineacion backend↔frontend):** `emergency_contact` no
+existia en el backend (no implementado, no divergente). Se agrego como
+campo unico, no como par `emergency_contact_name`/`emergency_contact_phone`.
 
 ## membership_plans
 
@@ -101,8 +101,8 @@ implementado, no divergente). Se agrego como campo unico, no como par
 | notes | TEXT | NULLABLE |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
 
-**Arbitraje de Isai (DECISIONES.md, 2026-09-12 — Arbitraje de desalineacion
-backend↔frontend):** `registered_by`/`notes` agregados al backend --
+**Arbitraje de la revision de arquitectura (DECISIONES.md, 2026-09-12 —
+Arbitraje de desalineacion backend↔frontend):** `registered_by`/`notes` agregados al backend --
 `payments` era la unica tabla de movimiento de dinero sin FK de "quien lo
 hizo" (inconsistente con `assigned_by` en `routine_assignments`/
 `diet_assignments`).
@@ -209,10 +209,10 @@ entrenador o admin.
 
 **Nota (DECISIONES.md, punto menor no bloqueante):** `height_cm` se deja
 aqui, no en `client_profiles`, hasta que se confirme con el negocio real.
-Leo: no mover este campo por tu cuenta al diseñar la pantalla de perfil.
+No mover este campo sin registrar la decision en DECISIONES.md.
 
-**Arbitraje de Isai (DECISIONES.md, 2026-09-12 — Arbitraje de desalineacion
-backend↔frontend):** `chest_cm`/`waist_cm`/`hip_cm`/`arm_cm` restauradas --
+**Arbitraje de la revision de arquitectura (DECISIONES.md, 2026-09-12 —
+Arbitraje de desalineacion backend↔frontend):** `chest_cm`/`waist_cm`/`hip_cm`/`arm_cm` restauradas --
 RF010 pide literalmente "peso, medidas, fecha de registro" (medidas en
 plural es requisito explicito, se habian omitido al construir sin dejarlo
 documentado). Todas nullable, sin exclusion mutua con `muscle_mass_kg`.
@@ -247,7 +247,7 @@ Bitacora de eventos/errores del sistema (RF015).
 
 ---
 
-## Resumen de valores permitidos (para los enums de TypeScript de Leo)
+## Resumen de valores permitidos (para los enums de TypeScript del frontend)
 
 | Campo | Valores |
 |---|---|
@@ -256,7 +256,10 @@ Bitacora de eventos/errores del sistema (RF015).
 | `payments.method` | `efectivo` \| `tarjeta` \| `transferencia` |
 | `payments.status` | `completado` \| `pendiente` \| `rechazado` |
 | `routine_assignments.status` / `diet_assignments.status` | `activa` \| `completada` \| `cancelada` |
-| `notifications.type` | `membresia_vencida` \| `membresia_por_vencer` \| `pago_registrado` \| `rutina_asignada` \| `dieta_asignada` \| `sistema` |
+| `notifications.type` | `membresia_vencida` \| `membresia_por_vencer` \| `pago_registrado` \| `rutina_asignada` \| `dieta_asignada` \| `sistema` \| `plan_cambiado` |
+| `membership_services.status` | `activa` \| `vencida` \| `cancelada` \| `cancelado_por_cambio_de_plan` |
+| `services.billing_period` | `unico` \| `mensual` \| `periodo` |
+| `payment_items.concept` | `plan` \| `servicio` |
 
 ## Backlog de alineacion de modelo (resuelto en Entrega 2)
 
@@ -267,7 +270,7 @@ alineacion de modelo (B0)" para el detalle completo de los 11 puntos. Las
 en las tablas de arriba. Los otros 7 puntos no requirieron cambio de
 esquema -- la correccion fue unicamente en `frontend/src/types/models.ts`.
 
-## Entrypoint FastAPI (para Royer)
+## Entrypoint FastAPI
 
 ```
 uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload

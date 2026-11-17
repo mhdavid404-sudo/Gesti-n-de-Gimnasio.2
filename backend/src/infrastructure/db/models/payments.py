@@ -38,7 +38,7 @@ class PaymentModel(Base):
     )
     method: Mapped[str] = mapped_column(String(20), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False)
-    # Arbitraje de Isai, 2026-09-12 (DECISIONES.md): FK de "quien lo hizo",
+    # Arbitraje de la revision de arquitectura, 2026-09-12 (DECISIONES.md): FK de "quien lo hizo",
     # consistente con `assigned_by` en routine/diet assignments.
     registered_by: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="RESTRICT"), nullable=False

@@ -19,7 +19,7 @@ class BodyProgress:
     aqui y no en `ClientProfile` por ahora; pendiente de confirmar con el
     negocio real en una entrega posterior.
 
-    Arbitraje de Isai, 2026-09-12 (DECISIONES.md): RF010 pide "peso,
+    Arbitraje de la revision de arquitectura, 2026-09-12 (DECISIONES.md): RF010 pide "peso,
     medidas, fecha de registro" -- `chest_cm/waist_cm/hip_cm/arm_cm`
     restauradas (nullable, sin exclusion mutua con `muscle_mass_kg`).
     """

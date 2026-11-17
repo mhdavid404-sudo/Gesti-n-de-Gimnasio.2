@@ -1,8 +1,8 @@
-# frontend/Dockerfile — SmartGym v2, Entrega 1
+# frontend/Dockerfile — SmartGym v2
 #
-# Imagen de desarrollo (Vite dev server con HMR), NO build de produccion:
-# eso esta fuera de alcance en Entrega 1 (COORDINACION-ENTREGA1.md,
-# seccion 3, nota para Royer).
+# Imagen de desarrollo (Vite dev server con HMR), NO build de produccion
+# (build multi-stage servido por nginx queda fuera de alcance de este
+# proyecto escolar -- ver docs/PUESTA-EN-PRODUCCION.md).
 
 FROM node:22-alpine
 

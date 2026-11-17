@@ -1,12 +1,11 @@
 """Entry point de FastAPI.
 
-Comando de arranque exacto (COORDINACION-ENTREGA1.md, seccion 3), corrido
-desde el directorio `backend/`:
+Comando de arranque exacto, corrido desde el directorio `backend/`:
 
     uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
 
-Ver `backend/README.md` para el detalle completo (por que `src.api.main`,
-donde debe correrse el comando, y donde queda documentado para Royer).
+Ver `backend/README.md` para el detalle completo (por que `src.api.main`
+y donde debe correrse el comando).
 
 Entrega 3: autenticacion JWT y logica de negocio completas en los 15 RF.
 Este archivo monta el router agregado de la v1, expone un health check,

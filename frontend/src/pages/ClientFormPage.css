@@ -55,9 +55,9 @@
   border-radius: var(--radius-sm);
   background: var(--color-bg-elevated);
   cursor: pointer;
-  /* A diferencia de .plan-card (Membresías, solo informativa), esta SÍ es
+  /* A diferencia de .plan-card (solo informativa), esta SÍ es
      una tarjeta clickeable real (label de un radio) — por eso lleva el
-     mismo feedback de presión que .btn (ver CLAUDE.md tarea 1). */
+     mismo feedback de presión que .btn. */
   transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.12s var(--ease-out);
 }
 

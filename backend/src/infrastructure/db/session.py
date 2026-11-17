@@ -1,7 +1,7 @@
 """Configuracion de engine/sesion de SQLAlchemy.
 
 La cadena de conexion viene SIEMPRE de la variable de entorno
-`DATABASE_URL` (COORDINACION-ENTREGA1.md, seccion 3) -- nunca hardcodeada,
+`DATABASE_URL` (ver `.env.example`) -- nunca hardcodeada,
 para que funcione igual en local (fuera de Docker) y dentro del contenedor
 `backend` de docker-compose (host `db`, no `localhost`).
 
@@ -10,7 +10,7 @@ En dev, via docker-compose, el valor esperado es:
 
 Este modulo NO corre migraciones ni crea tablas al importarse -- eso es
 exclusivamente responsabilidad de `alembic upgrade head`, corrido a mano
-(ver COORDINACION-ENTREGA1.md, seccion 5).
+(ver backend/README.md).
 """
 
 from __future__ import annotations

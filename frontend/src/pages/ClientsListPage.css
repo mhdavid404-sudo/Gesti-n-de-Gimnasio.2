@@ -88,9 +88,9 @@
 /* Fila de uso muy frecuente (se escanea/hover decenas de veces por turno):
    el único tratamiento es un cambio de fondo suavizado con `ease`, sin
    transform ni lift — no hace falta más para comunicar "esta fila tiene
-   una acción" (ver CLAUDE.md tarea 1, pregunta 1: frecuencia alta ->
-   animación mínima). El link "Ver detalle" adentro (.btn.btn-ghost) ya
-   trae su propio hover + feedback de presión real. */
+   una acción" (frecuencia alta -> animación mínima). El link "Ver
+   detalle" adentro (.btn.btn-ghost) ya trae su propio hover + feedback
+   de presión real. */
 .clients-page__table tbody tr {
   transition: background-color 0.15s ease;
 }
@@ -101,7 +101,7 @@
   }
 }
 
-/* Stagger de carga — ver CLAUDE.md tarea 3. Anima solo cuando React monta
+/* Stagger de carga. Anima solo cuando React monta
    la fila por primera vez (carga inicial o cuando un filtro nuevo revela
    una fila que no existía en el DOM); las filas que ya estaban montadas
    conservan su key y no vuelven a animarse en cada tecla del buscador. */

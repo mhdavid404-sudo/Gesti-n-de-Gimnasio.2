@@ -52,8 +52,8 @@ Con el servidor arriba: documentacion interactiva en
 
 ## Migraciones (Alembic)
 
-Requiere una base Postgres viva y accesible via `DATABASE_URL` (la levanta
-Royer con docker-compose; no hay una en este entorno de desarrollo). Correr
+Requiere una base Postgres viva y accesible via `DATABASE_URL` (se levanta
+con `docker compose up -d db`; no hay una en este entorno de desarrollo). Correr
 siempre a mano, nunca automatico:
 
 ```bash

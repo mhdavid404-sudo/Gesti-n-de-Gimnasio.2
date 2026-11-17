@@ -31,7 +31,7 @@ class ClientProfile:
     phone: str | None
     birth_date: date | None
     address: str | None
-    # Arbitraje de Isai, 2026-09-12 (DECISIONES.md): campo unico de texto
+    # Arbitraje de la revision de arquitectura, 2026-09-12 (DECISIONES.md): campo unico de texto
     # libre, igual que `address` -- no separado en nombre/telefono.
     emergency_contact: str | None = None
     created_at: datetime | None = None

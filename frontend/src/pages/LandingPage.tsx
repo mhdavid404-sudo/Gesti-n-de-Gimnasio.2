@@ -68,7 +68,7 @@ export function LandingPage() {
       .catch(() => setPlansError(true))
   }, [])
 
-  // Scroll-reveal editorial (ver CLAUDE.md tarea 2) — el hero queda fuera
+  // Scroll-reveal editorial -- el hero queda fuera
   // a propósito: ya está visible desde el primer frame, no hay "revelado"
   // posible en lo primero que ve el usuario.
   const valueReveal = useScrollReveal<HTMLElement>()

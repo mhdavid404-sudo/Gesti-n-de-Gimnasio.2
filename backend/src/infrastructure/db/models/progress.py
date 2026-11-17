@@ -28,7 +28,7 @@ class BodyProgressModel(Base):
     height_cm: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     body_fat_pct: Mapped[Decimal | None] = mapped_column(Numeric(4, 2), nullable=True)
     muscle_mass_kg: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
-    # Arbitraje de Isai, 2026-09-12 (DECISIONES.md): RF010 pide "medidas"
+    # Arbitraje de la revision de arquitectura, 2026-09-12 (DECISIONES.md): RF010 pide "medidas"
     # explicitamente; restauradas tras haberse omitido en la propuesta original.
     chest_cm: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     waist_cm: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)

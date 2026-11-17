@@ -1,6 +1,6 @@
 """Entidades de dominio del modulo Users.
 
-Regla dura (DECISIONES.md, correccion #2 de Isai): estas clases son
+Regla dura (DECISIONES.md, correccion #2 de la revision de arquitectura): estas clases son
 dataclasses planas. CERO imports de SQLAlchemy, FastAPI o cualquier otro
 detalle de infraestructura. El mapeo a la tabla real vive en
 `infrastructure/db/models/users.py`, y la conversion entidad <-> modelo ORM

@@ -112,7 +112,7 @@
 
 .lp-btn:active {
   /* Feedback de presión real, consistente con el resto del sistema (ver
-     theme.css / CLAUDE.md tarea 1). Transición CSS, no keyframe: un botón
+     theme.css). Transición CSS, no keyframe: un botón
      se puede presionar rápido y seguido. */
   transform: scale(0.97);
   transition: transform 0.12s var(--ease-out);
@@ -158,7 +158,7 @@
 }
 
 /* ---------------------------------------------------------------------------
-   Scroll-reveal editorial — ver CLAUDE.md tarea 2 / src/hooks/useScrollReveal.ts.
+   Scroll-reveal editorial — ver src/hooks/useScrollReveal.ts.
    Fade + translateY sutil (14px, nunca scale ni saltos grandes), 420ms con
    ease-out fuerte: más pausado que la UI operativa a propósito, porque esto
    es contenido de "primera vista" que se recorre una sola vez, no una
@@ -726,8 +726,7 @@
   /* Lift en hover con sombra dura de un solo trazo, pura y negra — mismo
      lenguaje que el Design Taste pide para fotografía sobre fondo oscuro
      (nunca sombra suave/multi-capa). Sin :active/scale: la tarjeta no
-     navega a nada, es contenido editorial, no un botón (ver CLAUDE.md
-     tarea 1, pregunta 1). */
+     navega a nada, es contenido editorial, no un botón. */
   transition: transform 0.2s var(--ease-in-out), box-shadow 0.2s ease;
 }
 
