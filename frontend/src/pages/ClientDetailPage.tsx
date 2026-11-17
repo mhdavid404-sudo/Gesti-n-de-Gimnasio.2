@@ -1049,7 +1049,16 @@ export function ClientDetailPage() {
       <ConfirmDialog
         open={showDeleteConfirm}
         title={`¿Eliminar a ${profile.full_name}?`}
-        description="Se borra su perfil junto con sus membresías, pagos, rutinas, dietas y progreso registrados. Esta acción no se puede deshacer."
+        description={
+          // CU04 (flujo alterno): una advertencia más específica cuando hay
+          // membresía activa o pagos registrados -- es exactamente el dato
+          // que se pierde (CASCADE), no solo "el perfil".
+          membership && getMembershipDisplayStatus(membership) === 'activa'
+            ? `Este cliente tiene una membresía activa (${plan?.name ?? 'plan'}) y ${payments.length} pago${payments.length === 1 ? '' : 's'} registrado${payments.length === 1 ? '' : 's'}. Al eliminarlo se borran también su membresía, pagos, extras, rutinas, dietas y progreso. Esta acción no se puede deshacer.`
+            : payments.length > 0
+              ? `Este cliente tiene ${payments.length} pago${payments.length === 1 ? '' : 's'} registrado${payments.length === 1 ? '' : 's'}. Se borra su perfil junto con sus membresías, pagos, rutinas, dietas y progreso registrados. Esta acción no se puede deshacer.`
+              : 'Se borra su perfil junto con sus membresías, pagos, rutinas, dietas y progreso registrados. Esta acción no se puede deshacer.'
+        }
         confirmLabel={isDeleting ? 'Eliminando…' : 'Eliminar'}
         onConfirm={handleDeleteClient}
         onCancel={() => setShowDeleteConfirm(false)}
