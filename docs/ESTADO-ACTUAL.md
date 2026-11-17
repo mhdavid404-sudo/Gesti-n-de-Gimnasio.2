@@ -1,12 +1,12 @@
-# Estado actual del sistema — SmartGym v2 (Entrega 3, cierre)
+# Estado actual del sistema — SmartGym v2 (cierre final, 23 nov 2026)
 
-Fecha de la auditoría de arranque: 2026-11-04. Fecha de cierre (Fase 1+2+3
-completas, más el ajuste de UX de Membresías y el cambio de plan): 2026-11-05.
-Verificado contra el código real (no contra documentación anterior) y contra
-una corrida limpia de `pytest` (ver abajo). Este archivo documenta el estado
-FINAL; el detalle del recorrido (qué se encontró en la auditoría y cómo se
-resolvió cada punto) vive en `DECISIONES.md` y en
-`docs/RESULTADOS-ENTREGA-3.md`.
+Fecha de la auditoría de arranque: 2026-11-04. Fecha de cierre final
+(auditoría completa documentación-vs-código, pruebas, despliegue y
+evidencias): 2026-11-16. Verificado contra el código real (no contra
+documentación anterior) y contra una corrida limpia de `pytest` (ver abajo).
+Este archivo documenta el estado FINAL; el detalle del recorrido vive en
+`DECISIONES.md`, `docs/AUDITORIA-DOC-VS-CODIGO.md`,
+`docs/RESULTADOS-FINALES.md` y `docs/PUESTA-EN-PRODUCCION.md`.
 
 ## Resultado de pytest (real, no estimado — cierre de Entrega 3)
 
@@ -103,15 +103,33 @@ calcula ningún prorrateo, solo se informa el monto ya pagado y un campo
 "Notas" para el acuerdo. Ver `DECISIONES.md`, entrada "Cambio de plan:
 efecto en servicios extra".
 
+## Cierre final (23 de noviembre de 2026)
+
+Auditoría completa documentación-vs-código (`docs/AUDITORIA-DOC-VS-CODIGO.md`),
+resultados finales de pruebas (`docs/RESULTADOS-FINALES.md`), verificación
+de despliegue desde un clon limpio (`docs/PUESTA-EN-PRODUCCION.md`), matriz
+de trazabilidad real (`docs/MATRIZ-TRAZABILIDAD-REAL.md`), ERD actualizado
+de 18 tablas (`docs/diagrama-entidad-relacion.svg`), capturas por rol
+(`docs/capturas/`), ramas remotas revisadas sin fusionar nada
+(`docs/RAMAS-PENDIENTES.md`) y pendientes que requieren una persona
+(`docs/PENDIENTES-HUMANOS.md`). Hallazgo principal: la sección 3.4 de la
+ampliación de RF004/RF005 no existe en el `.docx` fuente -- no se editó el
+documento, se reportó (ver `docs/AUDITORIA-DOC-VS-CODIGO.md` y
+`docs/PENDIENTES-HUMANOS.md`). El repositorio se limpió de nombres de
+agentes/"Claude" (código, comentarios y documentos de planeación interna).
+
 ## Backlog heredado
 
 - **11 inconsistencias de alineación de modelo backend↔frontend (Entrega 1):** resueltas al arranque de Entrega 2 vía migración aditiva `0002_backlog_alineacion_modelo` (ver `DECISIONES.md`, "Resolución del backlog de alineación de modelo (B0)"). Cerrado, no reabierto.
 - **BUG-01 a BUG-07:** todos corregidos y verificados en su momento (ver `DECISIONES.md` y `docs/RESULTADOS-ENTREGA-2.md` si existe, o la bitácora de bugs del documento de entrega). Ninguno sigue abierto.
 - **BUG-08 a BUG-10:** encontrados y corregidos durante la implementación del cambio de plan (ver `docs/RESULTADOS-ENTREGA-3.md` para el detalle de repro/corrección). Ninguno sigue abierto.
+- **BUG-11:** encontrado y corregido durante este cierre final, al agregar la advertencia específica de CU04 (ver `docs/RESULTADOS-FINALES.md`). No sigue abierto.
 
 ## Estado de cierre
 
 Fase 0 (auditoría), Fase 1 (pendientes RF001-RF015), Fase 2 (Planes y
 servicios extra), Fase 3 (pruebas CP19-28 y documentación), el ajuste de UX
-de Membresías y el cambio de plan completos. 106/106 pruebas automatizadas
-en verde. No hay RF en estado "Parcial" o "Pendiente".
+de Membresías, el cambio de plan y el cierre final (auditoría completa,
+despliegue verificado, evidencias) completos. 106/106 pruebas automatizadas
+en verde. No hay RF en estado "Parcial" o "Pendiente". Los únicos pendientes
+reales requieren una persona, no código -- ver `docs/PENDIENTES-HUMANOS.md`.

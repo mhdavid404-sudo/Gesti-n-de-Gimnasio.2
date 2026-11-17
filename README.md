@@ -8,7 +8,13 @@ el frontend, PostgreSQL como base de datos.
 
 Estado detallado de cada requerimiento funcional (RF001-RF015) en
 [`docs/ESTADO-ACTUAL.md`](docs/ESTADO-ACTUAL.md). Historial completo de
-decisiones de arquitectura en [`DECISIONES.md`](DECISIONES.md).
+decisiones de arquitectura en [`DECISIONES.md`](DECISIONES.md). Auditoría
+completa documentación-vs-código en
+[`docs/AUDITORIA-DOC-VS-CODIGO.md`](docs/AUDITORIA-DOC-VS-CODIGO.md),
+resultados de pruebas en
+[`docs/RESULTADOS-FINALES.md`](docs/RESULTADOS-FINALES.md) y verificación
+de despliegue desde un clon limpio en
+[`docs/PUESTA-EN-PRODUCCION.md`](docs/PUESTA-EN-PRODUCCION.md).
 
 ## Cómo levantar el proyecto (Docker)
 
@@ -71,12 +77,12 @@ docker compose exec backend pytest tests/ -v
 ```
 
 Un archivo por módulo en `backend/tests/`. Resultado real más reciente en
-`docs/ESTADO-ACTUAL.md` y `docs/RESULTADOS-ENTREGA-3.md`.
+`docs/RESULTADOS-FINALES.md` (106/106 casos).
 
 ## Estructura del repositorio
 
 ```
 backend/    API FastAPI, arquitectura hexagonal (ver backend/README.md)
 frontend/   Panel React + Vite + TypeScript, y la landing pública
-docs/       Auditorías de estado y resultados de pruebas por entrega
+docs/       Auditorías, resultados de pruebas, diagrama ER, capturas (docs/capturas/)
 ```
