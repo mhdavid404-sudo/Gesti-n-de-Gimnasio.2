@@ -14,7 +14,9 @@ completa documentación-vs-código en
 resultados de pruebas en
 [`docs/RESULTADOS-FINALES.md`](docs/RESULTADOS-FINALES.md) y verificación
 de despliegue desde un clon limpio en
-[`docs/PUESTA-EN-PRODUCCION.md`](docs/PUESTA-EN-PRODUCCION.md).
+[`docs/PUESTA-EN-PRODUCCION.md`](docs/PUESTA-EN-PRODUCCION.md). Manual de
+usuario e instalación para una persona sin conocimientos técnicos en
+[`docs/MANUAL-USUARIO.md`](docs/MANUAL-USUARIO.md).
 
 ## Cómo levantar el proyecto (Docker)
 
