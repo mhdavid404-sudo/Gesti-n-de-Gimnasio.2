@@ -13,8 +13,9 @@ Casos cubiertos:
     6. Acceso de cliente al perfil de otro -> 403.
     7. Reasignar entrenador con un `trainer_id` que NO es rol entrenador -> falla con mensaje correcto.
     8. Editar un campo de un cliente existente como admin -> 200, cambio reflejado.
-    9. Eliminar como no-admin -> 403.
-    10. Eliminar un cliente existente como admin -> 204, deja de aparecer en el listado.
+    9. Editar como no-admin -> 403, sin cambios.
+    10. Eliminar como no-admin -> 403.
+    11. Eliminar un cliente existente como admin -> 204, deja de aparecer en el listado.
 """
 
 from __future__ import annotations
@@ -212,6 +213,28 @@ def test_editar_cliente_como_admin_actualiza_datos(client: TestClient) -> None:
 
     listado = client.get(f"{API}/clients/{client_id}", headers=admin_headers)
     assert listado.json()["phone"] == "5599998888"
+
+
+def test_editar_cliente_como_no_admin_devuelve_403(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.clientes10@gmail.com", "AdminPass123", "admin")
+    trainer = _seed_user("smartgym.qa.entrenador.clientes10@gmail.com", "ClaveEntrenador123", "entrenador")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+
+    created = _register_client(client, admin_headers, "smartgym.qa.cliente.editar2@gmail.com", "Cliente a Editar 2")
+    client_id = created.json()["client"]["id"]
+
+    trainer_headers = _auth_headers(client, trainer.email, "ClaveEntrenador123")
+    response = client.patch(
+        f"{API}/clients/{client_id}",
+        json={"phone": "5500001111"},
+        headers=trainer_headers,
+    )
+
+    assert response.status_code == 403
+
+    # El intento rechazado no debe haber cambiado nada.
+    listado = client.get(f"{API}/clients/{client_id}", headers=admin_headers)
+    assert listado.json()["phone"] == "5512345678"
 
 
 def test_eliminar_cliente_como_no_admin_devuelve_403(client: TestClient) -> None:
