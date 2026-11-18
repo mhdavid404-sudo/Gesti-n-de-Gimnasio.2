@@ -9,6 +9,7 @@ import {
   IconGrid,
   IconLog,
   IconLogout,
+  IconShield,
   IconTag,
   IconTrend,
   IconUsers,
@@ -47,6 +48,15 @@ const NAV_ITEMS: NavItem[] = [
   // sistema, no "información propia" de ningún rol -- mismo criterio que
   // "Clientes" y el bloque "En números" del Dashboard (ver DECISIONES.md).
   { to: '/bitacora', label: 'Bitácora', Icon: IconLog, roles: ['admin'] },
+  // "Usuarios" (2026-11-18): administra cuentas de admin/entrenador
+  // (`POST`/`GET`/`PATCH /users`) -- los clientes NO aparecen aquí, se
+  // gestionan en "Clientes". Mismo criterio de visibilidad que "Bitácora":
+  // solo admin, misma protección (el link desaparece del menú Y el
+  // backend ya responde 403 a `GET /users` para `cliente` si entra por URL
+  // directa -- `entrenador` sí puede leer `GET /users`, pero esta pantalla
+  // igual se le oculta porque dar de alta/activar/desactivar cuentas es
+  // acción exclusiva de admin).
+  { to: '/usuarios', label: 'Usuarios', Icon: IconShield, roles: ['admin'] },
 ]
 
 interface SidebarProps {

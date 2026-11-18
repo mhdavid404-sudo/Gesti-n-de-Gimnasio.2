@@ -70,6 +70,22 @@ export interface PasswordResetResponse {
   temporary_password: string
 }
 
+/** Payload de `POST /users` (pantalla "Usuarios", solo admin/entrenador --
+ * los clientes se gestionan en `/clientes`, ver `UsersPage.tsx`). */
+export interface UserCreatePayload {
+  email: string
+  password: string
+  full_name: string
+  role: 'admin' | 'entrenador'
+}
+
+/** Payload de `PATCH /users/{id}` -- igual semántica de "`null`/omitido no
+ * cambia el campo" que `ClientProfileUpdatePayload`. */
+export interface UserUpdatePayload {
+  full_name?: string | null
+  is_active?: boolean | null
+}
+
 // ---------------------------------------------------------------------------
 // Memberships (RF004) — ver backend/src/api/v1/routers/memberships.py
 // ---------------------------------------------------------------------------

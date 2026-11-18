@@ -123,3 +123,11 @@ export const IconLog = ({ className }: IconProps) => (
     <line x1="6.6" y1="12" x2="9.6" y2="12" />
   </svg>
 )
+
+/** Usuarios (admin/entrenador, pantalla "Usuarios") — escudo con palomita, para distinguir de IconUsers (clientes). */
+export const IconShield = ({ className }: IconProps) => (
+  <svg {...base} className={className}>
+    <path d="M9 2.4 14.6 4.4V9c0 3.6-3 6.2-5.6 7.2C6.4 15.2 3.4 12.6 3.4 9V4.4Z" />
+    <path d="M6.6 9 8.2 10.6 11.4 7.2" />
+  </svg>
+)

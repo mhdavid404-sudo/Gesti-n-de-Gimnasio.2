@@ -14,6 +14,7 @@ import { MembershipsPage } from './pages/MembershipsPage'
 import { PlanesServiciosPage } from './pages/PlanesServiciosPage'
 import { ProgressPage } from './pages/ProgressPage'
 import { RoutinesPage } from './pages/RoutinesPage'
+import { UsersPage } from './pages/UsersPage'
 
 /** Redirige a `/login` si no hay sesión activa -- envuelve las rutas internas (`<AppShell />`). */
 function RequireAuth({ children }: { children: ReactNode }) {
@@ -45,6 +46,7 @@ function App() {
         <Route path="/dietas" element={<DietsPage />} />
         <Route path="/progreso" element={<ProgressPage />} />
         <Route path="/bitacora" element={<AuditLogsPage />} />
+        <Route path="/usuarios" element={<UsersPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
