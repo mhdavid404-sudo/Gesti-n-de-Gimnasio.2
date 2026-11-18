@@ -31,6 +31,21 @@ Resultado real en `docs/RESULTADOS-FINALES.md`.
 | Tablero de membresías activas | `api/v1/routers/memberships.py::get_active_memberships_board` | `pages/MembershipsPage.tsx` | CP29-36 (`test_memberships.py`) | Pasó |
 | Cambio de plan (cancela extras incluidos, conserva el resto, atómico) | `application/memberships/use_cases.py::ChangeMembershipPlanUseCase` | `pages/ClientDetailPage.tsx` (botón "Cambiar plan") | CP37-46 (`test_change_plan.py`) | Pasó |
 
+## Ampliación de RF001/RF003 (restablecimiento de contraseña + edición de datos de cliente, 2026-11-18 — sin ID formal en el documento)
+
+| Elemento | Archivo de código (backend) | Archivo de código (frontend) | CP | Resultado |
+|---|---|---|---|---|
+| Restablecer contraseña (admin, sin pedir la anterior) | `api/v1/routers/users.py::reset_user_password`, `application/users/use_cases.py::ResetUserPasswordUseCase` | `pages/ClientDetailPage.tsx` (botón "Restablecer contraseña", pestaña Perfil) | CP47-49 (`test_users.py`) | Pasó |
+| Editar datos de cliente desde la ficha (teléfono, dirección, fecha de nacimiento, contacto de emergencia, entrenador) | `api/v1/routers/clients.py::update_client` (endpoint ya existía desde Entrega 2; solo faltaba la pantalla) | `pages/ClientDetailPage.tsx` (botón "Editar datos", pestaña Perfil) | CP05 (+ `test_editar_cliente_como_no_admin_devuelve_403`) | Pasó |
+
+## Ampliación de RF001 (pantalla "Usuarios": alta, activar/desactivar admin/entrenador, 2026-11-18 — sin ID formal en el documento)
+
+| Elemento | Archivo de código (backend) | Archivo de código (frontend) | CP | Resultado |
+|---|---|---|---|---|
+| Alta de admin/entrenador con registro en Bitácora | `api/v1/routers/users.py::register_user`, `application/users/use_cases.py::RegisterUserUseCase` (`POST /users` ya existía desde Entrega 2; el registro en `AuditLog` es nuevo) | `pages/UsersPage.tsx` (botón "+ Nuevo usuario") | CP50 (`test_users.py`) | Pasó |
+| Activar/desactivar una cuenta, con autodesactivación bloqueada | `api/v1/routers/users.py::update_user` (`PATCH /users/{id}` ya existía; el chequeo de autodesactivación y el registro en `AuditLog` son nuevos) | `pages/UsersPage.tsx` (botón "Activar"/"Desactivar" por fila) | CP51, CP52 (`test_users.py`) | Pasó |
+| Protección de ruta de "Usuarios" (solo admin, `entrenador`/`cliente` bloqueados incluso por URL directa) | chequeo de rol en el cliente, no en `GET /users` (ver `DECISIONES.md` para por qué no se angostó ese endpoint compartido) | `pages/UsersPage.tsx` | — (verificado en navegador, sin CP de pytest -- es un chequeo puramente de frontend) | Pasó |
+
 ## Modelo de datos (18 tablas)
 
 Ver `docs/diagrama-entidad-relacion.svg` y `backend/MODELO-DATOS.md` para el
