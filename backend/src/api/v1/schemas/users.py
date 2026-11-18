@@ -36,3 +36,13 @@ class UserRead(BaseModel):
     is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class PasswordResetResponse(BaseModel):
+    """Respuesta de `POST /users/{id}/reset-password`: la nueva contraseña
+    temporal, en texto claro, UNA SOLA VEZ -- mismo criterio que
+    `ClientRegisterResponse.temporary_password` (no existe otro endpoint
+    que la vuelva a mostrar despues).
+    """
+
+    temporary_password: str
