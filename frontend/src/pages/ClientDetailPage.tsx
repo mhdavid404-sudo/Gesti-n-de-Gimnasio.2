@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { apiFetch, ApiError } from '../api/client'
+import type { AuthUser } from '../api/authStorage'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { EmptyState } from '../components/ui/EmptyState'
 import { ErrorMessage } from '../components/ui/ErrorMessage'
@@ -29,9 +30,11 @@ import type {
   ApiRoutineExercise,
   ApiService,
   BodyProgressCreatePayload,
+  ClientProfileUpdatePayload,
   DietAssignmentCreatePayload,
   MembershipCreatePayload,
   MembershipServiceCreatePayload,
+  PasswordResetResponse,
   PaymentCreatePayload,
   PaymentItemCreatePayload,
   RoutineAssignmentCreatePayload,
@@ -151,6 +154,123 @@ export function ClientDetailPage() {
       .finally(() => setIsLoading(false))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientProfileId])
+
+  // --- Editar datos del cliente (RF003, solo admin) ------------------------
+  // `PATCH /clients/{id}` ya existía (reasignar entrenador lo usaba desde
+  // Entrega 2) pero ninguna pantalla lo conectaba para el resto de los
+  // campos -- el formulario se prellena con `profile` al abrirse para que
+  // un campo que el admin no toca no se borre (el backend trata cada campo
+  // en `None` como "no cambiar", pero el frontend igual manda el valor
+  // actual explícito en vez de depender de eso).
+  const [showEditForm, setShowEditForm] = useState(false)
+  const [editPhone, setEditPhone] = useState('')
+  const [editBirthDate, setEditBirthDate] = useState('')
+  const [editAddress, setEditAddress] = useState('')
+  const [editEmergencyContact, setEditEmergencyContact] = useState('')
+  const [editTrainerId, setEditTrainerId] = useState('')
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+  const [editToast, setEditToast] = useState<string | null>(null)
+
+  const [trainers, setTrainers] = useState<AuthUser[]>([])
+
+  useEffect(() => {
+    apiFetch<AuthUser[]>('/users?role=entrenador')
+      .then(setTrainers)
+      .catch(() => setTrainers([]))
+  }, [])
+
+  const openEditForm = () => {
+    if (!profile) return
+    setEditPhone(profile.phone ?? '')
+    setEditBirthDate(profile.birth_date ?? '')
+    setEditAddress(profile.address ?? '')
+    setEditEmergencyContact(profile.emergency_contact ?? '')
+    setEditTrainerId(profile.trainer_id != null ? String(profile.trainer_id) : '')
+    setEditError(null)
+    setShowEditForm(true)
+  }
+
+  const handleSaveEdit = async (event: FormEvent) => {
+    event.preventDefault()
+    setEditError(null)
+
+    const payload: ClientProfileUpdatePayload = {
+      trainer_id: editTrainerId ? Number(editTrainerId) : null,
+      phone: editPhone.trim() || null,
+      birth_date: editBirthDate || null,
+      address: editAddress.trim() || null,
+      emergency_contact: editEmergencyContact.trim() || null,
+    }
+
+    setIsSavingEdit(true)
+    try {
+      const updated = await apiFetch<ApiClientProfile>(`/clients/${clientProfileId}`, {
+        method: 'PATCH',
+        body: payload,
+      })
+      setProfile(updated)
+      setEditToast('Datos del cliente actualizados correctamente.')
+      setShowEditForm(false)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.isUnauthorized) {
+          logout()
+          navigate('/login', { replace: true })
+          return
+        }
+        setEditError(
+          err.status === 403 ? 'No tienes permiso para editar este cliente.' : err.message,
+        )
+      } else {
+        setEditError('Ocurrió un error inesperado. Intenta de nuevo.')
+      }
+    } finally {
+      setIsSavingEdit(false)
+    }
+  }
+
+  // --- Restablecer contraseña (solo admin) ---------------------------------
+  // `POST /users/{id}/reset-password` genera una temporal nueva del lado del
+  // servidor -- nunca se pide ni se envía la anterior. Mismo criterio que el
+  // alta de cliente: la temporal se muestra UNA SOLA VEZ en `resetToast`, sin
+  // auto-ocultarse (ver `Toast`, sin temporizador), para que el admin tenga
+  // tiempo de copiarla antes de cerrarlo.
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [isResettingPassword, setIsResettingPassword] = useState(false)
+  const [resetError, setResetError] = useState<string | null>(null)
+  const [resetToast, setResetToast] = useState<string | null>(null)
+
+  const handleResetPassword = async () => {
+    if (!profile) return
+    setResetError(null)
+    setIsResettingPassword(true)
+    try {
+      const response = await apiFetch<PasswordResetResponse>(`/users/${profile.user_id}/reset-password`, {
+        method: 'POST',
+      })
+      setResetToast(
+        `Contraseña restablecida para "${profile.full_name}". Nueva contraseña temporal: ${response.temporary_password} (cópiala y compártela con el cliente; no se mostrará de nuevo).`,
+      )
+      setShowResetConfirm(false)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.isUnauthorized) {
+          logout()
+          navigate('/login', { replace: true })
+          return
+        }
+        setResetError(
+          err.status === 403 ? 'No tienes permiso para restablecer esta contraseña.' : err.message,
+        )
+      } else {
+        setResetError('Ocurrió un error inesperado. Intenta de nuevo.')
+      }
+      setShowResetConfirm(false)
+    } finally {
+      setIsResettingPassword(false)
+    }
+  }
 
   // --- Membresía (RF004, módulo Planes y Membresías) -----------------------
   // `GET /memberships?client_id=` puede devolver varias (historial) -- "la"
@@ -1067,31 +1187,142 @@ export function ClientDetailPage() {
         onCancel={() => setShowDeleteConfirm(false)}
       />
 
+      <ConfirmDialog
+        open={showResetConfirm}
+        title={`¿Restablecer la contraseña de ${profile.full_name}?`}
+        description="Se genera una contraseña temporal nueva y la anterior deja de funcionar de inmediato. La temporal se muestra una sola vez al confirmar -- cópiala y compártela con el cliente."
+        tone="neutral"
+        confirmLabel={isResettingPassword ? 'Restableciendo…' : 'Restablecer'}
+        onConfirm={handleResetPassword}
+        onCancel={() => setShowResetConfirm(false)}
+      />
+
       <div className="card client-detail__tabs">
         <Tabs items={TABS} activeId={activeTab} onChange={setActiveTab}>
           {activeTab === 'perfil' && (
-            <dl className="client-detail__grid">
-              <div>
-                <dt>Teléfono</dt>
-                <dd>{profile.phone ?? '—'}</dd>
-              </div>
-              <div>
-                <dt>Fecha de nacimiento</dt>
-                <dd>{profile.birth_date ?? '—'}</dd>
-              </div>
-              <div>
-                <dt>Dirección</dt>
-                <dd>{profile.address ?? '—'}</dd>
-              </div>
-              <div>
-                <dt>Contacto de emergencia</dt>
-                <dd>{profile.emergency_contact ?? '—'}</dd>
-              </div>
-              <div>
-                <dt>Cliente desde</dt>
-                <dd>{new Date(profile.created_at).toLocaleDateString('es-MX')}</dd>
-              </div>
-            </dl>
+            <div className="client-detail__perfil-tab">
+              {editToast && <Toast message={editToast} onDismiss={() => setEditToast(null)} />}
+              {resetToast && <Toast message={resetToast} onDismiss={() => setResetToast(null)} />}
+              {resetError && <Toast message={resetError} tone="danger" onDismiss={() => setResetError(null)} />}
+
+              {isAdmin && (
+                <div className="client-detail__perfil-header">
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => setShowResetConfirm(true)}
+                  >
+                    Restablecer contraseña
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-ghost"
+                    onClick={() => (showEditForm ? setShowEditForm(false) : openEditForm())}
+                  >
+                    {showEditForm ? 'Cancelar edición' : 'Editar datos'}
+                  </button>
+                </div>
+              )}
+
+              {isAdmin && showEditForm ? (
+                <form className="card client-detail__change-plan-form" onSubmit={handleSaveEdit}>
+                  {editError && <ErrorMessage title="No se pudo guardar" message={editError} />}
+                  <dl className="client-detail__grid">
+                    <div className="client-detail__field">
+                      <label className="field-label" htmlFor="editPhone">
+                        Teléfono
+                      </label>
+                      <input
+                        id="editPhone"
+                        className="input"
+                        value={editPhone}
+                        onChange={(e) => setEditPhone(e.target.value)}
+                      />
+                    </div>
+                    <div className="client-detail__field">
+                      <label className="field-label" htmlFor="editBirthDate">
+                        Fecha de nacimiento
+                      </label>
+                      <input
+                        id="editBirthDate"
+                        type="date"
+                        className="input"
+                        value={editBirthDate}
+                        onChange={(e) => setEditBirthDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="client-detail__field client-detail__grid-full">
+                      <label className="field-label" htmlFor="editAddress">
+                        Dirección
+                      </label>
+                      <input
+                        id="editAddress"
+                        className="input"
+                        value={editAddress}
+                        onChange={(e) => setEditAddress(e.target.value)}
+                      />
+                    </div>
+                    <div className="client-detail__field">
+                      <label className="field-label" htmlFor="editEmergencyContact">
+                        Contacto de emergencia
+                      </label>
+                      <input
+                        id="editEmergencyContact"
+                        className="input"
+                        value={editEmergencyContact}
+                        onChange={(e) => setEditEmergencyContact(e.target.value)}
+                      />
+                    </div>
+                    <div className="client-detail__field">
+                      <label className="field-label" htmlFor="editTrainer">
+                        Entrenador asignado
+                      </label>
+                      <select
+                        id="editTrainer"
+                        className="input"
+                        value={editTrainerId}
+                        onChange={(e) => setEditTrainerId(e.target.value)}
+                      >
+                        <option value="">Sin asignar</option>
+                        {trainers.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.full_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </dl>
+                  <div className="client-detail__assign-actions">
+                    <button type="submit" className="btn btn-primary" disabled={isSavingEdit}>
+                      {isSavingEdit ? 'Guardando…' : 'Guardar cambios'}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <dl className="client-detail__grid">
+                  <div>
+                    <dt>Teléfono</dt>
+                    <dd>{profile.phone ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Fecha de nacimiento</dt>
+                    <dd>{profile.birth_date ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Dirección</dt>
+                    <dd>{profile.address ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Contacto de emergencia</dt>
+                    <dd>{profile.emergency_contact ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Cliente desde</dt>
+                    <dd>{new Date(profile.created_at).toLocaleDateString('es-MX')}</dd>
+                  </div>
+                </dl>
+              )}
+            </div>
           )}
 
           {/* Conectado a la API real (RF004) -- ver useEffect de `membership`/

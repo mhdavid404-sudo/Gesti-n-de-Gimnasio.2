@@ -52,6 +52,24 @@ export interface ClientRegisterResponse {
   temporary_password: string
 }
 
+/** Payload de `PATCH /clients/{id}` -- un campo en `null` significa "no
+ * cambiarlo" del lado del backend (ver `UpdateClientProfileUseCase`), pero
+ * el formulario de edición siempre manda el valor actual explícito en vez
+ * de depender de eso (ver `ClientDetailPage.tsx`). */
+export interface ClientProfileUpdatePayload {
+  trainer_id?: number | null
+  phone?: string | null
+  birth_date?: string | null
+  address?: string | null
+  emergency_contact?: string | null
+}
+
+/** Respuesta de `POST /users/{id}/reset-password` -- la temporal en texto
+ * claro, igual que `ClientRegisterResponse.temporary_password`. */
+export interface PasswordResetResponse {
+  temporary_password: string
+}
+
 // ---------------------------------------------------------------------------
 // Memberships (RF004) — ver backend/src/api/v1/routers/memberships.py
 // ---------------------------------------------------------------------------
