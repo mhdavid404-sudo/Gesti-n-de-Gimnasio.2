@@ -89,21 +89,26 @@
 
 @media (hover: hover) and (pointer: fine) {
   .sidebar__link:hover {
+    /* El fondo de hover es SIEMPRE oscuro (--color-surface) -- el texto
+       se fija en claro de forma explícita en vez de usar --color-text
+       (que fuera de una tarjeta es tinta oscura desde el cambio de fondo
+       del 2026-11-18, ver theme.css). */
     background: var(--color-surface);
-    color: var(--color-text);
+    color: #f2f3ec;
   }
 }
 
 .sidebar__link--active {
   /* El oliva ya es el color PRIMARIO del sistema (Entrega 2, Parte A), no
      solo un acento en reserva — a diferencia del criterio histórico (ver
-     theme.css), aquí se usa directamente como señal de "sección activa":
-     texto, ícono y borde izquierdo en --color-primary sobre el wash
-     translúcido. El ícono usa --color-primary (no el ink oscuro), que ya
-     se verificó con ratio ≈5.24:1 sobre fondos casi negros (ver theme.css). */
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
-  border-left-color: var(--color-primary);
+     theme.css), aquí se usa directamente como señal de "sección activa".
+     --color-primary-soft/--color-primary quedan casi invisibles contra el
+     fondo verde del sidebar (2026-11-18, mismo hue ~71° que el fondo
+     nuevo) -- se usa en su lugar --color-accent-on-canvas(-soft), la
+     versión oscurecida pensada exactamente para esto (ver theme.css). */
+  background: var(--color-accent-on-canvas-soft);
+  color: var(--color-accent-on-canvas);
+  border-left-color: var(--color-accent-on-canvas);
   font-weight: 600;
 }
 

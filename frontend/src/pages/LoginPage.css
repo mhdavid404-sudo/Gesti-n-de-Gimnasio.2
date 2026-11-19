@@ -25,8 +25,12 @@
 
 @media (hover: hover) and (pointer: fine) {
   .login__back-link:hover {
-    color: var(--color-accent);
-    background: var(--color-accent-soft);
+    /* --color-accent/-soft quedan casi invisibles contra el verde de
+       fondo del hero (2026-11-18) -- este link vive directo sobre ese
+       fondo, así que usa --color-accent-on-canvas(-soft) en vez (ver
+       theme.css). */
+    color: var(--color-accent-on-canvas);
+    background: var(--color-accent-on-canvas-soft);
   }
 }
 

@@ -53,7 +53,11 @@
   padding: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  background: var(--color-bg-elevated);
+  /* --color-surface-2 (no --color-bg-elevated): ese token pasó a ser el
+     verde de fondo (2026-11-18) -- esta tarjeta necesita su propia
+     superficie oscura real para que su texto siga siendo legible (ver
+     theme.css, "Superficies oscuras reales"). */
+  background: var(--color-surface-2);
   cursor: pointer;
   /* A diferencia de .plan-card (solo informativa), esta SÍ es
      una tarjeta clickeable real (label de un radio) — por eso lleva el

@@ -38,13 +38,17 @@
   display: none;
   align-items: center;
   gap: 6px;
-  background: var(--color-primary-soft);
+  /* --color-primary-soft/--color-primary quedan casi invisibles contra el
+     lienzo verde (2026-11-18) -- este botón vive directo sobre el fondo
+     de la app, no dentro de una tarjeta, así que usa
+     --color-accent-on-canvas(-soft) en vez (ver theme.css). */
+  background: var(--color-accent-on-canvas-soft);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   padding: 8px 12px;
   font-size: 13.5px;
   font-weight: 600;
-  color: var(--color-primary);
+  color: var(--color-accent-on-canvas);
 }
 
 @media (max-width: 1100px) {
@@ -110,7 +114,11 @@
   top: -4px;
   right: -4px;
   background: var(--color-danger);
-  color: var(--color-bg);
+  /* --color-primary-text (no --color-bg): esto siempre fue "tinta oscura
+     sobre un chip de color", aprovechando que --color-bg ERA casi negro --
+     ahora que --color-bg es verde (2026-11-18), hay que usar el token de
+     tinta oscura real en vez (ver theme.css). */
+  color: var(--color-primary-text);
   font-size: 10px;
   font-weight: 700;
   min-width: 16px;

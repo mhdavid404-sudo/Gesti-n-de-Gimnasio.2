@@ -7,7 +7,11 @@
   align-items: center;
   gap: var(--space-2);
   padding: 8px 10px;
-  background: var(--color-bg-elevated);
+  /* --color-surface-2 (no --color-bg-elevated): ese token pasó a ser el
+     verde de fondo (2026-11-18) -- esta herramienta de desarrollo
+     necesita su propia superficie oscura real para que su texto siga
+     siendo legible (ver theme.css, "Superficies oscuras reales"). */
+  background: var(--color-surface-2);
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-floating);

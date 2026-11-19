@@ -124,16 +124,36 @@
 :root {
   color-scheme: dark;
 
-  --color-bg: #0b0c09;
-  --color-bg-elevated: #121409;
+  /* Fondo verde a pedido del cliente (2026-11-18, ver DECISIONES.md) --
+     #9CBF4A en vez del casi-negro original. Único lugar donde se define:
+     --color-bg (body/Sidebar/Login) y --color-bg-elevated (lienzo
+     principal del panel, ver AppShell.css) son ahora el MISMO verde --
+     antes eran dos tonos de negro casi idénticos, que ahora son el mismo
+     verde por la misma razón (no hay necesidad de dos verdes distintos
+     para lo que siempre fue "una sola superficie de fondo"). */
+  --color-bg: #9cbf4a;
+  --color-bg-elevated: #9cbf4a;
   --color-surface: #181a13;
   --color-surface-2: #21241a;
   --color-border: #2e3224;
   --color-border-soft: #1f2217;
 
-  --color-text: #f2f3ec;
-  --color-text-muted: #abb09c;
-  --color-text-dim: #7c816f;
+  /* Texto -- invertido a tinta oscura porque el fondo ya no es casi negro,
+     es un verde medio-claro (L relativa ≈0.448): texto claro sobre ese
+     verde no pasa ni AA grande (ver cálculo de contraste abajo). Esto
+     aplica solo donde el texto queda DIRECTO sobre --color-bg/-elevated
+     (títulos de página, Sidebar, el hero de Login) -- dentro de
+     superficies que siguen siendo oscuras de verdad (.card, .input, etc.)
+     se restauran los valores claros originales, ver el bloque
+     "Superficies oscuras reales" más abajo.
+     Contraste verificado (WCAG, luminancia relativa) contra el verde
+     nuevo (#9CBF4A, L≈0.448):
+       --color-text       (#10140a) ratio ≈ 8.8:1  (reusa --color-primary-text)
+       --color-text-muted (#2c3321) ratio ≈ 6.2:1
+       --color-text-dim   (#39431f) ratio ≈ 5.0:1 (el mínimo del sistema, igual que antes) */
+  --color-text: #10140a;
+  --color-text-muted: #2c3321;
+  --color-text-dim: #39431f;
 
   /* Oliva primario del sistema de diseño (Entrega 2, Parte A) — variantes
      claras/oscuras para hover/active, un ink oscuro para texto sobre
@@ -154,6 +174,20 @@
   --color-accent-hover: var(--color-primary-light);
   --color-accent-soft: var(--color-primary-soft);
   --color-accent-text: var(--color-primary-text);
+
+  /* --color-primary (#97A947) queda CASI IGUAL que el verde de fondo nuevo
+     (#9CBF4A, mismo hue ~71°) -- usado como TEXTO/borde directo sobre el
+     fondo (nav activo del Sidebar, el botón "Resultados" del Topbar en
+     móvil, el link "Volver al inicio" en hover) el acento se vuelve casi
+     invisible (ratio ≈1.2:1). Se avisó esto al cliente antes de aplicar
+     ningún ajuste (ver DECISIONES.md). --color-primary EN SÍ no se toca
+     (sigue sirviendo perfecto como relleno de botón, con su propia tinta
+     encima -- ese contraste no depende del fondo de alrededor): estos 2
+     tokens nuevos son solo para los 3 lugares puntuales donde el acento se
+     usa como texto/borde suelto directo sobre el verde, mismo hue, pero
+     oscurecido lo suficiente para pasar AA (ratio ≈5.0:1). */
+  --color-accent-on-canvas: #3a4319;
+  --color-accent-on-canvas-soft: rgba(16, 20, 10, 0.14);
 
   /* Estados semánticos — separados por HUE del primario oliva (~71°), no
      solo por brillo (ver nota de contraste/hue arriba). */
@@ -230,6 +264,53 @@
   --sidebar-width: 232px;
 }
 
+/* ---------------------------------------------------------------------------
+   Superficies oscuras reales -- 2026-11-18, cambio de fondo a verde.
+
+   --color-bg/-elevated ya no es casi-negro, así que --color-text/-muted/
+   -dim se invirtieron arriba a tinta oscura (son el valor por defecto,
+   pensado para texto que cae DIRECTO sobre ese verde: títulos de página,
+   Sidebar, el hero de Login). Pero varios contenedores siguen teniendo su
+   PROPIO fondo oscuro de verdad (nunca leyeron --color-bg/-elevated, o se
+   redirigieron aquí mismo a --color-surface-2 -- ver `.input`/
+   RoleSwitcher.css/ClientFormPage.css/ProgressPage.css) -- dentro de esos,
+   se restauran los 3 valores claros originales, igual que siempre.
+   Ninguna de estas reglas cambia qué pantalla usa cuál fondo, solo qué
+   color de texto le corresponde a cada superficie.
+
+   El `color: var(--color-text)` explícito aquí (no solo redefinir la
+   variable) es necesario: un elemento sin `color` propio (ej. un `<h1>`
+   plano, como `.login__title`) no reevalúa `var(--color-text)` por su
+   cuenta, hereda el valor de `color` YA RESUELTO de su ancestro más
+   cercano que sí lo haya declarado (normalmente `body`, en tinta oscura)
+   -- sin este `color:` aquí, cualquier título sin clase propia dentro de
+   una tarjeta se quedaría oscuro sobre oscuro. Encontrado al verificar
+   /login en el navegador (el título "Iniciar sesión" era ilegible). */
+.card,
+.app-shell__results,
+.input,
+.role-switcher,
+.client-form__plan,
+.progress-page__metric-toggle,
+.sidebar__brand-mark,
+.topbar__notif-panel,
+.topbar__bell,
+.topbar__menu-btn,
+.topbar__avatar,
+.quick-action-card,
+/* ConfirmDialog se monta vía createPortal en document.body (ver
+   ConfirmDialog.tsx) -- queda fuera de CUALQUIER tarjeta/página sin
+   importar desde dónde se abrió, así que necesita su propia entrada
+   aquí explícita (encontrado al verificar "Restablecer contraseña" en
+   Usuarios: el texto del diálogo era casi ilegible, tinta oscura sobre
+   su propio panel oscuro). */
+.confirm-dialog__panel {
+  --color-text: #f2f3ec;
+  --color-text-muted: #abb09c;
+  --color-text-dim: #7c816f;
+  color: var(--color-text);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -285,9 +366,15 @@ button {
   cursor: pointer;
 }
 
-/* Foco de teclado visible en todo el sistema — accesibilidad obligatoria */
+/* Foco de teclado visible en todo el sistema — accesibilidad obligatoria.
+   Usa --color-text (no --color-accent): --color-accent queda casi igual
+   al verde de fondo nuevo (ver nota de `--color-accent-on-canvas` arriba)
+   y un anillo de foco necesita 3:1 contra lo que sea que tenga alrededor,
+   en cualquier parte de la pantalla. --color-text ya es contextual (tinta
+   oscura sobre el lienzo verde, claro dentro de una tarjeta -- ver bloque
+   "Superficies oscuras reales"), así que el anillo se adapta solo. */
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-text);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -377,6 +464,17 @@ button {
      el botón de acción primaria. */
   background: var(--color-accent);
   color: var(--color-accent-text);
+  /* Encontrado al verificar "+ Nuevo cliente" en el navegador: el relleno
+     (#97A947) es casi idéntico al verde de fondo nuevo (#9CBF4A, mismo
+     hue ~71°) -- un botón primario directo sobre el lienzo (fuera de una
+     tarjeta, ej. la barra de "+ Nuevo X" de cada tabla) se volvía casi
+     invisible, se notaba solo por el texto encima, no por su borde. Este
+     borde (mismo --color-accent-on-canvas oscuro ya usado para
+     texto/wash sobre el lienzo) le da un límite visible SIN tocar el
+     relleno ni el verde pedido -- sobre una tarjeta oscura el botón ya
+     se distinguía bien solo por el relleno, así que este borde ahí es
+     casi imperceptible (no estorba). */
+  border-color: var(--color-accent-on-canvas);
 }
 
 .btn-ghost {
@@ -393,13 +491,26 @@ button {
     background: var(--color-accent-hover);
   }
   .btn-ghost:hover {
+    /* El fondo de hover es SIEMPRE oscuro (--color-surface-2),
+       independientemente de si el botón vive sobre el lienzo verde o
+       dentro de una tarjeta -- por eso el texto/borde de este estado se
+       fijan en claro de forma explícita (no vía --color-text/-text-dim,
+       que ahora son oscuros fuera de una tarjeta) en vez de depender del
+       contexto. */
     background: var(--color-surface-2);
-    border-color: var(--color-text-dim);
+    border-color: #7c816f;
+    color: #f2f3ec;
   }
 }
 
 .input {
-  background: var(--color-bg-elevated);
+  /* --color-surface-2 (no --color-bg-elevated): ese token pasó a ser el
+     verde de fondo (2026-11-18) -- un input SIEMPRE necesita su propia
+     superficie oscura real para que su texto (claro, ver bloque
+     "Superficies oscuras reales" de arriba) siga siendo legible,
+     independientemente de si el input vive sobre el lienzo verde o
+     dentro de una tarjeta. */
+  background: var(--color-surface-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   padding: 10px 12px;
