@@ -74,3 +74,16 @@ class UnauthorizedRoutineAssignmentError(Exception):
     def __init__(self, client_id: int) -> None:
         self.client_id = client_id
         super().__init__(f"El cliente {client_id} no esta asignado a este entrenador")
+
+
+class UnauthorizedRoutineEditError(Exception):
+    """Un `entrenador` intento editar/eliminar una rutina que NO creo el.
+
+    Ampliacion de RF012 (2026-11-18, "editar/eliminar rutina"): `admin`
+    puede editar/eliminar cualquier rutina del catalogo; `entrenador` solo
+    las que el mismo creo (`Routine.created_by`).
+    """
+
+    def __init__(self, routine_id: int) -> None:
+        self.routine_id = routine_id
+        super().__init__(f"La rutina {routine_id} no fue creada por este entrenador")

@@ -73,6 +73,13 @@ class RoutineAssignmentRepository(ABC):
         ...
 
     @abstractmethod
+    def has_assignments_for_routine(self, routine_id: int) -> bool:
+        """Usado por `DeleteOrDeactivateRoutineUseCase` (2026-11-18, ampliacion
+        de RF012): decide si eliminar una rutina la borra de verdad o solo la
+        desactiva -- mismo patron que `has_memberships_for_plan`."""
+        ...
+
+    @abstractmethod
     def add(self, assignment: RoutineAssignment) -> RoutineAssignment: ...
 
     @abstractmethod

@@ -34,6 +34,7 @@ import type {
   BodyProgressCreatePayload,
   ClientProfileUpdatePayload,
   DietAssignmentCreatePayload,
+  DietAssignmentUpdatePayload,
   MembershipCreatePayload,
   MembershipRenewalUndoPayload,
   MembershipRenewPayload,
@@ -42,6 +43,7 @@ import type {
   PaymentCreatePayload,
   PaymentItemCreatePayload,
   RoutineAssignmentCreatePayload,
+  RoutineAssignmentUpdatePayload,
 } from '../types/api'
 import {
   addDaysIso,
@@ -1031,6 +1033,91 @@ export function ClientDetailPage() {
     }
   }
 
+  // --- Corregir/quitar una asignación de rutina (admin, o entrenador dueño
+  // del cliente) -- 2026-11-18, ampliación de RF012 ("error de dedo" y
+  // "quitarla sin perder la bitácora"). Editar NUNCA la elimina, aunque ya
+  // esté 'completada'.
+  const [editingRoutineAssignmentId, setEditingRoutineAssignmentId] = useState<number | null>(null)
+  const [editRoutineAssignRoutineId, setEditRoutineAssignRoutineId] = useState('')
+  const [editRoutineAssignDate, setEditRoutineAssignDate] = useState('')
+  const [editRoutineAssignServerError, setEditRoutineAssignServerError] = useState<string | null>(null)
+  const [isSavingRoutineAssignEdit, setIsSavingRoutineAssignEdit] = useState(false)
+
+  const openEditRoutineAssignmentForm = (assignment: ApiRoutineAssignment) => {
+    setEditingRoutineAssignmentId(assignment.id)
+    setEditRoutineAssignRoutineId(String(assignment.routine_id))
+    setEditRoutineAssignDate(assignment.assigned_date)
+    setEditRoutineAssignServerError(null)
+  }
+
+  const handleSaveRoutineAssignmentEdit = async (event: FormEvent, assignment: ApiRoutineAssignment) => {
+    event.preventDefault()
+    setEditRoutineAssignServerError(null)
+
+    const payload: RoutineAssignmentUpdatePayload = {
+      routine_id: Number(editRoutineAssignRoutineId),
+      assigned_date: editRoutineAssignDate,
+    }
+
+    setIsSavingRoutineAssignEdit(true)
+    try {
+      const updated = await apiFetch<ApiRoutineAssignment>(`/routines/assignments/${assignment.id}`, {
+        method: 'PATCH',
+        body: payload,
+      })
+      setRoutineAssignments((prev) => (prev ?? []).map((a) => (a.id === updated.id ? updated : a)))
+      setEditingRoutineAssignmentId(null)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.isUnauthorized) {
+          logout()
+          navigate('/login', { replace: true })
+          return
+        }
+        if (err.status === 403) {
+          setEditRoutineAssignServerError('No tienes permiso para corregir esta asignación.')
+          return
+        }
+        setEditRoutineAssignServerError(err.message)
+        return
+      }
+      setEditRoutineAssignServerError('Ocurrió un error inesperado. Intenta de nuevo.')
+    } finally {
+      setIsSavingRoutineAssignEdit(false)
+    }
+  }
+
+  const [deletingRoutineAssignment, setDeletingRoutineAssignment] = useState<ApiRoutineAssignment | null>(null)
+  const [isDeletingRoutineAssignment, setIsDeletingRoutineAssignment] = useState(false)
+  const [deleteRoutineAssignmentError, setDeleteRoutineAssignmentError] = useState<string | null>(null)
+
+  const handleDeleteRoutineAssignment = async () => {
+    if (!deletingRoutineAssignment) return
+    setIsDeletingRoutineAssignment(true)
+    try {
+      await apiFetch<void>(`/routines/assignments/${deletingRoutineAssignment.id}`, { method: 'DELETE' })
+      setRoutineAssignments((prev) => (prev ?? []).filter((a) => a.id !== deletingRoutineAssignment.id))
+      setAssignRoutineToast('Asignación eliminada.')
+      setDeletingRoutineAssignment(null)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.isUnauthorized) {
+          logout()
+          navigate('/login', { replace: true })
+          return
+        }
+        setDeleteRoutineAssignmentError(
+          err.status === 403 ? 'No tienes permiso para eliminar esta asignación.' : err.message,
+        )
+      } else {
+        setDeleteRoutineAssignmentError('Ocurrió un error inesperado. Intenta de nuevo.')
+      }
+      setDeletingRoutineAssignment(null)
+    } finally {
+      setIsDeletingRoutineAssignment(false)
+    }
+  }
+
   // --- Dieta (RF009, módulo Dietas) ----------------------------------------
   // Mismo patrón que "Rutina" arriba: historial real vía
   // `GET /diets/assignments/clients/{id}` (ownership por dato ya resuelto en
@@ -1142,6 +1229,89 @@ export function ClientDetailPage() {
       setAssignDietServerError('Ocurrió un error inesperado. Intenta de nuevo.')
     } finally {
       setIsAssigningDiet(false)
+    }
+  }
+
+  // --- Corregir/quitar una asignación de dieta -- mismo criterio que
+  // "Rutina" arriba (2026-11-18, ampliación de RF012).
+  const [editingDietAssignmentId, setEditingDietAssignmentId] = useState<number | null>(null)
+  const [editDietAssignPlanId, setEditDietAssignPlanId] = useState('')
+  const [editDietAssignDate, setEditDietAssignDate] = useState('')
+  const [editDietAssignServerError, setEditDietAssignServerError] = useState<string | null>(null)
+  const [isSavingDietAssignEdit, setIsSavingDietAssignEdit] = useState(false)
+
+  const openEditDietAssignmentForm = (assignment: ApiDietAssignment) => {
+    setEditingDietAssignmentId(assignment.id)
+    setEditDietAssignPlanId(String(assignment.diet_plan_id))
+    setEditDietAssignDate(assignment.assigned_date)
+    setEditDietAssignServerError(null)
+  }
+
+  const handleSaveDietAssignmentEdit = async (event: FormEvent, assignment: ApiDietAssignment) => {
+    event.preventDefault()
+    setEditDietAssignServerError(null)
+
+    const payload: DietAssignmentUpdatePayload = {
+      diet_plan_id: Number(editDietAssignPlanId),
+      assigned_date: editDietAssignDate,
+    }
+
+    setIsSavingDietAssignEdit(true)
+    try {
+      const updated = await apiFetch<ApiDietAssignment>(`/diets/assignments/${assignment.id}`, {
+        method: 'PATCH',
+        body: payload,
+      })
+      setDietAssignments((prev) => (prev ?? []).map((a) => (a.id === updated.id ? updated : a)))
+      setEditingDietAssignmentId(null)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.isUnauthorized) {
+          logout()
+          navigate('/login', { replace: true })
+          return
+        }
+        if (err.status === 403) {
+          setEditDietAssignServerError('No tienes permiso para corregir esta asignación.')
+          return
+        }
+        setEditDietAssignServerError(err.message)
+        return
+      }
+      setEditDietAssignServerError('Ocurrió un error inesperado. Intenta de nuevo.')
+    } finally {
+      setIsSavingDietAssignEdit(false)
+    }
+  }
+
+  const [deletingDietAssignment, setDeletingDietAssignment] = useState<ApiDietAssignment | null>(null)
+  const [isDeletingDietAssignment, setIsDeletingDietAssignment] = useState(false)
+  const [deleteDietAssignmentError, setDeleteDietAssignmentError] = useState<string | null>(null)
+
+  const handleDeleteDietAssignment = async () => {
+    if (!deletingDietAssignment) return
+    setIsDeletingDietAssignment(true)
+    try {
+      await apiFetch<void>(`/diets/assignments/${deletingDietAssignment.id}`, { method: 'DELETE' })
+      setDietAssignments((prev) => (prev ?? []).filter((a) => a.id !== deletingDietAssignment.id))
+      setAssignDietToast('Asignación eliminada.')
+      setDeletingDietAssignment(null)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.isUnauthorized) {
+          logout()
+          navigate('/login', { replace: true })
+          return
+        }
+        setDeleteDietAssignmentError(
+          err.status === 403 ? 'No tienes permiso para eliminar esta asignación.' : err.message,
+        )
+      } else {
+        setDeleteDietAssignmentError('Ocurrió un error inesperado. Intenta de nuevo.')
+      }
+      setDeletingDietAssignment(null)
+    } finally {
+      setIsDeletingDietAssignment(false)
     }
   }
 
@@ -1320,6 +1490,20 @@ export function ClientDetailPage() {
       </div>
 
       {deleteError && <Toast message={deleteError} tone="danger" onDismiss={() => setDeleteError(null)} />}
+      {deleteRoutineAssignmentError && (
+        <Toast
+          message={deleteRoutineAssignmentError}
+          tone="danger"
+          onDismiss={() => setDeleteRoutineAssignmentError(null)}
+        />
+      )}
+      {deleteDietAssignmentError && (
+        <Toast
+          message={deleteDietAssignmentError}
+          tone="danger"
+          onDismiss={() => setDeleteDietAssignmentError(null)}
+        />
+      )}
 
       <ConfirmDialog
         open={showDeleteConfirm}
@@ -1360,6 +1544,24 @@ export function ClientDetailPage() {
         confirmLabel={isSavingEdit ? 'Guardando…' : 'Cambiar correo y guardar'}
         onConfirm={() => void performSaveEdit()}
         onCancel={() => setShowEmailChangeConfirm(false)}
+      />
+
+      <ConfirmDialog
+        open={deletingRoutineAssignment != null}
+        title="¿Quitar esta asignación de rutina?"
+        description="Se elimina del historial de este cliente. La acción queda registrada en la bitácora."
+        confirmLabel={isDeletingRoutineAssignment ? 'Quitando…' : 'Quitar'}
+        onConfirm={handleDeleteRoutineAssignment}
+        onCancel={() => setDeletingRoutineAssignment(null)}
+      />
+
+      <ConfirmDialog
+        open={deletingDietAssignment != null}
+        title="¿Quitar esta asignación de dieta?"
+        description="Se elimina del historial de este cliente. La acción queda registrada en la bitácora."
+        confirmLabel={isDeletingDietAssignment ? 'Quitando…' : 'Quitar'}
+        onConfirm={handleDeleteDietAssignment}
+        onCancel={() => setDeletingDietAssignment(null)}
       />
 
       <div className="card client-detail__tabs">
@@ -2395,6 +2597,82 @@ export function ClientDetailPage() {
                                 </tbody>
                               </table>
                             )}
+
+                            {isStaff && editingRoutineAssignmentId !== ra.id && (
+                              <div className="client-detail__payments-toolbar">
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost"
+                                  onClick={() => openEditRoutineAssignmentForm(ra)}
+                                >
+                                  Corregir
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost"
+                                  onClick={() => setDeletingRoutineAssignment(ra)}
+                                >
+                                  Quitar
+                                </button>
+                              </div>
+                            )}
+
+                            {isStaff && editingRoutineAssignmentId === ra.id && (
+                              <form
+                                className="client-detail__assign-form"
+                                onSubmit={(e) => handleSaveRoutineAssignmentEdit(e, ra)}
+                              >
+                                {editRoutineAssignServerError && (
+                                  <ErrorMessage
+                                    title="No se pudo corregir la asignación"
+                                    message={editRoutineAssignServerError}
+                                  />
+                                )}
+                                <div className="client-detail__assign-row">
+                                  <div className="client-detail__field">
+                                    <label className="field-label" htmlFor={`editRoutineAssignRoutine-${ra.id}`}>
+                                      Rutina
+                                    </label>
+                                    <select
+                                      id={`editRoutineAssignRoutine-${ra.id}`}
+                                      className="input"
+                                      value={editRoutineAssignRoutineId}
+                                      onChange={(e) => setEditRoutineAssignRoutineId(e.target.value)}
+                                    >
+                                      {routinesCatalog.map((r) => (
+                                        <option key={r.id} value={r.id}>
+                                          {r.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div className="client-detail__field">
+                                    <label className="field-label" htmlFor={`editRoutineAssignDate-${ra.id}`}>
+                                      Fecha de asignación
+                                    </label>
+                                    <input
+                                      id={`editRoutineAssignDate-${ra.id}`}
+                                      type="date"
+                                      className="input"
+                                      value={editRoutineAssignDate}
+                                      onChange={(e) => setEditRoutineAssignDate(e.target.value)}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="client-detail__assign-actions">
+                                  <button
+                                    type="button"
+                                    className="btn btn-ghost"
+                                    onClick={() => setEditingRoutineAssignmentId(null)}
+                                  >
+                                    Cancelar
+                                  </button>
+                                  <button type="submit" className="btn btn-primary" disabled={isSavingRoutineAssignEdit}>
+                                    {isSavingRoutineAssignEdit ? 'Guardando…' : 'Guardar corrección'}
+                                  </button>
+                                </div>
+                              </form>
+                            )}
                           </div>
                         )
                       })}
@@ -2523,6 +2801,82 @@ export function ClientDetailPage() {
                               {' · '}asignado el {da.assigned_date}
                               {da.notes ? ` · ${da.notes}` : ''}
                             </p>
+
+                            {isStaff && editingDietAssignmentId !== da.id && (
+                              <div className="client-detail__payments-toolbar">
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost"
+                                  onClick={() => openEditDietAssignmentForm(da)}
+                                >
+                                  Corregir
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn btn-ghost"
+                                  onClick={() => setDeletingDietAssignment(da)}
+                                >
+                                  Quitar
+                                </button>
+                              </div>
+                            )}
+
+                            {isStaff && editingDietAssignmentId === da.id && (
+                              <form
+                                className="client-detail__assign-form"
+                                onSubmit={(e) => handleSaveDietAssignmentEdit(e, da)}
+                              >
+                                {editDietAssignServerError && (
+                                  <ErrorMessage
+                                    title="No se pudo corregir la asignación"
+                                    message={editDietAssignServerError}
+                                  />
+                                )}
+                                <div className="client-detail__assign-row">
+                                  <div className="client-detail__field">
+                                    <label className="field-label" htmlFor={`editDietAssignPlan-${da.id}`}>
+                                      Plan de dieta
+                                    </label>
+                                    <select
+                                      id={`editDietAssignPlan-${da.id}`}
+                                      className="input"
+                                      value={editDietAssignPlanId}
+                                      onChange={(e) => setEditDietAssignPlanId(e.target.value)}
+                                    >
+                                      {dietPlansCatalog.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                          {p.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div className="client-detail__field">
+                                    <label className="field-label" htmlFor={`editDietAssignDate-${da.id}`}>
+                                      Fecha de asignación
+                                    </label>
+                                    <input
+                                      id={`editDietAssignDate-${da.id}`}
+                                      type="date"
+                                      className="input"
+                                      value={editDietAssignDate}
+                                      onChange={(e) => setEditDietAssignDate(e.target.value)}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="client-detail__assign-actions">
+                                  <button
+                                    type="button"
+                                    className="btn btn-ghost"
+                                    onClick={() => setEditingDietAssignmentId(null)}
+                                  >
+                                    Cancelar
+                                  </button>
+                                  <button type="submit" className="btn btn-primary" disabled={isSavingDietAssignEdit}>
+                                    {isSavingDietAssignEdit ? 'Guardando…' : 'Guardar corrección'}
+                                  </button>
+                                </div>
+                              </form>
+                            )}
                           </div>
                         )
                       })}

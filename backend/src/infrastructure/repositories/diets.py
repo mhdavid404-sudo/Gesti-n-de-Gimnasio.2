@@ -19,6 +19,7 @@ def _plan_to_entity(model: DietPlanModel) -> DietPlan:
         description=model.description,
         calories_target=model.calories_target,
         created_at=model.created_at,
+        is_active=model.is_active,
     )
 
 
@@ -64,6 +65,7 @@ class SqlAlchemyDietPlanRepository(DietPlanRepository):
         model.name = diet_plan.name
         model.description = diet_plan.description
         model.calories_target = diet_plan.calories_target
+        model.is_active = diet_plan.is_active
         self._session.flush()
         return _plan_to_entity(model)
 
@@ -101,6 +103,16 @@ class SqlAlchemyDietAssignmentRepository(DietAssignmentRepository):
         ).scalars()
         return [_assignment_to_entity(m) for m in models]
 
+    def has_assignments_for_diet_plan(self, diet_plan_id: int) -> bool:
+        return (
+            self._session.execute(
+                select(DietAssignmentModel.id)
+                .where(DietAssignmentModel.diet_plan_id == diet_plan_id)
+                .limit(1)
+            ).first()
+            is not None
+        )
+
     def add(self, assignment: DietAssignment) -> DietAssignment:
         model = DietAssignmentModel(
             diet_plan_id=assignment.diet_plan_id,
@@ -118,6 +130,8 @@ class SqlAlchemyDietAssignmentRepository(DietAssignmentRepository):
         model = self._session.get(DietAssignmentModel, assignment.id)
         if model is None:
             raise ValueError(f"DietAssignment {assignment.id} no existe")
+        model.diet_plan_id = assignment.diet_plan_id
+        model.assigned_date = assignment.assigned_date
         model.status = assignment.status
         model.notes = assignment.notes
         self._session.flush()

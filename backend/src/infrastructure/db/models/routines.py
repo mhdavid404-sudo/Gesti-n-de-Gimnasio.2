@@ -14,6 +14,7 @@ from __future__ import annotations
 from datetime import date, datetime
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Date,
     DateTime,
@@ -57,6 +58,10 @@ class RoutineModel(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    # 2026-11-18 (ampliacion de RF012, "editar/eliminar rutina"): ver nota
+    # en `domain/routines/entities.py` -- mismo patron que
+    # `MembershipPlanModel.is_active`.
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
 
 
 class RoutineExerciseModel(Base):

@@ -43,6 +43,7 @@ def _routine_to_entity(model: RoutineModel) -> Routine:
         created_by=model.created_by,
         description=model.description,
         created_at=model.created_at,
+        is_active=model.is_active,
     )
 
 
@@ -140,6 +141,7 @@ class SqlAlchemyRoutineRepository(RoutineRepository):
             raise ValueError(f"Routine {routine.id} no existe")
         model.name = routine.name
         model.description = routine.description
+        model.is_active = routine.is_active
         self._session.flush()
         return _routine_to_entity(model)
 
@@ -205,6 +207,16 @@ class SqlAlchemyRoutineAssignmentRepository(RoutineAssignmentRepository):
         ).scalars()
         return [_assignment_to_entity(m) for m in models]
 
+    def has_assignments_for_routine(self, routine_id: int) -> bool:
+        return (
+            self._session.execute(
+                select(RoutineAssignmentModel.id)
+                .where(RoutineAssignmentModel.routine_id == routine_id)
+                .limit(1)
+            ).first()
+            is not None
+        )
+
     def add(self, assignment: RoutineAssignment) -> RoutineAssignment:
         model = RoutineAssignmentModel(
             routine_id=assignment.routine_id,
@@ -222,6 +234,8 @@ class SqlAlchemyRoutineAssignmentRepository(RoutineAssignmentRepository):
         model = self._session.get(RoutineAssignmentModel, assignment.id)
         if model is None:
             raise ValueError(f"RoutineAssignment {assignment.id} no existe")
+        model.routine_id = assignment.routine_id
+        model.assigned_date = assignment.assigned_date
         model.status = assignment.status
         model.notes = assignment.notes
         self._session.flush()

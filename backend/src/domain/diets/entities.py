@@ -30,6 +30,11 @@ class DietPlan:
     description: str | None = None
     calories_target: int | None = None
     created_at: datetime | None = None
+    # 2026-11-18 (ampliacion de RF012, "editar/eliminar dieta"): mismo
+    # criterio que `Routine.is_active` -- "eliminar" un plan con
+    # asignaciones lo DESACTIVA en vez de borrarlo, para conservar el
+    # historial de quien lo tuvo asignado.
+    is_active: bool = True
 
 
 @dataclass

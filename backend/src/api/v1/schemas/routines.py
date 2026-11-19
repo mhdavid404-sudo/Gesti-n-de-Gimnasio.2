@@ -39,6 +39,15 @@ class RoutineCreate(BaseModel):
     description: str | None = None
 
 
+class RoutineUpdate(BaseModel):
+    """2026-11-18 (ampliacion de RF012, "editar rutina"): `None` en
+    cualquiera de los dos campos significa "no cambiarlo" (mismo criterio
+    que `RoutineAssignmentUpdate`)."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=150)
+    description: str | None = None
+
+
 class RoutineRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -47,6 +56,7 @@ class RoutineRead(BaseModel):
     created_by: int
     description: str | None
     created_at: datetime
+    is_active: bool
 
 
 class RoutineExerciseCreate(BaseModel):
@@ -86,9 +96,15 @@ class RoutineAssignmentCreate(BaseModel):
 
 class RoutineAssignmentUpdate(BaseModel):
     """RF012 (nuevo, ver DECISIONES.md): el entrenador/admin puede cambiar
-    `status`/`notes` de una asignacion existente. Ambos opcionales -- solo
-    se actualiza lo que venga distinto de `None`."""
+    `status`/`notes` de una asignacion existente. Todos opcionales -- solo
+    se actualiza lo que venga distinto de `None`.
 
+    2026-11-18 (ampliacion de RF012, "corregir una asignacion, error de
+    dedo"): se agregan `routine_id`/`assigned_date`, antes solo se podia
+    cambiar `status`/`notes`."""
+
+    routine_id: int | None = None
+    assigned_date: date | None = None
     status: AssignmentStatus | None = None
     notes: str | None = None
 
@@ -103,3 +119,13 @@ class RoutineAssignmentRead(BaseModel):
     assigned_date: date
     status: AssignmentStatus
     notes: str | None
+
+
+class RoutineDeleteResult(BaseModel):
+    """2026-11-18 (ampliacion de RF012, "eliminar rutina"): mismo patron
+    que `MembershipRenewResult` -- `DELETE /routines/{id}` nunca es solo
+    "borrar la fila", asi que la respuesta dice cual de las dos paso."""
+
+    deleted: bool
+    routine: RoutineRead | None
+    message: str

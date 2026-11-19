@@ -10,6 +10,7 @@ tiene una tabla puente de sub-items equivalente a
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 
 from src.domain.clients.exceptions import ClientNotFoundError
 from src.domain.clients.repositories import ClientProfileRepository
@@ -19,9 +20,12 @@ from src.domain.diets.exceptions import (
     DietPlanNotFoundError,
     InvalidDietAssignmentStatusError,
     UnauthorizedDietAssignmentError,
+    UnauthorizedDietEditError,
     UnauthorizedDietPlanCreatorError,
 )
 from src.domain.diets.repositories import DietAssignmentRepository, DietPlanRepository
+from src.domain.notifications.entities import AuditLog
+from src.domain.notifications.repositories import AuditLogRepository
 from src.domain.users.repositories import UserRepository
 
 _ROLES_CREADORES_DE_DIETA = ("entrenador", "admin")
@@ -51,6 +55,123 @@ class CreateDietPlanUseCase:
             raise UnauthorizedDietPlanCreatorError(diet_plan.created_by)
 
         return self.diet_plan_repository.add(diet_plan)
+
+
+@dataclass
+class UpdateDietPlanUseCase:
+    """2026-11-18 (ampliacion de RF012, "editar dieta"): editar
+    nombre/descripcion/objetivo calorico de un plan existente del catalogo.
+
+    Mismo criterio que `UpdateRoutineUseCase`: `admin` edita cualquiera;
+    `entrenador` solo los que el mismo creo
+    (`UnauthorizedDietEditError` si no). Cada campo en `None` significa
+    "no cambiar ese campo" (mismo criterio que `UpdateClientProfileUseCase`/
+    `UpdateRoutineUseCase`), INCLUYENDO `calories_target`: borrar un
+    objetivo calorico ya fijado no es un caso de uso real de esta
+    ampliacion. Queda en `AuditLog` solo si algo cambio de verdad.
+    """
+
+    diet_plan_repository: DietPlanRepository
+    audit_log_repository: AuditLogRepository
+
+    def execute(
+        self,
+        diet_plan_id: int,
+        name: str | None,
+        description: str | None,
+        calories_target: int | None,
+        updater_role: str,
+        updater_id: int,
+    ) -> DietPlan:
+        existing = self.diet_plan_repository.get_by_id(diet_plan_id)
+        if existing is None:
+            raise DietPlanNotFoundError(diet_plan_id)
+
+        if updater_role == "entrenador" and existing.created_by != updater_id:
+            raise UnauthorizedDietEditError(diet_plan_id)
+
+        changes = []
+        if name is not None and name != existing.name:
+            changes.append(f"nombre '{existing.name}' -> '{name}'")
+        if description is not None and description != existing.description:
+            changes.append("descripcion actualizada")
+        if calories_target is not None and calories_target != existing.calories_target:
+            changes.append(f"objetivo calorico {existing.calories_target} -> {calories_target}")
+
+        existing.name = name if name is not None else existing.name
+        existing.description = description if description is not None else existing.description
+        existing.calories_target = (
+            calories_target if calories_target is not None else existing.calories_target
+        )
+        updated = self.diet_plan_repository.update(existing)
+
+        if changes:
+            self.audit_log_repository.add(
+                AuditLog(
+                    id=None,
+                    user_id=updater_id,
+                    action="editar_dieta",
+                    entity_type="diet_plan",
+                    entity_id=str(diet_plan_id),
+                    details="; ".join(changes) + ".",
+                )
+            )
+
+        return updated
+
+
+@dataclass
+class DeleteOrDeactivateDietPlanUseCase:
+    """2026-11-18 (ampliacion de RF012, "eliminar dieta"): mismo criterio
+    que `DeleteOrDeactivateRoutineUseCase` -- un plan con asignaciones
+    existentes se DESACTIVA (conserva el historial); sin ninguna, se
+    elimina de verdad. Mismo ownership que `UpdateDietPlanUseCase`.
+    """
+
+    diet_plan_repository: DietPlanRepository
+    assignment_repository: DietAssignmentRepository
+    audit_log_repository: AuditLogRepository
+
+    def execute(
+        self, diet_plan_id: int, updater_role: str, updater_id: int
+    ) -> tuple[bool, DietPlan | None]:
+        plan = self.diet_plan_repository.get_by_id(diet_plan_id)
+        if plan is None:
+            raise DietPlanNotFoundError(diet_plan_id)
+
+        if updater_role == "entrenador" and plan.created_by != updater_id:
+            raise UnauthorizedDietEditError(diet_plan_id)
+
+        if self.assignment_repository.has_assignments_for_diet_plan(diet_plan_id):
+            plan.is_active = False
+            updated = self.diet_plan_repository.update(plan)
+            self.audit_log_repository.add(
+                AuditLog(
+                    id=None,
+                    user_id=updater_id,
+                    action="eliminar_dieta",
+                    entity_type="diet_plan",
+                    entity_id=str(diet_plan_id),
+                    details=(
+                        f"Plan de dieta '{plan.name}' desactivado "
+                        "(tiene asignaciones existentes, se conserva el historial)."
+                    ),
+                )
+            )
+            return False, updated
+
+        self.diet_plan_repository.delete(diet_plan_id)
+        self.audit_log_repository.add(
+            AuditLog(
+                id=None,
+                user_id=updater_id,
+                action="eliminar_dieta",
+                entity_type="diet_plan",
+                entity_id=str(diet_plan_id),
+                details=f"Plan de dieta '{plan.name}' eliminado (sin asignaciones).",
+            )
+        )
+        return True, None
 
 
 @dataclass
@@ -105,20 +226,30 @@ class UpdateDietAssignmentUseCase:
     a SUS clientes. Pieza nueva, no prevista en el esqueleto original --
     mismo criterio que `UpdateRoutineAssignmentUseCase` en Rutinas.
 
+    2026-11-18 (ampliacion de RF012, "corregir una asignacion, error de
+    dedo"): tambien admite corregir `diet_plan_id`/`assigned_date` -- ver
+    misma ampliacion en `UpdateRoutineAssignmentUseCase`.
+
     Valida, en este orden:
     1. que la asignacion exista (`DietAssignmentNotFoundError`).
-    2. que `status`, si viene, sea uno de `ESTADOS_ASIGNACION_VALIDOS`
+    2. que el plan nuevo, si viene, exista (`DietPlanNotFoundError`).
+    3. que `status`, si viene, sea uno de `ESTADOS_ASIGNACION_VALIDOS`
        (`InvalidDietAssignmentStatusError`).
-    3. si quien actualiza es `entrenador`, que el cliente de esa
+    4. si quien actualiza es `entrenador`, que el cliente de esa
        asignacion este asignado a EL (`UnauthorizedDietAssignmentError`
        si no) -- mismo patron de ownership que `AssignDietToClientUseCase`.
 
     `cliente` nunca llega a ejecutar esto -- RF013 es de solo lectura, el
-    bloqueo real ocurre en el router via `require_role`.
+    bloqueo real ocurre en el router via `require_role`. Una asignacion ya
+    en estado 'completada' se puede seguir corrigiendo igual que cualquier
+    otra -- editar NUNCA la elimina (ver `DeleteDietAssignmentUseCase`).
+    Queda en `AuditLog` solo si algo cambio de verdad.
     """
 
     assignment_repository: DietAssignmentRepository
+    diet_plan_repository: DietPlanRepository
     client_repository: ClientProfileRepository
+    audit_log_repository: AuditLogRepository
 
     def execute(
         self,
@@ -127,10 +258,15 @@ class UpdateDietAssignmentUseCase:
         notes: str | None,
         updater_role: str,
         updater_id: int,
+        diet_plan_id: int | None = None,
+        assigned_date: date | None = None,
     ) -> DietAssignment:
         existing = self.assignment_repository.get_by_id(assignment_id)
         if existing is None:
             raise DietAssignmentNotFoundError(assignment_id)
+
+        if diet_plan_id is not None and self.diet_plan_repository.get_by_id(diet_plan_id) is None:
+            raise DietPlanNotFoundError(diet_plan_id)
 
         if status_value is not None and status_value not in ESTADOS_ASIGNACION_VALIDOS:
             raise InvalidDietAssignmentStatusError(status_value)
@@ -140,10 +276,72 @@ class UpdateDietAssignmentUseCase:
             if client is None or client.trainer_id != updater_id:
                 raise UnauthorizedDietAssignmentError(existing.client_id)
 
+        changes = []
+        if diet_plan_id is not None and diet_plan_id != existing.diet_plan_id:
+            changes.append(f"plan {existing.diet_plan_id} -> {diet_plan_id}")
+        if assigned_date is not None and assigned_date != existing.assigned_date:
+            changes.append(f"fecha {existing.assigned_date} -> {assigned_date}")
+        if status_value is not None and status_value != existing.status:
+            changes.append(f"estado {existing.status} -> {status_value}")
+        if notes is not None and notes != existing.notes:
+            changes.append("notas actualizadas")
+
+        existing.diet_plan_id = diet_plan_id if diet_plan_id is not None else existing.diet_plan_id
+        existing.assigned_date = assigned_date if assigned_date is not None else existing.assigned_date
         existing.status = status_value if status_value is not None else existing.status
         existing.notes = notes if notes is not None else existing.notes
 
-        return self.assignment_repository.update(existing)
+        updated = self.assignment_repository.update(existing)
+
+        if changes:
+            self.audit_log_repository.add(
+                AuditLog(
+                    id=None,
+                    user_id=updater_id,
+                    action="editar_asignacion_dieta",
+                    entity_type="diet_assignment",
+                    entity_id=str(assignment_id),
+                    details="; ".join(changes) + ".",
+                )
+            )
+
+        return updated
+
+
+@dataclass
+class DeleteDietAssignmentUseCase:
+    """2026-11-18 (ampliacion de RF012, "quitar una asignacion sin perder
+    la bitacora"): mismo criterio que `DeleteRoutineAssignmentUseCase`.
+    """
+
+    assignment_repository: DietAssignmentRepository
+    client_repository: ClientProfileRepository
+    audit_log_repository: AuditLogRepository
+
+    def execute(self, assignment_id: int, updater_role: str, updater_id: int) -> None:
+        existing = self.assignment_repository.get_by_id(assignment_id)
+        if existing is None:
+            raise DietAssignmentNotFoundError(assignment_id)
+
+        if updater_role == "entrenador":
+            client = self.client_repository.get_by_id(existing.client_id)
+            if client is None or client.trainer_id != updater_id:
+                raise UnauthorizedDietAssignmentError(existing.client_id)
+
+        self.audit_log_repository.add(
+            AuditLog(
+                id=None,
+                user_id=updater_id,
+                action="eliminar_asignacion_dieta",
+                entity_type="diet_assignment",
+                entity_id=str(assignment_id),
+                details=(
+                    f"Asignacion del plan de dieta {existing.diet_plan_id} al cliente "
+                    f"{existing.client_id} eliminada (estaba en estado '{existing.status}')."
+                ),
+            )
+        )
+        self.assignment_repository.delete(assignment_id)
 
 
 @dataclass

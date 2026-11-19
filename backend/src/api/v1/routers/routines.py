@@ -26,6 +26,15 @@ del modulo Ejercicios y Rutinas, ver DECISIONES.md):
   esqueleto original -- ver DECISIONES.md, pieza que completa RF012 para
   este modulo): `admin` cualquiera; `entrenador` solo si el cliente de esa
   asignacion es suyo; `cliente` NO puede (RF013 es de solo lectura).
+- `DELETE /routines/assignments/{assignment_id}` (NUEVO, 2026-11-18,
+  ampliacion de RF012 "quitar una asignacion sin perder la bitacora"):
+  mismo criterio de ownership que el `PATCH` de arriba.
+- `PATCH /routines/{id}` y `DELETE /routines/{id}` (NUEVOS, 2026-11-18,
+  ampliacion de RF007/RF012 "editar/eliminar rutina"): `admin` cualquiera;
+  `entrenador` solo las rutinas que el mismo creo (`UnauthorizedRoutineEditError`
+  si no); `cliente` NO puede. `DELETE` desactiva la rutina en vez de
+  borrarla si tiene asignaciones existentes (conserva el historial) -- ver
+  `DeleteOrDeactivateRoutineUseCase`.
 """
 
 from __future__ import annotations
@@ -41,16 +50,21 @@ from src.api.v1.schemas.routines import (
     RoutineAssignmentRead,
     RoutineAssignmentUpdate,
     RoutineCreate,
+    RoutineDeleteResult,
     RoutineExerciseCreate,
     RoutineExerciseRead,
     RoutineRead,
+    RoutineUpdate,
 )
 from src.application.routines.use_cases import (
     AddExerciseToRoutineUseCase,
     AssignRoutineToClientUseCase,
     CreateRoutineUseCase,
+    DeleteOrDeactivateRoutineUseCase,
+    DeleteRoutineAssignmentUseCase,
     GetClientRoutineHistoryUseCase,
     UpdateRoutineAssignmentUseCase,
+    UpdateRoutineUseCase,
 )
 from src.domain.clients.exceptions import ClientNotFoundError
 from src.domain.routines.entities import Exercise, Routine, RoutineAssignment, RoutineExercise
@@ -61,10 +75,12 @@ from src.domain.routines.exceptions import (
     RoutineNotFoundError,
     UnauthorizedRoutineAssignmentError,
     UnauthorizedRoutineCreatorError,
+    UnauthorizedRoutineEditError,
 )
 from src.domain.users.entities import User
 from src.infrastructure.db.session import get_db
 from src.infrastructure.repositories.clients import SqlAlchemyClientProfileRepository
+from src.infrastructure.repositories.notifications import SqlAlchemyAuditLogRepository
 from src.infrastructure.repositories.routines import (
     SqlAlchemyExerciseRepository,
     SqlAlchemyRoutineAssignmentRepository,
@@ -253,12 +269,20 @@ def update_routine_assignment(
     db: Session = Depends(get_db),
 ) -> RoutineAssignmentRead:
     """RF012 (NUEVO, ver DECISIONES.md): cambiar `status`/`notes` de una
-    asignacion existente. `cliente` bloqueado de entrada (RF013 es solo
-    lectura). `entrenador` solo si el cliente de esa asignacion es suyo."""
+    asignacion existente. 2026-11-18 (ampliacion de RF012, "corregir una
+    asignacion, error de dedo"): tambien admite corregir
+    `routine_id`/`assigned_date`. `cliente` bloqueado de entrada (RF013 es
+    solo lectura). `entrenador` solo si el cliente de esa asignacion es
+    suyo. Editar NUNCA elimina la asignacion, aunque ya este 'completada'
+    -- eso es el `DELETE` de abajo, un endpoint aparte."""
     assignment_repository = SqlAlchemyRoutineAssignmentRepository(db)
+    routine_repository = SqlAlchemyRoutineRepository(db)
     client_repository = SqlAlchemyClientProfileRepository(db)
     use_case = UpdateRoutineAssignmentUseCase(
-        assignment_repository=assignment_repository, client_repository=client_repository
+        assignment_repository=assignment_repository,
+        routine_repository=routine_repository,
+        client_repository=client_repository,
+        audit_log_repository=SqlAlchemyAuditLogRepository(db),
     )
 
     try:
@@ -268,8 +292,12 @@ def update_routine_assignment(
             notes=payload.notes,
             updater_role=current_user.role,
             updater_id=current_user.id,  # type: ignore[arg-type]
+            routine_id=payload.routine_id,
+            assigned_date=payload.assigned_date,
         )
     except RoutineAssignmentNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except RoutineNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except InvalidAssignmentStatusError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -278,6 +306,127 @@ def update_routine_assignment(
 
     db.commit()
     return RoutineAssignmentRead.model_validate(updated)
+
+
+@router.delete(
+    "/assignments/{assignment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    dependencies=[Depends(require_role("admin", "entrenador"))],
+)
+def delete_routine_assignment(
+    assignment_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """2026-11-18 (ampliacion de RF012, "quitar una asignacion sin perder
+    la bitacora"): la fila se elimina, pero la eliminacion queda
+    registrada en `AuditLog` ANTES de borrarla -- el registro sobrevive a
+    la fila (ver `DeleteRoutineAssignmentUseCase`). `cliente` bloqueado de
+    entrada; `entrenador` solo si el cliente de esa asignacion es suyo."""
+    assignment_repository = SqlAlchemyRoutineAssignmentRepository(db)
+    client_repository = SqlAlchemyClientProfileRepository(db)
+    use_case = DeleteRoutineAssignmentUseCase(
+        assignment_repository=assignment_repository,
+        client_repository=client_repository,
+        audit_log_repository=SqlAlchemyAuditLogRepository(db),
+    )
+
+    try:
+        use_case.execute(
+            assignment_id,
+            updater_role=current_user.role,
+            updater_id=current_user.id,  # type: ignore[arg-type]
+        )
+    except RoutineAssignmentNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except UnauthorizedRoutineAssignmentError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+    db.commit()
+
+
+@router.patch(
+    "/{routine_id}",
+    response_model=RoutineRead,
+    dependencies=[Depends(require_role("admin", "entrenador"))],
+)
+def update_routine(
+    routine_id: int,
+    payload: RoutineUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> RoutineRead:
+    """2026-11-18 (ampliacion de RF007/RF012, "editar rutina"): cambiar
+    nombre/descripcion de una rutina del catalogo. `admin` puede editar
+    cualquiera; `entrenador` solo las que el mismo creo; `cliente`
+    bloqueado de entrada."""
+    routine_repository = SqlAlchemyRoutineRepository(db)
+    use_case = UpdateRoutineUseCase(
+        routine_repository=routine_repository,
+        audit_log_repository=SqlAlchemyAuditLogRepository(db),
+    )
+
+    try:
+        updated = use_case.execute(
+            routine_id,
+            name=payload.name,
+            description=payload.description,
+            updater_role=current_user.role,
+            updater_id=current_user.id,  # type: ignore[arg-type]
+        )
+    except RoutineNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except UnauthorizedRoutineEditError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+    db.commit()
+    return RoutineRead.model_validate(updated)
+
+
+@router.delete(
+    "/{routine_id}",
+    response_model=RoutineDeleteResult,
+    dependencies=[Depends(require_role("admin", "entrenador"))],
+)
+def delete_routine(
+    routine_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> RoutineDeleteResult:
+    """2026-11-18 (ampliacion de RF007/RF012, "eliminar rutina"): elimina
+    la rutina si no tiene ninguna asignacion; si tiene, la DESACTIVA en
+    vez de borrarla (conserva el historial) -- ver
+    `DeleteOrDeactivateRoutineUseCase`. Devuelve 200 (no 204) para que el
+    frontend sepa cual de las dos paso. `admin` puede eliminar/desactivar
+    cualquiera; `entrenador` solo las que el mismo creo."""
+    routine_repository = SqlAlchemyRoutineRepository(db)
+    assignment_repository = SqlAlchemyRoutineAssignmentRepository(db)
+    use_case = DeleteOrDeactivateRoutineUseCase(
+        routine_repository=routine_repository,
+        assignment_repository=assignment_repository,
+        audit_log_repository=SqlAlchemyAuditLogRepository(db),
+    )
+
+    try:
+        deleted, routine = use_case.execute(
+            routine_id,
+            updater_role=current_user.role,
+            updater_id=current_user.id,  # type: ignore[arg-type]
+        )
+    except RoutineNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except UnauthorizedRoutineEditError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+    db.commit()
+    if deleted:
+        return RoutineDeleteResult(deleted=True, routine=None, message="Rutina eliminada.")
+    return RoutineDeleteResult(
+        deleted=False,
+        routine=RoutineRead.model_validate(routine),
+        message="La rutina tiene asignaciones existentes: se desactivo en vez de eliminarse.",
+    )
 
 
 @router.get("/{routine_id}", response_model=RoutineRead)

@@ -23,6 +23,16 @@ class DietPlanCreate(BaseModel):
     calories_target: int | None = Field(default=None, gt=0)
 
 
+class DietPlanUpdate(BaseModel):
+    """2026-11-18 (ampliacion de RF012, "editar dieta"): `None` en
+    cualquiera de los campos significa "no cambiarlo" (mismo criterio que
+    `DietAssignmentUpdate`/`RoutineUpdate`)."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=150)
+    description: str | None = None
+    calories_target: int | None = Field(default=None, gt=0)
+
+
 class DietPlanRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -32,6 +42,16 @@ class DietPlanRead(BaseModel):
     description: str | None
     calories_target: int | None
     created_at: datetime
+    is_active: bool
+
+
+class DietPlanDeleteResult(BaseModel):
+    """2026-11-18 (ampliacion de RF012, "eliminar dieta"): mismo patron
+    que `RoutineDeleteResult`."""
+
+    deleted: bool
+    diet_plan: DietPlanRead | None
+    message: str
 
 
 class DietAssignmentCreate(BaseModel):
@@ -49,9 +69,15 @@ class DietAssignmentCreate(BaseModel):
 
 class DietAssignmentUpdate(BaseModel):
     """RF012 (nuevo, ver DECISIONES.md): el entrenador/admin puede cambiar
-    `status`/`notes` de una asignacion existente. Ambos opcionales -- solo
-    se actualiza lo que venga distinto de `None`."""
+    `status`/`notes` de una asignacion existente. Todos opcionales -- solo
+    se actualiza lo que venga distinto de `None`.
 
+    2026-11-18 (ampliacion de RF012, "corregir una asignacion, error de
+    dedo"): se agregan `diet_plan_id`/`assigned_date`, antes solo se podia
+    cambiar `status`/`notes`."""
+
+    diet_plan_id: int | None = None
+    assigned_date: date | None = None
     status: AssignmentStatus | None = None
     notes: str | None = None
 

@@ -419,11 +419,26 @@ export interface ApiRoutine {
   created_by: number
   description: string | null
   created_at: string
+  /** 2026-11-18 (ampliación de RF012, "editar/eliminar rutina"): una rutina con
+   * asignaciones existentes se desactiva en vez de borrarse -- deja de poder
+   * asignarse de nuevo pero conserva el historial de quien la tuvo asignada. */
+  is_active: boolean
 }
 
 export interface RoutineCreatePayload {
   name: string
   description?: string | null
+}
+
+export interface RoutineUpdatePayload {
+  name?: string
+  description?: string | null
+}
+
+export interface RoutineDeleteResult {
+  deleted: boolean
+  routine: ApiRoutine | null
+  message: string
 }
 
 export interface ApiRoutineExercise {
@@ -468,6 +483,9 @@ export interface RoutineAssignmentCreatePayload {
 }
 
 export interface RoutineAssignmentUpdatePayload {
+  /** 2026-11-18 (ampliación de RF012, "corregir una asignación, error de dedo"). */
+  routine_id?: number
+  assigned_date?: string
   status?: ApiRoutineAssignmentStatus
   notes?: string | null
 }
@@ -488,12 +506,27 @@ export interface ApiDietPlan {
   description: string | null
   calories_target: number | null
   created_at: string
+  /** 2026-11-18 (ampliación de RF012, "editar/eliminar dieta"): mismo criterio
+   * que `ApiRoutine.is_active`. */
+  is_active: boolean
 }
 
 export interface DietPlanCreatePayload {
   name: string
   description?: string | null
   calories_target?: number | null
+}
+
+export interface DietPlanUpdatePayload {
+  name?: string
+  description?: string | null
+  calories_target?: number | null
+}
+
+export interface DietPlanDeleteResult {
+  deleted: boolean
+  diet_plan: ApiDietPlan | null
+  message: string
 }
 
 export type ApiDietAssignmentStatus = 'activa' | 'completada' | 'cancelada'
@@ -518,6 +551,9 @@ export interface DietAssignmentCreatePayload {
 }
 
 export interface DietAssignmentUpdatePayload {
+  /** 2026-11-18 (ampliación de RF012, "corregir una asignación, error de dedo"). */
+  diet_plan_id?: number
+  assigned_date?: string
   status?: ApiDietAssignmentStatus
   notes?: string | null
 }

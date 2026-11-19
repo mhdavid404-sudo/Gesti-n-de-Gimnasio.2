@@ -45,6 +45,12 @@ class Routine:
     created_by: int
     description: str | None = None
     created_at: datetime | None = None
+    # 2026-11-18 (ampliacion de RF012, "editar/eliminar rutina"): antes no
+    # existia ningun concepto de activo/inactivo -- mismo criterio ya usado
+    # en `MembershipPlan`/`Service` (DECISIONES.md, Entrega 3, Fase 2):
+    # "eliminar" una rutina con asignaciones la DESACTIVA en vez de
+    # borrarla, para conservar el historial de quien la tuvo asignada.
+    is_active: bool = True
 
 
 @dataclass

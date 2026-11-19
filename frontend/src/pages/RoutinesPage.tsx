@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { apiFetch, ApiError } from '../api/client'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { EmptyState } from '../components/ui/EmptyState'
 import { ErrorMessage } from '../components/ui/ErrorMessage'
 import { LoadingState } from '../components/ui/LoadingState'
@@ -16,7 +17,10 @@ import type {
   ApiRoutineExercise,
   ExerciseCreatePayload,
   RoutineAssignmentCreatePayload,
+  RoutineAssignmentUpdatePayload,
   RoutineCreatePayload,
+  RoutineDeleteResult,
+  RoutineUpdatePayload,
   RoutineExerciseCreatePayload,
 } from '../types/api'
 import './RoutinesPage.css'
@@ -241,6 +245,88 @@ export function RoutinesPage() {
     }
   }
 
+  // Editar/eliminar rutina (admin cualquiera, entrenador solo la suya --
+  // 2026-11-18, ampliación de RF012) ---------------------------------------
+  const [editingRoutineId, setEditingRoutineId] = useState<number | null>(null)
+  const [editRoutineName, setEditRoutineName] = useState('')
+  const [editRoutineDescription, setEditRoutineDescription] = useState('')
+  const [editRoutineServerError, setEditRoutineServerError] = useState<string | null>(null)
+  const [isSavingRoutineEdit, setIsSavingRoutineEdit] = useState(false)
+
+  const canManageRoutine = (routine: ApiRoutine) =>
+    user?.role === 'admin' || (user?.role === 'entrenador' && routine.created_by === user.id)
+
+  const openEditRoutineForm = (routine: ApiRoutine) => {
+    setEditingRoutineId(routine.id)
+    setEditRoutineName(routine.name)
+    setEditRoutineDescription(routine.description ?? '')
+    setEditRoutineServerError(null)
+  }
+
+  const handleEditRoutine = async (event: FormEvent, routineId: number) => {
+    event.preventDefault()
+    setEditRoutineServerError(null)
+
+    if (!editRoutineName.trim()) {
+      setEditRoutineServerError('Ingresa el nombre de la rutina.')
+      return
+    }
+
+    const payload: RoutineUpdatePayload = {
+      name: editRoutineName.trim(),
+      description: editRoutineDescription.trim() || null,
+    }
+
+    setIsSavingRoutineEdit(true)
+    try {
+      const updated = await apiFetch<ApiRoutine>(`/routines/${routineId}`, { method: 'PATCH', body: payload })
+      setRoutines((prev) => (prev ?? []).map((r) => (r.id === updated.id ? updated : r)))
+      setRoutineToast(`Rutina "${updated.name}" actualizada.`)
+      setEditingRoutineId(null)
+    } catch (err) {
+      handleAuthError(
+        err,
+        setEditRoutineServerError,
+        () => setEditRoutineServerError('No tienes permiso para editar esta rutina.'),
+      )
+    } finally {
+      setIsSavingRoutineEdit(false)
+    }
+  }
+
+  const [deletingRoutine, setDeletingRoutine] = useState<ApiRoutine | null>(null)
+  const [isDeletingRoutine, setIsDeletingRoutine] = useState(false)
+  const [deleteRoutineError, setDeleteRoutineError] = useState<string | null>(null)
+
+  const handleDeleteRoutine = async () => {
+    if (!deletingRoutine) return
+    setIsDeletingRoutine(true)
+    try {
+      const result = await apiFetch<RoutineDeleteResult>(`/routines/${deletingRoutine.id}`, { method: 'DELETE' })
+      if (result.deleted) {
+        setRoutines((prev) => (prev ?? []).filter((r) => r.id !== deletingRoutine.id))
+      } else if (result.routine) {
+        setRoutines((prev) => (prev ?? []).map((r) => (r.id === result.routine!.id ? result.routine! : r)))
+      }
+      setRoutineToast(result.message)
+      setDeletingRoutine(null)
+    } catch (err) {
+      handleAuthError(
+        err,
+        (message) => {
+          setDeleteRoutineError(message)
+          setDeletingRoutine(null)
+        },
+        () => {
+          setDeleteRoutineError('No tienes permiso para eliminar esta rutina.')
+          setDeletingRoutine(null)
+        },
+      )
+    } finally {
+      setIsDeletingRoutine(false)
+    }
+  }
+
   // Agregar ejercicio a una rutina (admin/entrenador) -- un solo formulario
   // abierto a la vez, identificado por `addExerciseRoutineId`.
   const [addExerciseRoutineId, setAddExerciseRoutineId] = useState<number | null>(null)
@@ -460,6 +546,77 @@ export function RoutinesPage() {
     }
   }
 
+  // Corregir una asignación (rutina/fecha, "error de dedo") y quitarla sin
+  // perder la bitácora -- 2026-11-18, ampliación de RF012.
+  const [editingAssignmentId, setEditingAssignmentId] = useState<number | null>(null)
+  const [editAssignRoutineId, setEditAssignRoutineId] = useState('')
+  const [editAssignDate, setEditAssignDate] = useState('')
+  const [editAssignServerError, setEditAssignServerError] = useState<string | null>(null)
+  const [isSavingAssignEdit, setIsSavingAssignEdit] = useState(false)
+
+  const openEditAssignmentForm = (assignment: ApiRoutineAssignment) => {
+    setEditingAssignmentId(assignment.id)
+    setEditAssignRoutineId(String(assignment.routine_id))
+    setEditAssignDate(assignment.assigned_date)
+    setEditAssignServerError(null)
+  }
+
+  const handleSaveAssignmentEdit = async (event: FormEvent, assignment: ApiRoutineAssignment) => {
+    event.preventDefault()
+    setEditAssignServerError(null)
+
+    const payload: RoutineAssignmentUpdatePayload = {
+      routine_id: Number(editAssignRoutineId),
+      assigned_date: editAssignDate,
+    }
+
+    setIsSavingAssignEdit(true)
+    try {
+      const updated = await apiFetch<ApiRoutineAssignment>(`/routines/assignments/${assignment.id}`, {
+        method: 'PATCH',
+        body: payload,
+      })
+      setAssignments((prev) => (prev ?? []).map((a) => (a.id === updated.id ? updated : a)))
+      setEditingAssignmentId(null)
+    } catch (err) {
+      handleAuthError(
+        err,
+        setEditAssignServerError,
+        () => setEditAssignServerError('No tienes permiso para corregir esta asignación.'),
+      )
+    } finally {
+      setIsSavingAssignEdit(false)
+    }
+  }
+
+  const [deletingAssignment, setDeletingAssignment] = useState<ApiRoutineAssignment | null>(null)
+  const [isDeletingAssignment, setIsDeletingAssignment] = useState(false)
+
+  const handleDeleteAssignment = async () => {
+    if (!deletingAssignment) return
+    setIsDeletingAssignment(true)
+    try {
+      await apiFetch<void>(`/routines/assignments/${deletingAssignment.id}`, { method: 'DELETE' })
+      setAssignments((prev) => (prev ?? []).filter((a) => a.id !== deletingAssignment.id))
+      setAssignToast('Asignación eliminada.')
+      setDeletingAssignment(null)
+    } catch (err) {
+      handleAuthError(
+        err,
+        (message) => {
+          setUpdateError(message)
+          setDeletingAssignment(null)
+        },
+        () => {
+          setUpdateError('No tienes permiso para eliminar esta asignación.')
+          setDeletingAssignment(null)
+        },
+      )
+    } finally {
+      setIsDeletingAssignment(false)
+    }
+  }
+
   const selectedClient = clients?.find((c) => c.id === selectedClientId)
 
   return (
@@ -468,6 +625,9 @@ export function RoutinesPage() {
       {routineToast && <Toast message={routineToast} onDismiss={() => setRoutineToast(null)} />}
       {assignToast && <Toast message={assignToast} onDismiss={() => setAssignToast(null)} />}
       {updateError && <Toast message={updateError} tone="danger" onDismiss={() => setUpdateError(null)} />}
+      {deleteRoutineError && (
+        <Toast message={deleteRoutineError} tone="danger" onDismiss={() => setDeleteRoutineError(null)} />
+      )}
 
       <section>
         <div className="routines-page__section-header">
@@ -634,10 +794,65 @@ export function RoutinesPage() {
                   }}
                 >
                   <summary>
-                    <span className="routine-card__name">{routine.name}</span>
+                    <span className="routine-card__name">
+                      {routine.name}
+                      {!routine.is_active && <StatusPill status="inactivo" />}
+                    </span>
                     <span className="routine-card__count">{items ? `${items.length} ejercicios` : 'Ver ejercicios'}</span>
                   </summary>
                   {routine.description && <p className="routine-card__description">{routine.description}</p>}
+
+                  {canManageRoutine(routine) && editingRoutineId !== routine.id && (
+                    <div className="routines-page__form-actions">
+                      <button type="button" className="btn btn-ghost" onClick={() => openEditRoutineForm(routine)}>
+                        Editar
+                      </button>
+                      <button type="button" className="btn btn-ghost" onClick={() => setDeletingRoutine(routine)}>
+                        Eliminar
+                      </button>
+                    </div>
+                  )}
+
+                  {canManageRoutine(routine) && editingRoutineId === routine.id && (
+                    <form
+                      className="routines-page__inline-form routines-page__inline-form--nested"
+                      onSubmit={(e) => handleEditRoutine(e, routine.id)}
+                    >
+                      {editRoutineServerError && (
+                        <ErrorMessage title="No se pudo editar la rutina" message={editRoutineServerError} />
+                      )}
+                      <div className="routines-page__field">
+                        <label className="field-label" htmlFor={`editRoutineName-${routine.id}`}>
+                          Nombre
+                        </label>
+                        <input
+                          id={`editRoutineName-${routine.id}`}
+                          className="input"
+                          value={editRoutineName}
+                          onChange={(e) => setEditRoutineName(e.target.value)}
+                        />
+                      </div>
+                      <div className="routines-page__field">
+                        <label className="field-label" htmlFor={`editRoutineDescription-${routine.id}`}>
+                          Descripción (opcional)
+                        </label>
+                        <input
+                          id={`editRoutineDescription-${routine.id}`}
+                          className="input"
+                          value={editRoutineDescription}
+                          onChange={(e) => setEditRoutineDescription(e.target.value)}
+                        />
+                      </div>
+                      <div className="routines-page__form-actions">
+                        <button type="button" className="btn btn-ghost" onClick={() => setEditingRoutineId(null)}>
+                          Cancelar
+                        </button>
+                        <button type="submit" className="btn btn-primary" disabled={isSavingRoutineEdit}>
+                          {isSavingRoutineEdit ? 'Guardando…' : 'Guardar cambios'}
+                        </button>
+                      </div>
+                    </form>
+                  )}
 
                   {isLoadingItems ? (
                     <LoadingState label="Cargando ejercicios…" variant="skeleton" rows={2} />
@@ -891,7 +1106,7 @@ export function RoutinesPage() {
                       onChange={(e) => setAssignRoutineId(e.target.value)}
                     >
                       <option value="">Selecciona una rutina</option>
-                      {routines?.map((r) => (
+                      {routines?.filter((r) => r.is_active).map((r) => (
                         <option key={r.id} value={r.id}>
                           {r.name}
                         </option>
@@ -945,33 +1160,99 @@ export function RoutinesPage() {
                       <th>Asignada</th>
                       <th>Notas</th>
                       <th>Estado</th>
+                      {isStaff && <th>Acciones</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {assignments.map((ra) => (
-                      <tr key={ra.id}>
-                        <td>{routineById.get(ra.routine_id)?.name ?? `#${ra.routine_id}`}</td>
-                        <td>{ra.assigned_date}</td>
-                        <td>{ra.notes ?? '—'}</td>
-                        <td>
-                          {isStaff ? (
-                            <select
-                              className="input routines-page__status-select"
-                              value={ra.status}
-                              disabled={updatingAssignmentId === ra.id}
-                              onChange={(e) => handleUpdateStatus(ra, e.target.value as ApiRoutineAssignmentStatus)}
-                            >
-                              {ASSIGNMENT_STATUSES.map((s) => (
-                                <option key={s.value} value={s.value}>
-                                  {s.label}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <StatusPill status={ra.status} />
+                      <Fragment key={ra.id}>
+                        <tr>
+                          <td>{routineById.get(ra.routine_id)?.name ?? `#${ra.routine_id}`}</td>
+                          <td>{ra.assigned_date}</td>
+                          <td>{ra.notes ?? '—'}</td>
+                          <td>
+                            {isStaff ? (
+                              <select
+                                className="input routines-page__status-select"
+                                value={ra.status}
+                                disabled={updatingAssignmentId === ra.id}
+                                onChange={(e) => handleUpdateStatus(ra, e.target.value as ApiRoutineAssignmentStatus)}
+                              >
+                                {ASSIGNMENT_STATUSES.map((s) => (
+                                  <option key={s.value} value={s.value}>
+                                    {s.label}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <StatusPill status={ra.status} />
+                            )}
+                          </td>
+                          {isStaff && (
+                            <td>
+                              <button type="button" className="btn btn-ghost" onClick={() => openEditAssignmentForm(ra)}>
+                                Corregir
+                              </button>
+                              <button type="button" className="btn btn-ghost" onClick={() => setDeletingAssignment(ra)}>
+                                Eliminar
+                              </button>
+                            </td>
                           )}
-                        </td>
-                      </tr>
+                        </tr>
+                        {isStaff && editingAssignmentId === ra.id && (
+                          <tr>
+                            <td colSpan={5}>
+                              <form
+                                className="routines-page__inline-form routines-page__inline-form--nested"
+                                onSubmit={(e) => handleSaveAssignmentEdit(e, ra)}
+                              >
+                                {editAssignServerError && (
+                                  <ErrorMessage title="No se pudo corregir la asignación" message={editAssignServerError} />
+                                )}
+                                <div className="routines-page__form-row">
+                                  <div className="routines-page__field">
+                                    <label className="field-label" htmlFor={`editAssignRoutine-${ra.id}`}>
+                                      Rutina
+                                    </label>
+                                    <select
+                                      id={`editAssignRoutine-${ra.id}`}
+                                      className="input"
+                                      value={editAssignRoutineId}
+                                      onChange={(e) => setEditAssignRoutineId(e.target.value)}
+                                    >
+                                      {routines?.map((r) => (
+                                        <option key={r.id} value={r.id}>
+                                          {r.name}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                  <div className="routines-page__field">
+                                    <label className="field-label" htmlFor={`editAssignDate-${ra.id}`}>
+                                      Fecha de asignación
+                                    </label>
+                                    <input
+                                      id={`editAssignDate-${ra.id}`}
+                                      type="date"
+                                      className="input"
+                                      value={editAssignDate}
+                                      onChange={(e) => setEditAssignDate(e.target.value)}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="routines-page__form-actions">
+                                  <button type="button" className="btn btn-ghost" onClick={() => setEditingAssignmentId(null)}>
+                                    Cancelar
+                                  </button>
+                                  <button type="submit" className="btn btn-primary" disabled={isSavingAssignEdit}>
+                                    {isSavingAssignEdit ? 'Guardando…' : 'Guardar corrección'}
+                                  </button>
+                                </div>
+                              </form>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -980,6 +1261,24 @@ export function RoutinesPage() {
           </>
         )}
       </section>
+
+      <ConfirmDialog
+        open={deletingRoutine != null}
+        title={`¿Eliminar "${deletingRoutine?.name}"?`}
+        description="Si tiene asignaciones existentes, se desactivará en vez de eliminarse (se conserva el historial)."
+        onConfirm={handleDeleteRoutine}
+        onCancel={() => setDeletingRoutine(null)}
+        confirmDisabled={isDeletingRoutine}
+      />
+
+      <ConfirmDialog
+        open={deletingAssignment != null}
+        title="¿Quitar esta asignación?"
+        description="La asignación se eliminará del historial. La acción queda registrada en la bitácora."
+        onConfirm={handleDeleteAssignment}
+        onCancel={() => setDeletingAssignment(null)}
+        confirmDisabled={isDeletingAssignment}
+      />
     </div>
   )
 }

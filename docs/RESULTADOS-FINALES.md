@@ -32,21 +32,31 @@ forma de deshacer):** ver `DECISIONES.md`, entrada "BUG-12". "Renovar" y
 operación atómica), solo funcionan dentro de una ventana de 7 días, y se
 agrega "Deshacer renovación" (anula el pago sin borrarlo). 7 casos nuevos
 (CP53-CP59) + 4 casos existentes ampliados para exigir método de pago y la
-nueva ventana — suite completa corrida de nuevo, **122/122 en verde**. Los
-totales de abajo ya reflejan esta corrida.
+nueva ventana — suite completa corrida de nuevo, **122/122 en verde**.
+
+**Actualización 2026-11-18 (editar/eliminar rutinas y dietas):** ver
+`DECISIONES.md`, entrada "Editar/eliminar rutinas y dietas". Se agregan
+`PATCH`/`DELETE` para el catálogo de rutinas y planes de dieta (eliminar
+desactiva en vez de borrar si hay asignaciones existentes) y `PATCH`
+ampliado + `DELETE` nuevo para sus asignaciones (corregir "error de dedo"
+y quitarla sin perder la bitácora). 17 casos nuevos (9 en
+`test_routines.py`, 8 en `test_diets.py`) — suite completa corrida de
+nuevo, **139/139 en verde**. Los totales de abajo ya reflejan esta
+corrida.
 
 ## Totales reales
 
 ```
 docker compose exec backend pytest tests/ -q
-122 passed, 1 warning in 518.18s (0:08:38)
+139 passed, 1 warning in 494.47s (0:08:14)
 ```
 
-**122/122 casos automatizados en verde, 0 fallos** (106 del cierre original
+**139/139 casos automatizados en verde, 0 fallos** (106 del cierre original
 + 4 del 2026-11-18 de restablecer-contraseña/editar-cliente + 3 del
 2026-11-18 de la pantalla "Usuarios" + 2 del 2026-11-18 de editar
-nombre/correo + 7 del 2026-11-18 de BUG-12). Ninguna corrección hizo bajar
-el número de casos en verde, así que no hizo falta revertir ningún commit.
+nombre/correo + 7 del 2026-11-18 de BUG-12 + 17 del 2026-11-18 de
+editar/eliminar rutinas y dietas). Ninguna corrección hizo bajar el número
+de casos en verde, así que no hizo falta revertir ningún commit.
 
 | Archivo | Casos |
 |---|---|
@@ -58,14 +68,14 @@ el número de casos en verde, así que no hizo falta revertir ningún commit.
 | test_change_plan.py | 10 |
 | test_notifications.py | 7 |
 | test_scheduler.py | 2 |
-| test_routines.py | 10 |
-| test_diets.py | 8 |
+| test_routines.py | 19 |
+| test_diets.py | 16 |
 | test_progress.py | 7 |
 | test_audit_logs.py | 5 |
 | test_cp17_documentacion_api.py | 2 |
 | test_health.py | 2 |
 | test_users.py | 6 |
-| **Total** | **122** |
+| **Total** | **139** |
 
 ## CP01–CP18 (plan de pruebas original, Tabla 15 del documento)
 
@@ -141,16 +151,43 @@ casos nuevos, 4 casos existentes de `test_memberships.py` se ampliaron
 | CP58 | Deshacer como no-admin -> 403 | Pasó | `test_deshacer_renovacion_como_no_admin_devuelve_403` |
 | CP59 | Un pago anulado no cuenta en los ingresos del mes (tablero de Membresías) | Pasó | `test_pago_anulado_no_cuenta_en_ingresos_del_mes` |
 
+## CP60–CP76 (editar/eliminar rutinas y dietas, 2026-11-18)
+
+Sin ID formal en el documento (mismo caso que CP47-59). Ver `DECISIONES.md`,
+entrada "Editar/eliminar rutinas y dietas".
+
+| CP | Descripción | Resultado | Observación |
+|---|---|---|---|
+| CP60 | Editar rutina como admin -> 200, queda en bitácora | Pasó | `test_editar_rutina_como_admin_actualiza_datos` |
+| CP61 | Editar rutina ajena como entrenador -> 403 | Pasó | `test_editar_rutina_ajena_como_entrenador_devuelve_403` |
+| CP62 | Eliminar rutina sin asignaciones -> se borra de verdad | Pasó | `test_eliminar_rutina_sin_asignaciones_borra_de_verdad` |
+| CP63 | Eliminar rutina con asignaciones -> se desactiva, conserva historial | Pasó | `test_eliminar_rutina_con_asignaciones_la_desactiva` |
+| CP64 | Eliminar rutina como cliente -> 403 | Pasó | `test_eliminar_rutina_como_cliente_devuelve_403` |
+| CP65 | Corregir una asignación de rutina (rutina/fecha) como entrenador dueño -> 200, queda en bitácora | Pasó | `test_corregir_asignacion_rutina_como_entrenador_dueno_actualiza_y_registra_bitacora` |
+| CP66 | Eliminar una asignación de rutina -> 204, desaparece del historial pero la bitácora sobrevive | Pasó | `test_eliminar_asignacion_rutina_borra_la_fila_pero_bitacora_sobrevive` |
+| CP67 | Eliminar una asignación de rutina como entrenador no dueño -> 403 | Pasó | `test_eliminar_asignacion_rutina_como_entrenador_no_dueno_devuelve_403` |
+| CP68 | Editar una asignación de rutina ya 'completada' nunca la borra | Pasó | `test_editar_asignacion_completada_no_la_elimina` |
+| CP69 | Editar plan de dieta como admin -> 200, queda en bitácora | Pasó | `test_editar_plan_como_admin_actualiza_datos` |
+| CP70 | Editar plan de dieta ajeno como entrenador -> 403 | Pasó | `test_editar_plan_ajeno_como_entrenador_devuelve_403` |
+| CP71 | Eliminar plan de dieta sin asignaciones -> se borra de verdad | Pasó | `test_eliminar_plan_sin_asignaciones_borra_de_verdad` |
+| CP72 | Eliminar plan de dieta con asignaciones -> se desactiva, conserva historial | Pasó | `test_eliminar_plan_con_asignaciones_lo_desactiva` |
+| CP73 | Eliminar plan de dieta como cliente -> 403 | Pasó | `test_eliminar_plan_como_cliente_devuelve_403` |
+| CP74 | Corregir una asignación de dieta (plan/fecha) como entrenador dueño -> 200, queda en bitácora | Pasó | `test_corregir_asignacion_dieta_como_entrenador_dueno_actualiza_y_registra_bitacora` |
+| CP75 | Eliminar una asignación de dieta -> 204, bitácora sobrevive | Pasó | `test_eliminar_asignacion_dieta_borra_la_fila_pero_bitacora_sobrevive` |
+| CP76 | Eliminar una asignación de dieta como entrenador no dueño -> 403 | Pasó | `test_eliminar_asignacion_dieta_como_entrenador_no_dueno_devuelve_403` |
+
 ## Bugs encontrados en este cierre
 
 BUG-01 a BUG-10 (de entregas y sesiones anteriores) siguen cerrados — ver
-`DECISIONES.md`. Esta sesión de cierre encontró y corrigió 1 bug nuevo; una
-sesión posterior (2026-11-18) encontró y corrigió otro:
+`DECISIONES.md`. Esta sesión de cierre encontró y corrigió 1 bug nuevo; dos
+sesiones posteriores (ambas 2026-11-18) encontraron y corrigieron tres más:
 
 | Bug | Repro | Causa | Corrección | Estado |
 |---|---|---|---|---|
 | BUG-11 | Al agregar la advertencia específica de CU04 (eliminar cliente con membresía activa), una membresía activa mostrando el estado calculado "por vencer" no disparaba la advertencia -- solo mostraba el texto genérico, como si no tuviera membresía activa | `ClientDetailPage.tsx` comparaba contra `getMembershipDisplayStatus()` (que devuelve `'por_vencer'` para una membresía activa próxima a expirar) en vez de `membership.status` (el dato real en la base, que sigue siendo `"activa"`) | Se compara ahora contra `membership.status === 'activa'` directamente | Corregido, verificado en navegador (commit `139d20d`) |
 | BUG-12 | En el tablero de Membresías, "Renovar" estaba disponible siempre (incluso con 154 días restantes) y cada clic sumaba otro periodo sin límite y sin ningún pago asociado; no había forma de deshacer un clic equivocado | `RenewMembershipUseCase` (Entrega 3) se diseñó a propósito sin ventana ni pago ("renovar" y "cobrar" como dos acciones separadas) -- esa decisión de diseño resultó ser el defecto real en uso | Reemplazado por `RenewAndChargeMembershipUseCase` (renueva y cobra en una sola operación atómica, solo dentro de una ventana de 7 días) + `UndoMembershipRenewalUseCase` (deshacer la última renovación, anula el pago sin borrarlo) | Corregido, verificado en navegador y con 7 pruebas automatizadas nuevas (CP53-CP59) |
+| BUG-13 | `PATCH /routines/assignments/{id}`/`PATCH /diets/assignments/{id}` con `routine_id`/`diet_plan_id` nuevo devolvía 200 pero el id seguía siendo el viejo -- la corrección de "error de dedo" no corregía nada | `SqlAlchemyRoutineAssignmentRepository.update()`/`SqlAlchemyDietAssignmentRepository.update()` (desde Entrega 2) solo escribían `status`/`notes` en el modelo -- nunca `routine_id`/`assigned_date`/`diet_plan_id`. Invisible hasta ahora porque el `PATCH` original solo tocaba esos dos campos | Ambos repositorios ahora persisten también `routine_id`/`assigned_date`/`diet_plan_id` | Corregido, delatado por el primer caso de prueba de la ampliación (`test_corregir_asignacion_*`), 17 pruebas nuevas en verde |
+| BUG-14 | El contenedor Docker del backend quedaba caído (`AssertionError: Status code 204 must not have a response body`) al agregar los `DELETE` nuevos de asignación | Faltaba `response_model=None` en los dos `DELETE` (204) nuevos; `fastapi==0.115.0` (el pin real de `requirements.txt`, el que corre en el contenedor) lo exige, una versión más nueva instalada en el entorno de desarrollo local no -- `pytest` local pasaba igual, sin detectarlo | Se agrega `response_model=None` (mismo patrón que `DELETE /clients/{id}`, que ya lo tenía) | Corregido, confirmado con `docker logs` y verificación en navegador contra el contenedor real |
 
 ## Verificación de despliegue
 
@@ -161,19 +198,19 @@ membresía → pago con desglose → cambio de plan) verificado con `curl`, los
 
 ## Resumen
 
-- **122/122 pruebas automatizadas en verde** (106 del cierre del
+- **139/139 pruebas automatizadas en verde** (106 del cierre del
   2026-11-16 + 4 de restablecer-contraseña/editar-cliente + 3 de la
   pantalla "Usuarios" + 2 de editar nombre/correo del cliente + 7 de
-  BUG-12, las últimas cuatro actualizaciones del 2026-11-18) -- 0 commits
-  revertidos.
-- **59 casos de prueba cubiertos en total** (CP01-18 del plan original +
+  BUG-12 + 17 de editar/eliminar rutinas y dietas, las últimas cinco
+  actualizaciones del 2026-11-18) -- 0 commits revertidos.
+- **76 casos de prueba cubiertos en total** (CP01-18 del plan original +
   CP19-46 de la ampliación de RF004/RF005 + CP47-49 del restablecimiento
-  de contraseña + CP50-52 de la pantalla "Usuarios" + CP53-59 de BUG-12),
-  todos "Pasó".
-- **2 bugs nuevos encontrados y corregidos**: BUG-11 durante el cierre del
-  2026-11-16, BUG-12 el 2026-11-18 (ver tabla de bugs arriba); 0 bugs
-  abiertos en todo el proyecto. Ninguna de las otras actualizaciones del
-  2026-11-18 (restablecer contraseña/editar cliente, editar nombre/correo,
-  y la pantalla "Usuarios") encontró ningún bug nuevo.
+  de contraseña + CP50-52 de la pantalla "Usuarios" + CP53-59 de BUG-12 +
+  CP60-76 de editar/eliminar rutinas y dietas), todos "Pasó".
+- **4 bugs nuevos encontrados y corregidos**: BUG-11 durante el cierre del
+  2026-11-16, BUG-12/13/14 el 2026-11-18 (ver tabla de bugs arriba); 0
+  bugs abiertos en todo el proyecto. Ninguna de las otras actualizaciones
+  del 2026-11-18 (restablecer contraseña/editar cliente, editar
+  nombre/correo, y la pantalla "Usuarios") encontró ningún bug nuevo.
 - **Despliegue verificado end-to-end desde un clon limpio**, sin ningún
   problema encontrado.

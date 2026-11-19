@@ -15,6 +15,23 @@ Casos cubiertos:
     6. Listar historial como cliente ve lo propio pero no lo de otro.
     7. `PATCH /routines/assignments/{id}` como entrenador dueno (200) y
        como entrenador que NO es dueno (403).
+
+2026-11-18 (ampliacion de RF007/RF012, "editar/eliminar rutina" -- ver
+DECISIONES.md). Casos nuevos, numeracion continua desde el ultimo CP del
+plan de pruebas (ver `docs/RESULTADOS-FINALES.md`):
+    8. Editar rutina como admin -> 200, cambia nombre/descripcion, queda
+       en bitacora.
+    9. Editar rutina ajena como entrenador (no la creo) -> 403.
+    10. Eliminar rutina SIN asignaciones -> se borra de verdad.
+    11. Eliminar rutina CON asignaciones -> se desactiva (no se borra),
+        conserva el historial.
+    12. Eliminar rutina como cliente -> 403.
+    13. Corregir una asignacion (rutina/fecha, "error de dedo") como
+        entrenador dueno -> 200, queda en bitacora.
+    14. Eliminar una asignacion -> 204, la fila desaparece del historial
+        pero la bitacora conserva el registro.
+    15. Eliminar una asignacion como entrenador que NO es dueno -> 403.
+    16. Editar una asignacion ya 'completada' NUNCA la borra.
 """
 
 from __future__ import annotations
@@ -280,3 +297,202 @@ def test_patch_assignment_como_entrenador_no_dueno_devuelve_403(client: TestClie
     )
 
     assert response.status_code == 403
+
+
+# --- Ampliacion 2026-11-18: editar/eliminar rutina y sus asignaciones ------
+
+
+def test_editar_rutina_como_admin_actualiza_datos(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.rut11@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+    routine_id = _create_routine(client, admin_headers, "Rutina Fuerza 11").json()["id"]
+
+    response = client.patch(
+        f"{API}/routines/{routine_id}",
+        json={"name": "Rutina Fuerza 11 (editada)", "description": "Ajustada"},
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["name"] == "Rutina Fuerza 11 (editada)"
+    assert body["description"] == "Ajustada"
+
+    audit = client.get(f"{API}/audit-logs?limit=5", headers=admin_headers).json()
+    entry = next(a for a in audit if a["action"] == "editar_rutina" and a["entity_id"] == str(routine_id))
+    assert entry["user_id"] == admin.id
+
+
+def test_editar_rutina_ajena_como_entrenador_devuelve_403(client: TestClient) -> None:
+    trainer_a = _seed_user("smartgym.qa.entrenador.a.rut12@gmail.com", "ClaveEntrenadorA123", "entrenador")
+    trainer_b = _seed_user("smartgym.qa.entrenador.b.rut12@gmail.com", "ClaveEntrenadorB123", "entrenador")
+    trainer_a_headers = _auth_headers(client, trainer_a.email, "ClaveEntrenadorA123")
+    trainer_b_headers = _auth_headers(client, trainer_b.email, "ClaveEntrenadorB123")
+
+    routine_id = _create_routine(client, trainer_a_headers, "Rutina Fuerza 12").json()["id"]
+
+    response = client.patch(
+        f"{API}/routines/{routine_id}",
+        json={"name": "Intento ajeno"},
+        headers=trainer_b_headers,
+    )
+
+    assert response.status_code == 403
+
+
+def test_eliminar_rutina_sin_asignaciones_borra_de_verdad(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.rut13@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+    routine_id = _create_routine(client, admin_headers, "Rutina Fuerza 13").json()["id"]
+
+    response = client.delete(f"{API}/routines/{routine_id}", headers=admin_headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["deleted"] is True
+    assert body["routine"] is None
+
+    # Ya no aparece en el catalogo -- se borro de verdad.
+    catalog = client.get(f"{API}/routines", headers=admin_headers).json()
+    assert all(r["id"] != routine_id for r in catalog)
+
+
+def test_eliminar_rutina_con_asignaciones_la_desactiva(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.rut14@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+    client_id = _register_client(
+        client, admin_headers, "smartgym.qa.cliente.rut14@gmail.com"
+    ).json()["client"]["id"]
+    routine_id = _create_routine(client, admin_headers, "Rutina Fuerza 14").json()["id"]
+    _assign_routine(client, admin_headers, routine_id, client_id)
+
+    response = client.delete(f"{API}/routines/{routine_id}", headers=admin_headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["deleted"] is False
+    assert body["routine"]["is_active"] is False
+
+    # Sigue existiendo (se conserva el historial) pero marcada inactiva.
+    still_there = client.get(f"{API}/routines/{routine_id}", headers=admin_headers)
+    assert still_there.status_code == 200
+    assert still_there.json()["is_active"] is False
+
+
+def test_eliminar_rutina_como_cliente_devuelve_403(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.rut15@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+    routine_id = _create_routine(client, admin_headers, "Rutina Fuerza 15").json()["id"]
+    created = _register_client(client, admin_headers, "smartgym.qa.cliente.rut15@gmail.com")
+    password = created.json()["temporary_password"]
+    client_headers = _auth_headers(client, "smartgym.qa.cliente.rut15@gmail.com", password)
+
+    response = client.delete(f"{API}/routines/{routine_id}", headers=client_headers)
+
+    assert response.status_code == 403
+
+
+def test_corregir_asignacion_rutina_como_entrenador_dueno_actualiza_y_registra_bitacora(
+    client: TestClient,
+) -> None:
+    admin = _seed_user("smartgym.qa.admin.rut16@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+    trainer = _seed_user("smartgym.qa.entrenador.rut16@gmail.com", "ClaveEntrenador123", "entrenador")
+    trainer_headers = _auth_headers(client, trainer.email, "ClaveEntrenador123")
+
+    client_id = _register_client(
+        client, admin_headers, "smartgym.qa.cliente.rut16@gmail.com", trainer_id=trainer.id
+    ).json()["client"]["id"]
+    routine_id = _create_routine(client, trainer_headers, "Rutina Fuerza 16 - original").json()["id"]
+    otra_routine_id = _create_routine(client, trainer_headers, "Rutina Fuerza 16 - correcta").json()["id"]
+    assignment_id = _assign_routine(client, trainer_headers, routine_id, client_id).json()["id"]
+
+    response = client.patch(
+        f"{API}/routines/assignments/{assignment_id}",
+        json={"routine_id": otra_routine_id, "assigned_date": date.today().isoformat()},
+        headers=trainer_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["routine_id"] == otra_routine_id
+
+    audit = client.get(f"{API}/audit-logs?limit=5", headers=admin_headers).json()
+    entry = next(
+        a for a in audit if a["action"] == "editar_asignacion_rutina" and a["entity_id"] == str(assignment_id)
+    )
+    assert entry["user_id"] == trainer.id
+
+
+def test_eliminar_asignacion_rutina_borra_la_fila_pero_bitacora_sobrevive(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.rut17@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+    client_id = _register_client(
+        client, admin_headers, "smartgym.qa.cliente.rut17@gmail.com"
+    ).json()["client"]["id"]
+    routine_id = _create_routine(client, admin_headers, "Rutina Fuerza 17").json()["id"]
+    assignment_id = _assign_routine(client, admin_headers, routine_id, client_id).json()["id"]
+
+    response = client.delete(f"{API}/routines/assignments/{assignment_id}", headers=admin_headers)
+    assert response.status_code == 204
+
+    historial = client.get(
+        f"{API}/routines/assignments/clients/{client_id}", headers=admin_headers
+    ).json()
+    assert all(a["id"] != assignment_id for a in historial)
+
+    audit = client.get(f"{API}/audit-logs?limit=5", headers=admin_headers).json()
+    entry = next(
+        a
+        for a in audit
+        if a["action"] == "eliminar_asignacion_rutina" and a["entity_id"] == str(assignment_id)
+    )
+    assert entry["user_id"] == admin.id
+
+
+def test_eliminar_asignacion_rutina_como_entrenador_no_dueno_devuelve_403(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.rut18@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+    trainer_a = _seed_user("smartgym.qa.entrenador.a.rut18@gmail.com", "ClaveEntrenadorA123", "entrenador")
+    trainer_b = _seed_user("smartgym.qa.entrenador.b.rut18@gmail.com", "ClaveEntrenadorB123", "entrenador")
+    trainer_a_headers = _auth_headers(client, trainer_a.email, "ClaveEntrenadorA123")
+    trainer_b_headers = _auth_headers(client, trainer_b.email, "ClaveEntrenadorB123")
+
+    client_id = _register_client(
+        client, admin_headers, "smartgym.qa.cliente.rut18@gmail.com", trainer_id=trainer_a.id
+    ).json()["client"]["id"]
+    routine_id = _create_routine(client, trainer_a_headers, "Rutina Fuerza 18").json()["id"]
+    assignment_id = _assign_routine(client, trainer_a_headers, routine_id, client_id).json()["id"]
+
+    response = client.delete(
+        f"{API}/routines/assignments/{assignment_id}", headers=trainer_b_headers
+    )
+
+    assert response.status_code == 403
+
+
+def test_editar_asignacion_completada_no_la_elimina(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.rut19@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+    client_id = _register_client(
+        client, admin_headers, "smartgym.qa.cliente.rut19@gmail.com"
+    ).json()["client"]["id"]
+    routine_id = _create_routine(client, admin_headers, "Rutina Fuerza 19").json()["id"]
+    assignment_id = _assign_routine(client, admin_headers, routine_id, client_id).json()["id"]
+
+    primera = client.patch(
+        f"{API}/routines/assignments/{assignment_id}",
+        json={"status": "completada"},
+        headers=admin_headers,
+    )
+    assert primera.status_code == 200
+    assert primera.json()["status"] == "completada"
+
+    segunda = client.patch(
+        f"{API}/routines/assignments/{assignment_id}",
+        json={"notes": "Nota de cierre"},
+        headers=admin_headers,
+    )
+    assert segunda.status_code == 200
+    assert segunda.json()["id"] == assignment_id
+    assert segunda.json()["status"] == "completada"
+    assert segunda.json()["notes"] == "Nota de cierre"

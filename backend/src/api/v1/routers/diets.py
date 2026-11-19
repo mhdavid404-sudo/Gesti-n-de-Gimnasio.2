@@ -22,6 +22,15 @@ patron):
   RF012 para este modulo): `admin` cualquiera; `entrenador` solo si el
   cliente de esa asignacion es suyo; `cliente` NO puede (RF013 es de
   solo lectura).
+- `DELETE /diets/assignments/{assignment_id}` (NUEVO, 2026-11-18,
+  ampliacion de RF012 "quitar una asignacion sin perder la bitacora"):
+  mismo criterio de ownership que el `PATCH` de arriba.
+- `PATCH /diets/plans/{id}` y `DELETE /diets/plans/{id}` (NUEVOS,
+  2026-11-18, ampliacion de RF009/RF012 "editar/eliminar dieta"): `admin`
+  cualquiera; `entrenador` solo los planes que el mismo creo
+  (`UnauthorizedDietEditError` si no); `cliente` NO puede. `DELETE`
+  desactiva el plan en vez de borrarlo si tiene asignaciones existentes
+  (conserva el historial) -- ver `DeleteOrDeactivateDietPlanUseCase`.
 """
 
 from __future__ import annotations
@@ -35,13 +44,18 @@ from src.api.v1.schemas.diets import (
     DietAssignmentRead,
     DietAssignmentUpdate,
     DietPlanCreate,
+    DietPlanDeleteResult,
     DietPlanRead,
+    DietPlanUpdate,
 )
 from src.application.diets.use_cases import (
     AssignDietToClientUseCase,
     CreateDietPlanUseCase,
+    DeleteDietAssignmentUseCase,
+    DeleteOrDeactivateDietPlanUseCase,
     GetClientDietHistoryUseCase,
     UpdateDietAssignmentUseCase,
+    UpdateDietPlanUseCase,
 )
 from src.domain.clients.exceptions import ClientNotFoundError
 from src.domain.diets.entities import DietAssignment, DietPlan
@@ -50,6 +64,7 @@ from src.domain.diets.exceptions import (
     DietPlanNotFoundError,
     InvalidDietAssignmentStatusError,
     UnauthorizedDietAssignmentError,
+    UnauthorizedDietEditError,
     UnauthorizedDietPlanCreatorError,
 )
 from src.domain.users.entities import User
@@ -59,6 +74,7 @@ from src.infrastructure.repositories.diets import (
     SqlAlchemyDietAssignmentRepository,
     SqlAlchemyDietPlanRepository,
 )
+from src.infrastructure.repositories.notifications import SqlAlchemyAuditLogRepository
 from src.infrastructure.repositories.users import SqlAlchemyUserRepository
 
 router = APIRouter(prefix="/diets", tags=["diets"])
@@ -211,13 +227,20 @@ def update_diet_assignment(
     db: Session = Depends(get_db),
 ) -> DietAssignmentRead:
     """RF012 (NUEVO, ver DECISIONES.md): cambiar `status`/`notes` de una
-    asignacion existente. `cliente` bloqueado de entrada (RF013 es solo
-    lectura). `entrenador` solo si el cliente de esa asignacion es
-    suyo."""
+    asignacion existente. 2026-11-18 (ampliacion de RF012, "corregir una
+    asignacion, error de dedo"): tambien admite corregir
+    `diet_plan_id`/`assigned_date`. `cliente` bloqueado de entrada (RF013
+    es solo lectura). `entrenador` solo si el cliente de esa asignacion es
+    suyo. Editar NUNCA elimina la asignacion, aunque ya este 'completada'
+    -- eso es el `DELETE` de abajo, un endpoint aparte."""
     assignment_repository = SqlAlchemyDietAssignmentRepository(db)
+    diet_plan_repository = SqlAlchemyDietPlanRepository(db)
     client_repository = SqlAlchemyClientProfileRepository(db)
     use_case = UpdateDietAssignmentUseCase(
-        assignment_repository=assignment_repository, client_repository=client_repository
+        assignment_repository=assignment_repository,
+        diet_plan_repository=diet_plan_repository,
+        client_repository=client_repository,
+        audit_log_repository=SqlAlchemyAuditLogRepository(db),
     )
 
     try:
@@ -227,8 +250,12 @@ def update_diet_assignment(
             notes=payload.notes,
             updater_role=current_user.role,
             updater_id=current_user.id,  # type: ignore[arg-type]
+            diet_plan_id=payload.diet_plan_id,
+            assigned_date=payload.assigned_date,
         )
     except DietAssignmentNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except DietPlanNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except InvalidDietAssignmentStatusError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -237,3 +264,125 @@ def update_diet_assignment(
 
     db.commit()
     return DietAssignmentRead.model_validate(updated)
+
+
+@router.delete(
+    "/assignments/{assignment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_model=None,
+    dependencies=[Depends(require_role("admin", "entrenador"))],
+)
+def delete_diet_assignment(
+    assignment_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """2026-11-18 (ampliacion de RF012, "quitar una asignacion sin perder
+    la bitacora"): la fila se elimina, pero la eliminacion queda
+    registrada en `AuditLog` ANTES de borrarla (ver
+    `DeleteDietAssignmentUseCase`). `cliente` bloqueado de entrada;
+    `entrenador` solo si el cliente de esa asignacion es suyo."""
+    assignment_repository = SqlAlchemyDietAssignmentRepository(db)
+    client_repository = SqlAlchemyClientProfileRepository(db)
+    use_case = DeleteDietAssignmentUseCase(
+        assignment_repository=assignment_repository,
+        client_repository=client_repository,
+        audit_log_repository=SqlAlchemyAuditLogRepository(db),
+    )
+
+    try:
+        use_case.execute(
+            assignment_id,
+            updater_role=current_user.role,
+            updater_id=current_user.id,  # type: ignore[arg-type]
+        )
+    except DietAssignmentNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except UnauthorizedDietAssignmentError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+    db.commit()
+
+
+@router.patch(
+    "/plans/{diet_plan_id}",
+    response_model=DietPlanRead,
+    dependencies=[Depends(require_role("admin", "entrenador"))],
+)
+def update_diet_plan(
+    diet_plan_id: int,
+    payload: DietPlanUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> DietPlanRead:
+    """2026-11-18 (ampliacion de RF009/RF012, "editar dieta"): cambiar
+    nombre/descripcion/objetivo calorico de un plan del catalogo. `admin`
+    puede editar cualquiera; `entrenador` solo los que el mismo creo;
+    `cliente` bloqueado de entrada."""
+    diet_plan_repository = SqlAlchemyDietPlanRepository(db)
+    use_case = UpdateDietPlanUseCase(
+        diet_plan_repository=diet_plan_repository,
+        audit_log_repository=SqlAlchemyAuditLogRepository(db),
+    )
+
+    try:
+        updated = use_case.execute(
+            diet_plan_id,
+            name=payload.name,
+            description=payload.description,
+            calories_target=payload.calories_target,
+            updater_role=current_user.role,
+            updater_id=current_user.id,  # type: ignore[arg-type]
+        )
+    except DietPlanNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except UnauthorizedDietEditError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+    db.commit()
+    return DietPlanRead.model_validate(updated)
+
+
+@router.delete(
+    "/plans/{diet_plan_id}",
+    response_model=DietPlanDeleteResult,
+    dependencies=[Depends(require_role("admin", "entrenador"))],
+)
+def delete_diet_plan(
+    diet_plan_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> DietPlanDeleteResult:
+    """2026-11-18 (ampliacion de RF009/RF012, "eliminar dieta"): elimina
+    el plan si no tiene ninguna asignacion; si tiene, lo DESACTIVA en vez
+    de borrarlo (conserva el historial) -- ver
+    `DeleteOrDeactivateDietPlanUseCase`. Devuelve 200 (no 204) para que el
+    frontend sepa cual de las dos paso. `admin` puede eliminar/desactivar
+    cualquiera; `entrenador` solo los que el mismo creo."""
+    diet_plan_repository = SqlAlchemyDietPlanRepository(db)
+    assignment_repository = SqlAlchemyDietAssignmentRepository(db)
+    use_case = DeleteOrDeactivateDietPlanUseCase(
+        diet_plan_repository=diet_plan_repository,
+        assignment_repository=assignment_repository,
+        audit_log_repository=SqlAlchemyAuditLogRepository(db),
+    )
+
+    try:
+        deleted, plan = use_case.execute(
+            diet_plan_id,
+            updater_role=current_user.role,
+            updater_id=current_user.id,  # type: ignore[arg-type]
+        )
+    except DietPlanNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except UnauthorizedDietEditError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+
+    db.commit()
+    if deleted:
+        return DietPlanDeleteResult(deleted=True, diet_plan=None, message="Plan de dieta eliminado.")
+    return DietPlanDeleteResult(
+        deleted=False,
+        diet_plan=DietPlanRead.model_validate(plan),
+        message="El plan tiene asignaciones existentes: se desactivo en vez de eliminarse.",
+    )

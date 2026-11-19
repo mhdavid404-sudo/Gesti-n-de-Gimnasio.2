@@ -38,6 +38,13 @@ class DietAssignmentRepository(ABC):
     def list_by_trainer(self, trainer_id: int) -> list[DietAssignment]: ...
 
     @abstractmethod
+    def has_assignments_for_diet_plan(self, diet_plan_id: int) -> bool:
+        """Usado por `DeleteOrDeactivateDietPlanUseCase` (2026-11-18,
+        ampliacion de RF012): mismo patron que
+        `RoutineAssignmentRepository.has_assignments_for_routine`."""
+        ...
+
+    @abstractmethod
     def add(self, assignment: DietAssignment) -> DietAssignment: ...
 
     @abstractmethod

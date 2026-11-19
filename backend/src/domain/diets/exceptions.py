@@ -66,3 +66,17 @@ class UnauthorizedDietAssignmentError(Exception):
     def __init__(self, client_id: int) -> None:
         self.client_id = client_id
         super().__init__(f"El cliente {client_id} no esta asignado a este entrenador")
+
+
+class UnauthorizedDietEditError(Exception):
+    """Un `entrenador` intento editar/eliminar un plan de dieta que NO creo el.
+
+    Ampliacion de RF012 (2026-11-18, "editar/eliminar dieta"): mismo
+    criterio que `UnauthorizedRoutineEditError` -- `admin` puede
+    editar/eliminar cualquier plan; `entrenador` solo los que el mismo
+    creo (`DietPlan.created_by`).
+    """
+
+    def __init__(self, diet_plan_id: int) -> None:
+        self.diet_plan_id = diet_plan_id
+        super().__init__(f"El plan de dieta {diet_plan_id} no fue creado por este entrenador")

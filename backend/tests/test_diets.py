@@ -16,6 +16,18 @@ equivalente a `Exercise`/`RoutineExercise`). Casos cubiertos:
     5. Listar historial como cliente ve lo propio pero no lo de otro.
     6. `PATCH /diets/assignments/{id}` como entrenador dueno (200) y
        como entrenador que NO es dueno (403).
+
+2026-11-18 (ampliacion de RF009/RF012, "editar/eliminar dieta" -- ver
+DECISIONES.md). Casos nuevos, mismo patron que `test_routines.py`:
+    7. Editar plan como admin -> 200, queda en bitacora.
+    8. Editar plan ajeno como entrenador (no lo creo) -> 403.
+    9. Eliminar plan SIN asignaciones -> se borra de verdad.
+    10. Eliminar plan CON asignaciones -> se desactiva, conserva historial.
+    11. Eliminar plan como cliente -> 403.
+    12. Corregir una asignacion (plan/fecha, "error de dedo") como
+        entrenador dueno -> 200, queda en bitacora.
+    13. Eliminar una asignacion -> 204, bitacora sobrevive.
+    14. Eliminar una asignacion como entrenador que NO es dueno -> 403.
 """
 
 from __future__ import annotations
@@ -242,6 +254,175 @@ def test_patch_assignment_como_entrenador_no_dueno_devuelve_403(client: TestClie
         f"{API}/diets/assignments/{assignment_id}",
         json={"status": "completada"},
         headers=trainer_b_headers,
+    )
+
+    assert response.status_code == 403
+
+
+# --- Ampliacion 2026-11-18: editar/eliminar dieta y sus asignaciones ------
+
+
+def test_editar_plan_como_admin_actualiza_datos(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.diet11@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+    plan_id = _create_diet_plan(client, admin_headers, "Plan Volumen 11").json()["id"]
+
+    response = client.patch(
+        f"{API}/diets/plans/{plan_id}",
+        json={"name": "Plan Volumen 11 (editado)", "calories_target": 2500},
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["name"] == "Plan Volumen 11 (editado)"
+    assert body["calories_target"] == 2500
+
+    audit = client.get(f"{API}/audit-logs?limit=5", headers=admin_headers).json()
+    entry = next(a for a in audit if a["action"] == "editar_dieta" and a["entity_id"] == str(plan_id))
+    assert entry["user_id"] == admin.id
+
+
+def test_editar_plan_ajeno_como_entrenador_devuelve_403(client: TestClient) -> None:
+    trainer_a = _seed_user("smartgym.qa.entrenador.a.diet12@gmail.com", "ClaveEntrenadorA123", "entrenador")
+    trainer_b = _seed_user("smartgym.qa.entrenador.b.diet12@gmail.com", "ClaveEntrenadorB123", "entrenador")
+    trainer_a_headers = _auth_headers(client, trainer_a.email, "ClaveEntrenadorA123")
+    trainer_b_headers = _auth_headers(client, trainer_b.email, "ClaveEntrenadorB123")
+
+    plan_id = _create_diet_plan(client, trainer_a_headers, "Plan Volumen 12").json()["id"]
+
+    response = client.patch(
+        f"{API}/diets/plans/{plan_id}",
+        json={"name": "Intento ajeno"},
+        headers=trainer_b_headers,
+    )
+
+    assert response.status_code == 403
+
+
+def test_eliminar_plan_sin_asignaciones_borra_de_verdad(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.diet13@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+    plan_id = _create_diet_plan(client, admin_headers, "Plan Volumen 13").json()["id"]
+
+    response = client.delete(f"{API}/diets/plans/{plan_id}", headers=admin_headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["deleted"] is True
+    assert body["diet_plan"] is None
+
+    catalog = client.get(f"{API}/diets/plans", headers=admin_headers).json()
+    assert all(p["id"] != plan_id for p in catalog)
+
+
+def test_eliminar_plan_con_asignaciones_lo_desactiva(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.diet14@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+    client_id = _register_client(
+        client, admin_headers, "smartgym.qa.cliente.diet14@gmail.com"
+    ).json()["client"]["id"]
+    plan_id = _create_diet_plan(client, admin_headers, "Plan Volumen 14").json()["id"]
+    _assign_diet(client, admin_headers, plan_id, client_id)
+
+    response = client.delete(f"{API}/diets/plans/{plan_id}", headers=admin_headers)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["deleted"] is False
+    assert body["diet_plan"]["is_active"] is False
+
+    catalog = client.get(f"{API}/diets/plans", headers=admin_headers).json()
+    still_there = next(p for p in catalog if p["id"] == plan_id)
+    assert still_there["is_active"] is False
+
+
+def test_eliminar_plan_como_cliente_devuelve_403(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.diet15@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+    plan_id = _create_diet_plan(client, admin_headers, "Plan Volumen 15").json()["id"]
+    created = _register_client(client, admin_headers, "smartgym.qa.cliente.diet15@gmail.com")
+    password = created.json()["temporary_password"]
+    client_headers = _auth_headers(client, "smartgym.qa.cliente.diet15@gmail.com", password)
+
+    response = client.delete(f"{API}/diets/plans/{plan_id}", headers=client_headers)
+
+    assert response.status_code == 403
+
+
+def test_corregir_asignacion_dieta_como_entrenador_dueno_actualiza_y_registra_bitacora(
+    client: TestClient,
+) -> None:
+    admin = _seed_user("smartgym.qa.admin.diet16@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+    trainer = _seed_user("smartgym.qa.entrenador.diet16@gmail.com", "ClaveEntrenador123", "entrenador")
+    trainer_headers = _auth_headers(client, trainer.email, "ClaveEntrenador123")
+
+    client_id = _register_client(
+        client, admin_headers, "smartgym.qa.cliente.diet16@gmail.com", trainer_id=trainer.id
+    ).json()["client"]["id"]
+    plan_id = _create_diet_plan(client, trainer_headers, "Plan Volumen 16 - original").json()["id"]
+    otro_plan_id = _create_diet_plan(client, trainer_headers, "Plan Volumen 16 - correcto").json()["id"]
+    assignment_id = _assign_diet(client, trainer_headers, plan_id, client_id).json()["id"]
+
+    response = client.patch(
+        f"{API}/diets/assignments/{assignment_id}",
+        json={"diet_plan_id": otro_plan_id, "assigned_date": date.today().isoformat()},
+        headers=trainer_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["diet_plan_id"] == otro_plan_id
+
+    audit = client.get(f"{API}/audit-logs?limit=5", headers=admin_headers).json()
+    entry = next(
+        a for a in audit if a["action"] == "editar_asignacion_dieta" and a["entity_id"] == str(assignment_id)
+    )
+    assert entry["user_id"] == trainer.id
+
+
+def test_eliminar_asignacion_dieta_borra_la_fila_pero_bitacora_sobrevive(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.diet17@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+    client_id = _register_client(
+        client, admin_headers, "smartgym.qa.cliente.diet17@gmail.com"
+    ).json()["client"]["id"]
+    plan_id = _create_diet_plan(client, admin_headers, "Plan Volumen 17").json()["id"]
+    assignment_id = _assign_diet(client, admin_headers, plan_id, client_id).json()["id"]
+
+    response = client.delete(f"{API}/diets/assignments/{assignment_id}", headers=admin_headers)
+    assert response.status_code == 204
+
+    historial = client.get(
+        f"{API}/diets/assignments/clients/{client_id}", headers=admin_headers
+    ).json()
+    assert all(a["id"] != assignment_id for a in historial)
+
+    audit = client.get(f"{API}/audit-logs?limit=5", headers=admin_headers).json()
+    entry = next(
+        a
+        for a in audit
+        if a["action"] == "eliminar_asignacion_dieta" and a["entity_id"] == str(assignment_id)
+    )
+    assert entry["user_id"] == admin.id
+
+
+def test_eliminar_asignacion_dieta_como_entrenador_no_dueno_devuelve_403(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.diet18@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+    trainer_a = _seed_user("smartgym.qa.entrenador.a.diet18@gmail.com", "ClaveEntrenadorA123", "entrenador")
+    trainer_b = _seed_user("smartgym.qa.entrenador.b.diet18@gmail.com", "ClaveEntrenadorB123", "entrenador")
+    trainer_a_headers = _auth_headers(client, trainer_a.email, "ClaveEntrenadorA123")
+    trainer_b_headers = _auth_headers(client, trainer_b.email, "ClaveEntrenadorB123")
+
+    client_id = _register_client(
+        client, admin_headers, "smartgym.qa.cliente.diet18@gmail.com", trainer_id=trainer_a.id
+    ).json()["client"]["id"]
+    plan_id = _create_diet_plan(client, trainer_a_headers, "Plan Volumen 18").json()["id"]
+    assignment_id = _assign_diet(client, trainer_a_headers, plan_id, client_id).json()["id"]
+
+    response = client.delete(
+        f"{API}/diets/assignments/{assignment_id}", headers=trainer_b_headers
     )
 
     assert response.status_code == 403
