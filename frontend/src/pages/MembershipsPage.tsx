@@ -225,7 +225,7 @@ export function MembershipsPage() {
             </div>
           ) : (
             <div className="card memberships-page__table-wrap">
-              <table className="memberships-page__table">
+              <table className="memberships-page__table data-table">
                 <thead>
                   <tr>
                     <th>Plan</th>
@@ -333,7 +333,7 @@ export function MembershipsPage() {
           </div>
         ) : (
           <div className="card memberships-page__table-wrap">
-            <table className="memberships-page__table">
+            <table className="memberships-page__table data-table">
               <thead>
                 <tr>
                   <th>Cliente</th>

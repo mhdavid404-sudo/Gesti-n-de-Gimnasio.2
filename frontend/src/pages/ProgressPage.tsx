@@ -497,7 +497,7 @@ export function ProgressPage() {
               </div>
 
               <div className="card progress-page__table-wrap">
-                <table className="progress-page__table">
+                <table className="progress-page__table data-table">
                   <thead>
                     <tr>
                       <th>Fecha</th>

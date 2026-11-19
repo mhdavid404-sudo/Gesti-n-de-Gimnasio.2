@@ -312,7 +312,7 @@ export function UsersPage() {
         </div>
       ) : (
         <div className="card users-page__table-wrap">
-          <table className="users-page__table">
+          <table className="users-page__table data-table">
             <thead>
               <tr>
                 <th>Nombre</th>

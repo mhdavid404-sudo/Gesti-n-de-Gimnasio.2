@@ -185,7 +185,7 @@ export function ClientsListPage() {
         </div>
       ) : (
         <div className="card clients-page__table-wrap">
-          <table className="clients-page__table">
+          <table className="clients-page__table data-table">
             <thead>
               <tr>
                 <th>Cliente</th>

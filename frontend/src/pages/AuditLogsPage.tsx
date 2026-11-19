@@ -67,7 +67,7 @@ export function AuditLogsPage() {
         </div>
       ) : (
         <div className="card audit-logs-page__table-wrap">
-          <table className="audit-logs-page__table">
+          <table className="audit-logs-page__table data-table">
             <thead>
               <tr>
                 <th>Fecha</th>

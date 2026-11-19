@@ -629,7 +629,7 @@ export function PlanesServiciosPage() {
               </div>
             ) : (
               <div className="card plans-services-page__table-wrap">
-                <table className="plans-services-page__table">
+                <table className="plans-services-page__table data-table">
                   <thead>
                     <tr>
                       <th>Nombre</th>

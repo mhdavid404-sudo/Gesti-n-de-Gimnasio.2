@@ -371,6 +371,50 @@ button {
   padding: 20px;
 }
 
+/* Tabla de datos compartida (2026-11-19, ajuste de paleta) -- UN solo
+   componente de estilo para TODAS las tablas del panel (Clientes,
+   Membresías, Pagos, Rutinas, Dietas, Bitácora, Usuarios, Planes y
+   servicios...). Agregar la clase `data-table` al elemento `<table>` de
+   cada pantalla alcanza -- estos selectores son todos descendientes, no
+   hace falta tocar `<thead>`/`<tbody>`/`<tr>` por separado. Lo que NO es
+   color (ancho, `font-size`, animación de entrada por fila) sigue
+   viviendo en el CSS propio de cada página; aquí solo vive la paleta. */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table thead th {
+  background: var(--color-secundario);
+  color: var(--color-primary-text);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-secundario) 70%, black);
+}
+
+.data-table tbody tr {
+  background: color-mix(in srgb, var(--color-secundario) 8%, transparent);
+  transition: background-color 0.15s ease;
+}
+
+/* Filas alternas, apenas distinguibles -- "ligeramente distintas", no un
+   efecto cebra fuerte. */
+.data-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--color-secundario) 14%, transparent);
+}
+
+.data-table tbody td {
+  border-bottom: 1px solid color-mix(in srgb, var(--color-secundario) 25%, var(--color-border-soft) 75%);
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .data-table tbody tr:hover {
+    background: color-mix(in srgb, var(--color-secundario) 22%, transparent);
+  }
+}
+
 .section-title {
   /* El "grito" tipográfico del sistema — ver punto 2 de la nota de
      adaptación arriba. Siempre blanco/neutro: el tamaño + el trazo de

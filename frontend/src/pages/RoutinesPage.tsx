@@ -861,7 +861,7 @@ export function RoutinesPage() {
                   ) : items && items.length === 0 ? (
                     <p className="routines-page__note">Esta rutina todavía no tiene ejercicios.</p>
                   ) : items ? (
-                    <table className="routines-page__table">
+                    <table className="routines-page__table data-table">
                       <thead>
                         <tr>
                           <th>Ejercicio</th>
@@ -1153,7 +1153,7 @@ export function RoutinesPage() {
               </div>
             ) : (
               <div className="card routines-page__table-wrap">
-                <table className="routines-page__table">
+                <table className="routines-page__table data-table">
                   <thead>
                     <tr>
                       <th>Rutina</th>

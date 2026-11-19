@@ -763,7 +763,7 @@ export function DietsPage() {
               </div>
             ) : (
               <div className="card diets-page__table-wrap">
-                <table className="diets-page__table">
+                <table className="diets-page__table data-table">
                   <thead>
                     <tr>
                       <th>Plan</th>

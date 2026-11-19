@@ -66,39 +66,19 @@
   min-width: 720px;
 }
 
+/* Color (fondo de encabezado/filas, hover, bordes) vive en el componente
+   compartido `.data-table` (ver theme.css) -- aquí solo queda lo que no
+   es color: tipografía/espaciado del encabezado y alineación de celda. */
 .clients-page__table th {
   text-align: left;
   padding: var(--space-3) var(--space-4);
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--color-text-dim);
-  border-bottom: 1px solid var(--color-border-soft);
 }
 
 .clients-page__table td {
   padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--color-border-soft);
   vertical-align: middle;
-}
-
-.clients-page__table tr:last-child td {
-  border-bottom: none;
-}
-
-/* Fila de uso muy frecuente (se escanea/hover decenas de veces por turno):
-   el único tratamiento es un cambio de fondo suavizado con `ease`, sin
-   transform ni lift — no hace falta más para comunicar "esta fila tiene
-   una acción" (frecuencia alta -> animación mínima). El link "Ver
-   detalle" adentro (.btn.btn-ghost) ya trae su propio hover + feedback
-   de presión real. */
-.clients-page__table tbody tr {
-  transition: background-color 0.15s ease;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .clients-page__table tbody tr:hover {
-    background: var(--color-surface-2);
-  }
 }
 
 /* Stagger de carga. Anima solo cuando React monta

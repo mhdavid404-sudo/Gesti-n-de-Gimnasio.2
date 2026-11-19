@@ -2096,7 +2096,7 @@ export function ClientDetailPage() {
                       ) : contractedServices.length === 0 ? (
                         <p className="client-detail__empty">Sin extras contratados.</p>
                       ) : (
-                        <table className="client-detail__table">
+                        <table className="client-detail__table data-table">
                           <thead>
                             <tr>
                               <th>Servicio</th>
@@ -2403,7 +2403,7 @@ export function ClientDetailPage() {
                           </button>
                         </div>
                       )}
-                      <table className="client-detail__table">
+                      <table className="client-detail__table data-table">
                         <thead>
                           <tr>
                             <th>Fecha</th>
@@ -2573,7 +2573,7 @@ export function ClientDetailPage() {
                             ) : items.length === 0 ? (
                               <p className="client-detail__empty">Esta rutina todavía no tiene ejercicios.</p>
                             ) : (
-                              <table className="client-detail__table">
+                              <table className="client-detail__table data-table">
                                 <thead>
                                   <tr>
                                     <th>Ejercicio</th>
@@ -3033,7 +3033,7 @@ export function ClientDetailPage() {
                           unit="kg"
                         />
                       </div>
-                      <table className="client-detail__table">
+                      <table className="client-detail__table data-table">
                         <thead>
                           <tr>
                             <th>Fecha</th>
