@@ -17,6 +17,16 @@ const apiProxy = {
   },
 }
 
+// Vite rechaza por defecto cualquier request cuyo header Host no reconozca
+// (proteccion contra DNS rebinding) -- un tunel rapido de Cloudflare usa un
+// subdominio *.trycloudflare.com al azar en cada corrida, imposible de
+// anotar de antemano en una lista fija. `true` desactiva el chequeo por
+// completo: aceptable para un tunel de demo de corta duracion (ver
+// docs/PUESTA-EN-PRODUCCION.md, "Publicar con tunel para demo"), no para
+// un despliegue real con dominio fijo (ahi si conviene listar el dominio
+// exacto en vez de `true`).
+const allowedHosts = true
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -28,10 +38,12 @@ export default defineConfig({
       interval: 300,
     },
     proxy: apiProxy,
+    allowedHosts,
   },
   preview: {
     port: 5173,
     host: true,
     proxy: apiProxy,
+    allowedHosts,
   },
 })

@@ -212,3 +212,11 @@ que se vuelve a correr el comando.
   `docker compose restart frontend` una vez para que tome la configuración
   nueva (un `docker compose up -d` normal, en una máquina que recién
   clona el repo, ya la incluye).
+- **Probado en vivo** (2026-11-19): el primer intento devolvió un `403
+  Blocked request. This host (...) is not allowed.` -- Vite rechaza por
+  defecto cualquier `Host` que no reconozca (protección contra DNS
+  rebinding), y el subdominio `*.trycloudflare.com` de un túnel rápido es
+  al azar en cada corrida, así que no se puede anotar de antemano.
+  Solución aplicada en `vite.config.ts` (`allowedHosts: true`): tras un
+  `docker compose restart frontend`, la URL del túnel cargó el login real
+  y el `POST /api/v1/auth/login` respondió `200` igual que en local.
