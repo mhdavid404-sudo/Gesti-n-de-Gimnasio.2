@@ -163,6 +163,8 @@ export function ClientDetailPage() {
   // en `None` como "no cambiar", pero el frontend igual manda el valor
   // actual explícito en vez de depender de eso).
   const [showEditForm, setShowEditForm] = useState(false)
+  const [editFullName, setEditFullName] = useState('')
+  const [editEmail, setEditEmail] = useState('')
   const [editPhone, setEditPhone] = useState('')
   const [editBirthDate, setEditBirthDate] = useState('')
   const [editAddress, setEditAddress] = useState('')
@@ -171,6 +173,11 @@ export function ClientDetailPage() {
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
   const [editToast, setEditToast] = useState<string | null>(null)
+  // Cambiar el correo cambia con QUÉ inicia sesión el cliente -- se avisa
+  // explícitamente antes de guardar (distinto del resto de los campos, que
+  // se guardan directo), con el mismo ConfirmDialog que ya usa el resto de
+  // la pantalla.
+  const [showEmailChangeConfirm, setShowEmailChangeConfirm] = useState(false)
 
   const [trainers, setTrainers] = useState<AuthUser[]>([])
 
@@ -182,6 +189,8 @@ export function ClientDetailPage() {
 
   const openEditForm = () => {
     if (!profile) return
+    setEditFullName(profile.full_name)
+    setEditEmail(profile.email)
     setEditPhone(profile.phone ?? '')
     setEditBirthDate(profile.birth_date ?? '')
     setEditAddress(profile.address ?? '')
@@ -191,11 +200,13 @@ export function ClientDetailPage() {
     setShowEditForm(true)
   }
 
-  const handleSaveEdit = async (event: FormEvent) => {
-    event.preventDefault()
+  const performSaveEdit = async () => {
+    setShowEmailChangeConfirm(false)
     setEditError(null)
 
     const payload: ClientProfileUpdatePayload = {
+      full_name: editFullName.trim() || null,
+      email: editEmail.trim() || null,
       trainer_id: editTrainerId ? Number(editTrainerId) : null,
       phone: editPhone.trim() || null,
       birth_date: editBirthDate || null,
@@ -219,6 +230,10 @@ export function ClientDetailPage() {
           navigate('/login', { replace: true })
           return
         }
+        // 403 (rol no admin) y 409 (correo repetido, ver
+        // UpdateClientProfileUseCase) ya traen un mensaje claro del
+        // backend -- 409 se deja pasar tal cual por el `err.message` de
+        // abajo, no se reescribe.
         setEditError(
           err.status === 403 ? 'No tienes permiso para editar este cliente.' : err.message,
         )
@@ -228,6 +243,21 @@ export function ClientDetailPage() {
     } finally {
       setIsSavingEdit(false)
     }
+  }
+
+  const handleSaveEdit = (event: FormEvent) => {
+    event.preventDefault()
+    setEditError(null)
+
+    // Si cambió el correo, se avisa ANTES de guardar que ese es el nuevo
+    // dato con el que el cliente va a iniciar sesión -- el guardado real
+    // ocurre solo al confirmar ese diálogo (ver `performSaveEdit`).
+    if (profile && editEmail.trim() !== profile.email) {
+      setShowEmailChangeConfirm(true)
+      return
+    }
+
+    void performSaveEdit()
   }
 
   // --- Restablecer contraseña (solo admin) ---------------------------------
@@ -1197,6 +1227,16 @@ export function ClientDetailPage() {
         onCancel={() => setShowResetConfirm(false)}
       />
 
+      <ConfirmDialog
+        open={showEmailChangeConfirm}
+        title="¿Cambiar el correo de inicio de sesión?"
+        description={`A partir de ahora el cliente inicia sesión con "${editEmail.trim()}" y el correo anterior deja de funcionar.`}
+        tone="neutral"
+        confirmLabel={isSavingEdit ? 'Guardando…' : 'Cambiar correo y guardar'}
+        onConfirm={() => void performSaveEdit()}
+        onCancel={() => setShowEmailChangeConfirm(false)}
+      />
+
       <div className="card client-detail__tabs">
         <Tabs items={TABS} activeId={activeTab} onChange={setActiveTab}>
           {activeTab === 'perfil' && (
@@ -1228,6 +1268,31 @@ export function ClientDetailPage() {
                 <form className="card client-detail__change-plan-form" onSubmit={handleSaveEdit}>
                   {editError && <ErrorMessage title="No se pudo guardar" message={editError} />}
                   <dl className="client-detail__grid">
+                    <div className="client-detail__field">
+                      <label className="field-label" htmlFor="editFullName">
+                        Nombre completo
+                      </label>
+                      <input
+                        id="editFullName"
+                        className="input"
+                        value={editFullName}
+                        onChange={(e) => setEditFullName(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="client-detail__field">
+                      <label className="field-label" htmlFor="editEmail">
+                        Correo
+                      </label>
+                      <input
+                        id="editEmail"
+                        type="email"
+                        className="input"
+                        value={editEmail}
+                        onChange={(e) => setEditEmail(e.target.value)}
+                        required
+                      />
+                    </div>
                     <div className="client-detail__field">
                       <label className="field-label" htmlFor="editPhone">
                         Teléfono

@@ -25,8 +25,11 @@ de Entrega 2):
 - `PATCH /clients/{client_id}`: RF012 le da al entrenador acceso a
   actualizar RUTINAS/DIETAS de sus clientes asignados (modulos separados),
   NO el perfil del cliente -- por eso el PATCH de perfil completo (incluida
-  la reasignacion de `trainer_id`, que usa `AssignTrainerToClientUseCase`)
-  queda reservado a `admin`.
+  la reasignacion de `trainer_id`, que usa `AssignTrainerToClientUseCase`,
+  y desde 2026-11-18 tambien `full_name`/`email` de la cuenta dueña del
+  perfil) queda reservado a `admin`. Un correo repetido devuelve 409
+  (mismo mensaje que `POST /users`/`POST /clients`); el cambio de
+  nombre/correo (no los demas campos) queda en `AuditLog`.
 - `DELETE /clients/{client_id}`: solo `admin`.
 """
 
@@ -54,6 +57,7 @@ from src.domain.users.entities import User
 from src.domain.users.exceptions import EmailAlreadyExistsError
 from src.infrastructure.db.session import get_db
 from src.infrastructure.repositories.clients import SqlAlchemyClientProfileRepository
+from src.infrastructure.repositories.notifications import SqlAlchemyAuditLogRepository
 from src.infrastructure.repositories.users import SqlAlchemyUserRepository
 
 router = APIRouter(prefix="/clients", tags=["clients"])
@@ -198,14 +202,25 @@ def list_clients(
     response_model=ClientProfileRead,
     dependencies=[Depends(require_role("admin"))],
 )
-def update_client(client_id: int, payload: ClientProfileUpdate, db: Session = Depends(get_db)) -> ClientProfileRead:
+def update_client(
+    client_id: int,
+    payload: ClientProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ClientProfileRead:
     """Incluye reasignar `trainer_id` -- delega en `AssignTrainerToClientUseCase`
     (ver docstring del modulo: solo `admin`, RF012 es de Rutinas/Dietas, no
-    de este perfil).
+    de este perfil) -- y, si el payload trae `full_name`/`email`, tambien
+    actualiza la cuenta (`User`) dueña del perfil (2026-11-18, ver
+    `UpdateClientProfileUseCase`).
     """
     client_repository = SqlAlchemyClientProfileRepository(db)
     user_repository = SqlAlchemyUserRepository(db)
-    use_case = UpdateClientProfileUseCase(client_repository=client_repository, user_repository=user_repository)
+    use_case = UpdateClientProfileUseCase(
+        client_repository=client_repository,
+        user_repository=user_repository,
+        audit_log_repository=SqlAlchemyAuditLogRepository(db),
+    )
 
     updates = ClientProfile(
         id=None,
@@ -218,11 +233,22 @@ def update_client(client_id: int, payload: ClientProfileUpdate, db: Session = De
     )
 
     try:
-        updated = use_case.execute(client_id, updates)
+        updated = use_case.execute(
+            client_id,
+            updates,
+            new_full_name=payload.full_name,
+            new_email=payload.email,
+            performed_by_user_id=current_user.id,  # type: ignore[arg-type]
+        )
     except ClientNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_CLIENTE_NO_ENCONTRADO) from exc
     except InvalidTrainerAssignmentError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except EmailAlreadyExistsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Ya existe un usuario registrado con el email '{exc.email}'.",
+        ) from exc
 
     db.commit()
     return _enrich(user_repository, updated)

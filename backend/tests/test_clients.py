@@ -14,8 +14,11 @@ Casos cubiertos:
     7. Reasignar entrenador con un `trainer_id` que NO es rol entrenador -> falla con mensaje correcto.
     8. Editar un campo de un cliente existente como admin -> 200, cambio reflejado.
     9. Editar como no-admin -> 403, sin cambios.
-    10. Eliminar como no-admin -> 403.
-    11. Eliminar un cliente existente como admin -> 204, deja de aparecer en el listado.
+    10. Editar nombre/correo de la cuenta como admin -> 200, queda en Bitacora,
+        login con el correo nuevo funciona y con el viejo ya no.
+    11. Editar con un correo que ya usa otra cuenta -> 409, sin cambios.
+    12. Eliminar como no-admin -> 403.
+    13. Eliminar un cliente existente como admin -> 204, deja de aparecer en el listado.
 """
 
 from __future__ import annotations
@@ -235,6 +238,73 @@ def test_editar_cliente_como_no_admin_devuelve_403(client: TestClient) -> None:
     # El intento rechazado no debe haber cambiado nada.
     listado = client.get(f"{API}/clients/{client_id}", headers=admin_headers)
     assert listado.json()["phone"] == "5512345678"
+
+
+def test_editar_nombre_y_correo_de_cliente_como_admin(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.clientes11@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+
+    created = _register_client(
+        client, admin_headers, "smartgym.qa.cliente.correoviejo@gmail.com", "Nombre Viejo"
+    )
+    client_id = created.json()["client"]["id"]
+    temporary_password = created.json()["temporary_password"]
+
+    response = client.patch(
+        f"{API}/clients/{client_id}",
+        json={"full_name": "Nombre Nuevo", "email": "smartgym.qa.cliente.correonuevo@gmail.com"},
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["full_name"] == "Nombre Nuevo"
+    assert body["email"] == "smartgym.qa.cliente.correonuevo@gmail.com"
+
+    # Queda registrado en la Bitacora quien hizo el cambio y que cambio.
+    bitacora = client.get(f"{API}/audit-logs", headers=admin_headers)
+    entradas = bitacora.json()
+    entrada = next(e for e in entradas if e["action"] == "editar_cuenta_cliente")
+    assert entrada["user_id"] == admin.id
+    assert "Nombre Viejo" in entrada["details"] and "Nombre Nuevo" in entrada["details"]
+    assert "correonuevo" in entrada["details"]
+
+    # El cliente ahora inicia sesion con el correo nuevo, no con el viejo.
+    login_nuevo = client.post(
+        f"{API}/auth/login",
+        json={"email": "smartgym.qa.cliente.correonuevo@gmail.com", "password": temporary_password},
+    )
+    assert login_nuevo.status_code == 200
+
+    login_viejo = client.post(
+        f"{API}/auth/login",
+        json={"email": "smartgym.qa.cliente.correoviejo@gmail.com", "password": temporary_password},
+    )
+    assert login_viejo.status_code == 401
+
+
+def test_editar_cliente_con_correo_repetido_devuelve_409(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.clientes12@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+
+    _register_client(client, admin_headers, "smartgym.qa.cliente.correoocupado@gmail.com", "Cliente Uno")
+    creado_dos = _register_client(
+        client, admin_headers, "smartgym.qa.cliente.correolibre@gmail.com", "Cliente Dos"
+    )
+    client_id_dos = creado_dos.json()["client"]["id"]
+
+    response = client.patch(
+        f"{API}/clients/{client_id_dos}",
+        json={"email": "smartgym.qa.cliente.correoocupado@gmail.com"},
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 409
+    assert "email" in response.json()["detail"].lower()
+
+    # Nada cambio: el cliente dos sigue con su correo original.
+    listado = client.get(f"{API}/clients/{client_id_dos}", headers=admin_headers)
+    assert listado.json()["email"] == "smartgym.qa.cliente.correolibre@gmail.com"
 
 
 def test_eliminar_cliente_como_no_admin_devuelve_403(client: TestClient) -> None:

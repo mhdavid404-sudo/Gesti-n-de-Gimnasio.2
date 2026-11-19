@@ -25,6 +25,11 @@ class ClientProfileCreate(BaseModel):
 
 
 class ClientProfileUpdate(BaseModel):
+    # full_name/email viven en `User` (dueño del perfil), no en
+    # `ClientProfile` -- 2026-11-18, "Editar datos" se amplía para
+    # tocar también la cuenta, ver `UpdateClientProfileUseCase`.
+    full_name: str | None = Field(default=None, min_length=1, max_length=255)
+    email: EmailStr | None = None
     trainer_id: int | None = None
     phone: str | None = Field(default=None, max_length=30)
     birth_date: date | None = None

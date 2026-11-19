@@ -13,6 +13,8 @@ from datetime import date
 from src.domain.clients.entities import ClientProfile
 from src.domain.clients.exceptions import ClientNotFoundError, InvalidTrainerAssignmentError
 from src.domain.clients.repositories import ClientProfileRepository
+from src.domain.notifications.entities import AuditLog
+from src.domain.notifications.repositories import AuditLogRepository
 from src.domain.users.entities import User
 from src.domain.users.exceptions import EmailAlreadyExistsError
 from src.domain.users.repositories import UserRepository
@@ -136,7 +138,11 @@ class AssignTrainerToClientUseCase:
 @dataclass
 class UpdateClientProfileUseCase:
     """RF003: editar datos de perfil de un cliente (incluye reasignar
-    `trainer_id`, cuando el payload lo trae).
+    `trainer_id`, cuando el payload lo trae) y, opcionalmente, el nombre
+    y/o correo de la CUENTA (`User`) dueña de ese perfil (2026-11-18 --
+    antes de esta entrada, "Editar datos" solo tocaba `ClientProfile`;
+    nombre/correo viven en `User`, no aquí, por eso necesitan su propio
+    camino explícito en vez de colarse en `ClientProfile`).
 
     Autorizacion (quien puede llamar esto) es responsabilidad del router
     (`api/v1/routers/clients.py`) -- esta clase solo aplica la logica de
@@ -145,12 +151,29 @@ class UpdateClientProfileUseCase:
     `application/users/use_cases.py`), excepto `trainer_id`, cuyo cambio se
     delega integramente en `AssignTrainerToClientUseCase` para no duplicar
     la validacion de rol.
+
+    `new_full_name`/`new_email` siguen el mismo criterio de "`None` = no
+    cambiar". Si `new_email` cambia, se valida unicidad (mismo
+    `EmailAlreadyExistsError` que usa `RegisterClientUseCase`/
+    `RegisterUserUseCase`) ANTES de tocar nada, para que un correo
+    repetido no deje la mitad de la operación a medias. El cambio de
+    nombre/correo (y solo ese, no los campos de `ClientProfile`) queda
+    registrado en `AuditLog` -- es la cuenta de acceso de otra persona la
+    que cambia, no un dato administrativo cualquiera.
     """
 
     client_repository: ClientProfileRepository
     user_repository: UserRepository
+    audit_log_repository: AuditLogRepository
 
-    def execute(self, client_id: int, updates: ClientProfile) -> ClientProfile:
+    def execute(
+        self,
+        client_id: int,
+        updates: ClientProfile,
+        new_full_name: str | None = None,
+        new_email: str | None = None,
+        performed_by_user_id: int | None = None,
+    ) -> ClientProfile:
         existing = self.client_repository.get_by_id(client_id)
         if existing is None:
             raise ClientNotFoundError(client_id)
@@ -161,6 +184,43 @@ class UpdateClientProfileUseCase:
                 user_repository=self.user_repository,
             )
             existing = assign_use_case.execute(client_id, updates.trainer_id)
+
+        if new_full_name is not None or new_email is not None:
+            owner = self.user_repository.get_by_id(existing.user_id)
+            assert owner is not None  # invariante: todo ClientProfile tiene un User dueño
+
+            if new_email is not None and new_email != owner.email:
+                if self.user_repository.get_by_email(new_email) is not None:
+                    raise EmailAlreadyExistsError(new_email)
+
+            changes = []
+            if new_full_name is not None and new_full_name != owner.full_name:
+                changes.append(f"nombre '{owner.full_name}' -> '{new_full_name}'")
+            if new_email is not None and new_email != owner.email:
+                changes.append(f"correo '{owner.email}' -> '{new_email}'")
+
+            self.user_repository.update(
+                User(
+                    id=owner.id,
+                    email=new_email if new_email is not None else owner.email,
+                    password_hash=owner.password_hash,
+                    full_name=new_full_name if new_full_name is not None else owner.full_name,
+                    role=owner.role,
+                    is_active=owner.is_active,
+                )
+            )
+
+            if changes:
+                self.audit_log_repository.add(
+                    AuditLog(
+                        id=None,
+                        user_id=performed_by_user_id,
+                        action="editar_cuenta_cliente",
+                        entity_type="user",
+                        entity_id=str(owner.id),
+                        details="; ".join(changes) + ".",
+                    )
+                )
 
         merged = ClientProfile(
             id=existing.id,

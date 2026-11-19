@@ -57,6 +57,10 @@ export interface ClientRegisterResponse {
  * el formulario de edición siempre manda el valor actual explícito en vez
  * de depender de eso (ver `ClientDetailPage.tsx`). */
 export interface ClientProfileUpdatePayload {
+  // full_name/email viven en la cuenta (User), no en el perfil -- 2026-11-18,
+  // ver UpdateClientProfileUseCase.
+  full_name?: string | null
+  email?: string | null
   trainer_id?: number | null
   phone?: string | null
   birth_date?: string | null
