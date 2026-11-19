@@ -20,6 +20,8 @@ import type {
   ApiExercise,
   ApiMembership,
   ApiMembershipPlan,
+  ApiMembershipRenewal,
+  ApiMembershipRenewResult,
   ApiMembershipService,
   ApiMembershipServiceLimited,
   ApiPayment,
@@ -33,13 +35,21 @@ import type {
   ClientProfileUpdatePayload,
   DietAssignmentCreatePayload,
   MembershipCreatePayload,
+  MembershipRenewalUndoPayload,
+  MembershipRenewPayload,
   MembershipServiceCreatePayload,
   PasswordResetResponse,
   PaymentCreatePayload,
   PaymentItemCreatePayload,
   RoutineAssignmentCreatePayload,
 } from '../types/api'
-import { addDaysIso, getMembershipDisplayStatus, pickCurrentMembership } from '../utils/membership'
+import {
+  addDaysIso,
+  canRenewMembership,
+  getMembershipDisplayStatus,
+  pickCurrentMembership,
+  previewRenewedEndDate,
+} from '../utils/membership'
 import './ClientDetailPage.css'
 
 const todayIso = () => new Date().toISOString().slice(0, 10)
@@ -357,6 +367,121 @@ export function ClientDetailPage() {
     () => (membership ? plans.find((p) => p.id === membership.plan_id) : undefined),
     [membership, plans],
   )
+
+  // --- Renovar + cobrar, y deshacer (BUG-12, ver DECISIONES.md) ------------
+  // "Renovar" dejó de ser una acción que solo extendía la vigencia -- ahora
+  // cobra el pago en la misma operación atómica y solo funciona dentro de
+  // la ventana de 7 días (o membresía ya vencida), ver
+  // `RenewAndChargeMembershipUseCase`. El historial de renovaciones
+  // (`GET /memberships/{id}/renewals`, solo admin) es lo que permite saber
+  // si hay algo que "Deshacer renovación".
+  const [renewals, setRenewals] = useState<ApiMembershipRenewal[]>([])
+  const lastRenewal = renewals[0]
+  const canUndoLastRenewal = Boolean(lastRenewal && lastRenewal.reversed_at === null)
+
+  const loadRenewals = (membershipId: number) => {
+    apiFetch<ApiMembershipRenewal[]>(`/memberships/${membershipId}/renewals`)
+      .then(setRenewals)
+      .catch(() => setRenewals([]))
+  }
+
+  useEffect(() => {
+    if (!isAdmin || !membership) {
+      setRenewals([])
+      return
+    }
+    loadRenewals(membership.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, membership?.id])
+
+  const [showRenewDialog, setShowRenewDialog] = useState(false)
+  const [renewMethod, setRenewMethod] = useState<ApiPaymentMethod>('efectivo')
+  const [isRenewing, setIsRenewing] = useState(false)
+  const [renewError, setRenewError] = useState<string | null>(null)
+  const [renewToast, setRenewToast] = useState<string | null>(null)
+
+  const openRenewDialog = () => {
+    setRenewMethod('efectivo')
+    setRenewError(null)
+    setShowRenewDialog(true)
+  }
+
+  const handleConfirmRenew = async () => {
+    if (!membership) return
+    setIsRenewing(true)
+    setRenewError(null)
+    try {
+      const payload: MembershipRenewPayload = { method: renewMethod }
+      const result = await apiFetch<ApiMembershipRenewResult>(`/memberships/${membership.id}/renew`, {
+        method: 'POST',
+        body: payload,
+      })
+      setMembership(result.membership)
+      setRenewToast(
+        `Membresía renovada hasta el ${result.membership.end_date} -- pago de $${Number(result.payment.amount).toLocaleString('es-MX')} registrado.`,
+      )
+      setShowRenewDialog(false)
+      loadRenewals(membership.id)
+      loadPayments(membership.id)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.isUnauthorized) {
+          logout()
+          navigate('/login', { replace: true })
+          return
+        }
+        setRenewError(err.status === 403 ? 'No tienes permiso para renovar esta membresía.' : err.message)
+      } else {
+        setRenewError('Ocurrió un error inesperado. Intenta de nuevo.')
+      }
+    } finally {
+      setIsRenewing(false)
+    }
+  }
+
+  const [showUndoRenewalDialog, setShowUndoRenewalDialog] = useState(false)
+  const [undoReason, setUndoReason] = useState('')
+  const [isUndoingRenewal, setIsUndoingRenewal] = useState(false)
+  const [undoRenewalError, setUndoRenewalError] = useState<string | null>(null)
+
+  const openUndoRenewalDialog = () => {
+    setUndoReason('')
+    setUndoRenewalError(null)
+    setShowUndoRenewalDialog(true)
+  }
+
+  const handleConfirmUndoRenewal = async () => {
+    if (!membership || !lastRenewal || !undoReason.trim()) return
+    setIsUndoingRenewal(true)
+    setUndoRenewalError(null)
+    try {
+      const payload: MembershipRenewalUndoPayload = { reason: undoReason.trim() }
+      const result = await apiFetch<ApiMembershipRenewResult>(
+        `/memberships/renewals/${lastRenewal.id}/undo`,
+        { method: 'POST', body: payload },
+      )
+      setMembership(result.membership)
+      setRenewToast(`Renovación deshecha -- la membresía vuelve a vencer el ${result.membership.end_date}.`)
+      setShowUndoRenewalDialog(false)
+      loadRenewals(membership.id)
+      loadPayments(membership.id)
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.isUnauthorized) {
+          logout()
+          navigate('/login', { replace: true })
+          return
+        }
+        setUndoRenewalError(
+          err.status === 403 ? 'No tienes permiso para deshacer esta renovación.' : err.message,
+        )
+      } else {
+        setUndoRenewalError('Ocurrió un error inesperado. Intenta de nuevo.')
+      }
+    } finally {
+      setIsUndoingRenewal(false)
+    }
+  }
 
   // --- Cambiar plan (amplía RF004/RF005 de nuevo) --------------------------
   // Flujo en dos pasos sobre el MISMO endpoint-pareja: "Ver resumen" pide
@@ -1403,9 +1528,28 @@ export function ClientDetailPage() {
               ) : membership && plan ? (
                 <>
                   {changePlanToast && <Toast message={changePlanToast} onDismiss={() => setChangePlanToast(null)} />}
+                  {renewToast && <Toast message={renewToast} onDismiss={() => setRenewToast(null)} />}
 
                   {isAdmin && (
                     <div className="client-detail__membership-header">
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={openRenewDialog}
+                        disabled={!canRenewMembership(membership)}
+                        title={
+                          canRenewMembership(membership)
+                            ? undefined
+                            : 'Solo se puede renovar si la membresía vence en 7 días o menos, o si ya venció.'
+                        }
+                      >
+                        Renovar
+                      </button>
+                      {canUndoLastRenewal && (
+                        <button type="button" className="btn btn-ghost" onClick={openUndoRenewalDialog}>
+                          Deshacer renovación
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="btn btn-ghost"
@@ -1421,6 +1565,94 @@ export function ClientDetailPage() {
                       </button>
                     </div>
                   )}
+
+                  {isAdmin && !canRenewMembership(membership) && (
+                    <p className="client-detail__empty">
+                      Esta membresía vence el {membership.end_date} -- solo se puede renovar si vence en 7
+                      días o menos, o si ya venció.
+                    </p>
+                  )}
+
+                  <ConfirmDialog
+                    open={showRenewDialog}
+                    title="¿Renovar esta membresía?"
+                    tone="neutral"
+                    confirmLabel={isRenewing ? 'Renovando…' : 'Renovar y cobrar'}
+                    confirmDisabled={isRenewing}
+                    onConfirm={() => void handleConfirmRenew()}
+                    onCancel={() => setShowRenewDialog(false)}
+                    description={
+                      <div className="client-detail__renew-summary">
+                        {renewError && <ErrorMessage title="No se pudo renovar" message={renewError} />}
+                        <dl className="client-detail__grid">
+                          <div>
+                            <dt>Plan</dt>
+                            <dd>{plan.name}</dd>
+                          </div>
+                          <div>
+                            <dt>Monto a cobrar</dt>
+                            <dd>${Number(plan.price).toLocaleString('es-MX')}</dd>
+                          </div>
+                          <div>
+                            <dt>Nueva fecha de vencimiento</dt>
+                            <dd>{previewRenewedEndDate(membership.end_date, plan.duration_days, todayIso())}</dd>
+                          </div>
+                        </dl>
+                        <div className="client-detail__field">
+                          <label className="field-label" htmlFor="renewMethodSelectFicha">
+                            Método de pago
+                          </label>
+                          <select
+                            id="renewMethodSelectFicha"
+                            className="input"
+                            value={renewMethod}
+                            onChange={(e) => setRenewMethod(e.target.value as ApiPaymentMethod)}
+                          >
+                            {PAYMENT_METHODS.map((m) => (
+                              <option key={m.value} value={m.value}>
+                                {m.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    }
+                  />
+
+                  <ConfirmDialog
+                    open={showUndoRenewalDialog}
+                    title="¿Deshacer la última renovación?"
+                    tone="danger"
+                    confirmLabel={isUndoingRenewal ? 'Deshaciendo…' : 'Deshacer renovación'}
+                    confirmDisabled={isUndoingRenewal || !undoReason.trim()}
+                    onConfirm={() => void handleConfirmUndoRenewal()}
+                    onCancel={() => setShowUndoRenewalDialog(false)}
+                    description={
+                      <div className="client-detail__renew-summary">
+                        {undoRenewalError && (
+                          <ErrorMessage title="No se pudo deshacer" message={undoRenewalError} />
+                        )}
+                        <p>
+                          La membresía vuelve a vencer el {lastRenewal?.previous_end_date} y el pago de la
+                          renovación queda anulado (se conserva en el historial). Esta acción no se puede
+                          deshacer.
+                        </p>
+                        <div className="client-detail__field">
+                          <label className="field-label" htmlFor="undoRenewalReason">
+                            Motivo
+                          </label>
+                          <textarea
+                            id="undoRenewalReason"
+                            className="input"
+                            rows={2}
+                            value={undoReason}
+                            onChange={(e) => setUndoReason(e.target.value)}
+                            placeholder="Ej. clic equivocado, el cliente no pidió renovar"
+                          />
+                        </div>
+                      </div>
+                    }
+                  />
 
                   {isAdmin && showChangePlanForm && !changePlanPreview && (
                     <form className="card client-detail__change-plan-form" onSubmit={handlePreviewChangePlan}>

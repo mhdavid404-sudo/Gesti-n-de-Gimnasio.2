@@ -136,3 +136,33 @@ class MembershipServiceModel(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+
+
+class MembershipRenewalModel(Base):
+    """BUG-12 (ver DECISIONES.md): historial de renovaciones, usado para
+    poder deshacer la ULTIMA renovacion de una membresia. Tabla nueva --
+    ver migracion 0005."""
+
+    __tablename__ = "membership_renewals"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    membership_id: Mapped[int] = mapped_column(
+        ForeignKey("memberships.id", ondelete="CASCADE"), nullable=False
+    )
+    payment_id: Mapped[int] = mapped_column(
+        ForeignKey("payments.id", ondelete="RESTRICT"), nullable=False
+    )
+    previous_end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    new_end_date: Mapped[date] = mapped_column(Date, nullable=False)
+    previous_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    performed_by: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    reversed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reversed_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reversed_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

@@ -163,7 +163,9 @@ export function DashboardPage() {
   }, [mockRole])
 
   const monthIncome = (monthPayments ?? [])
-    .filter((p) => p.payment_date.startsWith(currentMonthPrefix))
+    // BUG-12 (ver DECISIONES.md): un pago 'anulado' (renovación deshecha)
+    // se conserva en el historial pero nunca cuenta como ingreso real.
+    .filter((p) => p.status !== 'anulado' && p.payment_date.startsWith(currentMonthPrefix))
     .reduce((sum, p) => sum + Number(p.amount), 0)
 
   // --- Alertas de membresía reales (RF006) -------------------------------

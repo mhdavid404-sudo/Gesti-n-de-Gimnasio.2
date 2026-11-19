@@ -109,10 +109,35 @@ ACTIVAS:
 - `POST /memberships/{membership_id}/renew`: accion "Renovar" del
   tablero -- solo `admin`, mismo criterio que el resto de acciones que
   comprometen dinero/contrato en este modulo (asignar membresia, registrar
-  pago). Ver `RenewMembershipUseCase` para la regla de extension de
-  `end_date`. Deliberadamente NO registra un pago -- "Cobrar" es una
-  accion distinta en la UI (navega al formulario de pago de la ficha del
-  cliente), para no asumir metodo ni monto.
+  pago).
+
+BUG-12 (ver DECISIONES.md, entrada BUG-12 -- corrige el diseno original de
+"Renovar" de arriba):
+
+- Antes, `POST /memberships/{membership_id}/renew` extendia `end_date` SIN
+  ninguna ventana (se podia renovar con meses de anticipacion) y SIN pago
+  asociado ("renovar" y "cobrar" eran dos acciones separadas en la UI) --
+  un clic de mas sumaba un periodo gratis sin forma de deshacerlo. Ahora:
+    - El body pasa a requerir `method` (como se cobra) -- "Renovar" y
+      "Cobrar" son una sola operacion atomica
+      (`RenewAndChargeMembershipUseCase`): crea el `Payment` Y extiende
+      `end_date` en la misma sesion, o ninguno de los dos si algo falla.
+    - Solo funciona si la membresia vence en 7 dias o menos, o ya vencio
+      (mismo umbral que "por vencer") -- `409` con mensaje claro fuera de
+      esa ventana. Esto tambien evita que un doble clic renueve dos veces:
+      tras la primera renovacion `end_date` ya quedo lejos de hoy.
+    - Responde `MembershipRenewResult` (membresia + pago + la fila de
+      `MembershipRenewal` creada), en vez de solo `MembershipRead`.
+- `POST /memberships/renewals/{renewal_id}/undo` (nuevo): deshace un
+  "error de dedo" al renovar -- solo `admin`, solo sobre la renovacion que
+  sea en este momento la ULTIMA de su membresia, y solo si no fue deshecha
+  ya (`UndoMembershipRenewalUseCase`). Restaura `end_date`/`status` al
+  valor anterior y marca el `Payment` asociado como `'anulado'` (se
+  conserva, nunca se borra -- excluido de ingresos/totales). Pide
+  `reason` en el body.
+- `GET /memberships/{membership_id}/renewals` (nuevo, solo `admin`):
+  historial de renovaciones, mas reciente primero -- el frontend usa
+  `items[0]` para saber si hay algo que deshacer.
 
 Cambio de plan (amplia RF004/RF005 de nuevo, ver DECISIONES.md):
 
@@ -153,6 +178,11 @@ from src.api.v1.schemas.memberships import (
     MembershipPlanRead,
     MembershipPlanUpdate,
     MembershipRead,
+    MembershipRenewalRead,
+    MembershipRenewalUndoRequest,
+    MembershipRenewalUndoResult,
+    MembershipRenewRequest,
+    MembershipRenewResult,
     MembershipServiceCreate,
     MembershipServiceRead,
     MembershipServiceReadLimited,
@@ -166,6 +196,7 @@ from src.api.v1.schemas.memberships import (
     ServiceRead,
     ServiceUpdate,
 )
+from src.api.v1.schemas.payments import PaymentItemRead, PaymentRead
 from src.application.memberships.use_cases import (
     AddServiceToPlanUseCase,
     AssignMembershipUseCase,
@@ -176,7 +207,8 @@ from src.application.memberships.use_cases import (
     DetectExpiringMembershipsUseCase,
     PlanChangeImpact,
     PreviewChangeMembershipPlanUseCase,
-    RenewMembershipUseCase,
+    RenewAndChargeMembershipUseCase,
+    UndoMembershipRenewalUseCase,
 )
 from src.application.notifications.use_cases import NotifyUserUseCase
 from src.domain.clients.entities import ClientProfile
@@ -189,16 +221,23 @@ from src.domain.memberships.exceptions import (
     InvalidMembershipStatusError,
     MembershipNotFoundError,
     MembershipPlanNotFoundError,
+    MembershipRenewalNotFoundError,
+    MembershipRenewalWindowError,
+    RenewalAlreadyReversedError,
+    RenewalSupersededError,
     SamePlanChangeError,
     ServiceAlreadyIncludedInPlanError,
     ServiceIncludedInPlanError,
     ServiceNotFoundError,
 )
+from src.domain.payments.entities import Payment
+from src.domain.payments.exceptions import InvalidPaymentMethodError
 from src.domain.users.entities import User
 from src.infrastructure.db.session import get_db
 from src.infrastructure.repositories.clients import SqlAlchemyClientProfileRepository
 from src.infrastructure.repositories.memberships import (
     SqlAlchemyMembershipPlanRepository,
+    SqlAlchemyMembershipRenewalRepository,
     SqlAlchemyMembershipRepository,
     SqlAlchemyMembershipServiceRepository,
     SqlAlchemyPlanServiceRepository,
@@ -208,7 +247,10 @@ from src.infrastructure.repositories.notifications import (
     SqlAlchemyAuditLogRepository,
     SqlAlchemyNotificationRepository,
 )
-from src.infrastructure.repositories.payments import SqlAlchemyPaymentRepository
+from src.infrastructure.repositories.payments import (
+    SqlAlchemyPaymentItemRepository,
+    SqlAlchemyPaymentRepository,
+)
 from src.infrastructure.repositories.users import SqlAlchemyUserRepository
 
 router = APIRouter(prefix="/memberships", tags=["memberships"])
@@ -634,7 +676,10 @@ def get_active_memberships_board(
         for profile in client_repository.list_all():
             for membership in membership_repository.list_by_client(profile.id):  # type: ignore[arg-type]
                 for payment in payment_repository.list_by_membership(membership.id):  # type: ignore[arg-type]
-                    if payment.payment_date.strftime("%Y-%m") == month_prefix:
+                    # BUG-12 (ver DECISIONES.md): un pago 'anulado' (renovacion
+                    # deshecha) se conserva en el historial pero NUNCA cuenta
+                    # como ingreso real.
+                    if payment.status != "anulado" and payment.payment_date.strftime("%Y-%m") == month_prefix:
                         total += payment.amount
         monthly_revenue = total
 
@@ -767,29 +812,151 @@ def update_membership_status(
     return MembershipRead.model_validate(updated)
 
 
+def _payment_to_read(payment: Payment, item_repository: SqlAlchemyPaymentItemRepository) -> PaymentRead:
+    """Mismo helper que `routers/payments.py::_payment_to_read` -- duplicado
+    aqui a proposito (no se importa de ese modulo) para no acoplar los dos
+    routers por una funcion privada; adjunta el desglose (`PaymentItem`) al
+    `Payment` creado por una renovacion."""
+    read = PaymentRead.model_validate(payment)
+    items = item_repository.list_by_payment(payment.id)  # type: ignore[arg-type]
+    read.items = [PaymentItemRead.model_validate(i) for i in items]
+    return read
+
+
 @router.post(
     "/{membership_id}/renew",
-    response_model=MembershipRead,
+    response_model=MembershipRenewResult,
     dependencies=[Depends(require_role("admin"))],
 )
-def renew_membership(membership_id: int, db: Session = Depends(get_db)) -> MembershipRead:
-    """Accion "Renovar" del tablero de membresias activas. Solo `admin` --
-    ver `RenewMembershipUseCase` y el docstring del modulo arriba."""
+def renew_membership(
+    membership_id: int,
+    payload: MembershipRenewRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MembershipRenewResult:
+    """BUG-12 (ver DECISIONES.md y docstring del modulo arriba): "Renovar"
+    y "Cobrar" dejaron de ser dos acciones separadas -- esta sola llamada
+    extiende la vigencia Y registra el pago de forma atomica, y solo
+    funciona dentro de la ventana de renovacion (vence en 7 dias o menos,
+    o ya vencio). Solo `admin`."""
     membership_repository = SqlAlchemyMembershipRepository(db)
     plan_repository = SqlAlchemyMembershipPlanRepository(db)
-    use_case = RenewMembershipUseCase(
-        membership_repository=membership_repository, plan_repository=plan_repository
+    payment_repository = SqlAlchemyPaymentRepository(db)
+    payment_item_repository = SqlAlchemyPaymentItemRepository(db)
+    renewal_repository = SqlAlchemyMembershipRenewalRepository(db)
+    audit_log_repository = SqlAlchemyAuditLogRepository(db)
+
+    use_case = RenewAndChargeMembershipUseCase(
+        membership_repository=membership_repository,
+        plan_repository=plan_repository,
+        payment_repository=payment_repository,
+        payment_item_repository=payment_item_repository,
+        renewal_repository=renewal_repository,
+        audit_log_repository=audit_log_repository,
     )
 
     try:
-        renewed = use_case.execute(membership_id)
+        renewal = use_case.execute(
+            membership_id,
+            method=payload.method,
+            performed_by_user_id=current_user.id,  # type: ignore[arg-type]
+            payment_date=payload.payment_date,
+        )
     except MembershipNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except MembershipPlanNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except MembershipRenewalWindowError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except InvalidPaymentMethodError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     db.commit()
-    return MembershipRead.model_validate(renewed)
+
+    membership = membership_repository.get_by_id(membership_id)
+    payment = payment_repository.get_by_id(renewal.payment_id)
+    return MembershipRenewResult(
+        membership=MembershipRead.model_validate(membership),
+        payment=_payment_to_read(payment, payment_item_repository),  # type: ignore[arg-type]
+        renewal=MembershipRenewalRead.model_validate(renewal),
+    )
+
+
+# IMPORTANTE: mismo motivo que "/board"/"/expiring" arriba -- "/renewals" es
+# un segmento ESTATICO de 3 (".../renewals/{renewal_id}/undo"), nunca puede
+# chocar con "/{membership_id}" (1 segmento) ni "/{membership_id}/renew" (2
+# segmentos), pero se declara en este bloque por consistencia con el resto
+# de rutas estaticas del modulo.
+@router.post(
+    "/renewals/{renewal_id}/undo",
+    response_model=MembershipRenewalUndoResult,
+    dependencies=[Depends(require_role("admin"))],
+)
+def undo_membership_renewal(
+    renewal_id: int,
+    payload: MembershipRenewalUndoRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MembershipRenewalUndoResult:
+    """BUG-12: deshacer un "error de dedo" al renovar. Solo `admin`, y solo
+    sobre la renovacion que sea en este momento la ULTIMA de su membresia
+    (`RenewalSupersededError` si ya hubo otra despues) y que no haya sido
+    deshecha ya (`RenewalAlreadyReversedError`). Restaura `end_date`/
+    `status`, marca el `Payment` asociado como `'anulado'` (se conserva,
+    nunca se borra) y pide un motivo -- ver
+    `UndoMembershipRenewalUseCase`."""
+    membership_repository = SqlAlchemyMembershipRepository(db)
+    payment_repository = SqlAlchemyPaymentRepository(db)
+    payment_item_repository = SqlAlchemyPaymentItemRepository(db)
+    renewal_repository = SqlAlchemyMembershipRenewalRepository(db)
+    audit_log_repository = SqlAlchemyAuditLogRepository(db)
+
+    use_case = UndoMembershipRenewalUseCase(
+        membership_repository=membership_repository,
+        payment_repository=payment_repository,
+        renewal_repository=renewal_repository,
+        audit_log_repository=audit_log_repository,
+    )
+
+    try:
+        renewal = use_case.execute(
+            renewal_id,
+            reason=payload.reason,
+            performed_by_user_id=current_user.id,  # type: ignore[arg-type]
+        )
+    except MembershipRenewalNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except RenewalAlreadyReversedError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except RenewalSupersededError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except MembershipNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    db.commit()
+
+    membership = membership_repository.get_by_id(renewal.membership_id)
+    payment = payment_repository.get_by_id(renewal.payment_id)
+    return MembershipRenewalUndoResult(
+        membership=MembershipRead.model_validate(membership),
+        payment=_payment_to_read(payment, payment_item_repository),  # type: ignore[arg-type]
+        renewal=MembershipRenewalRead.model_validate(renewal),
+    )
+
+
+@router.get(
+    "/{membership_id}/renewals",
+    response_model=list[MembershipRenewalRead],
+    dependencies=[Depends(require_role("admin"))],
+)
+def list_membership_renewals(membership_id: int, db: Session = Depends(get_db)) -> list[MembershipRenewalRead]:
+    """Historial de renovaciones de una membresia, mas reciente primero --
+    el frontend toma `items[0]` como "la ultima renovacion" para decidir si
+    mostrar "Deshacer renovacion". Solo `admin` (la bitacora financiera no
+    es un dato del propio entrenador/cliente)."""
+    renewal_repository = SqlAlchemyMembershipRenewalRepository(db)
+    renewals = renewal_repository.list_by_membership(membership_id)
+    return [MembershipRenewalRead.model_validate(r) for r in renewals]
 
 
 def _build_plan_change_preview(

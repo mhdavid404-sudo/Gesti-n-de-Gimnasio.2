@@ -23,10 +23,20 @@ Tablero de membresias activas + renovar (Entrega 3, ajuste de UX de
     12. Tablero como entrenador: solo sus clientes, sin ingresos.
     13. Tablero como cliente -> 403.
     14. Filtros por plan y por nombre acotan la tabla, no los indicadores.
-    15. Renovar extiende `end_date` desde la vigencia actual.
+
+BUG-12 (ver DECISIONES.md, entrada BUG-12) -- "Renovar" pasa a cobrar en la
+misma operacion, con ventana de 7 dias, y se puede deshacer:
+    15. Renovar dentro de la ventana extiende `end_date` Y cobra el pago.
     16. Renovar una membresia vencida la reactiva desde hoy.
-    17. Renovar como no-admin -> 403.
-    18. Renovar una membresia inexistente -> 404.
+    17. Renovar fuera de la ventana -> 409, sin cambios (atomico).
+    18. Renovar dos veces seguidas -> la segunda falla (409).
+    19. Renovar como no-admin -> 403.
+    20. Renovar una membresia inexistente -> 404.
+    21. Deshacer una renovacion restaura la fecha anterior y anula el pago.
+    22. Deshacer una renovacion ya deshecha -> 409.
+    23. Deshacer con una renovacion posterior -> 409.
+    24. Deshacer como no-admin -> 403.
+    25. Un pago anulado no cuenta en los ingresos del mes.
 """
 
 from __future__ import annotations
@@ -35,6 +45,7 @@ from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from src.domain.users.entities import User
@@ -103,7 +114,13 @@ def _create_plan(client: TestClient, headers: dict[str, str], name: str = "Basic
     return client.post(f"{API}/membership-plans", json=payload, headers=headers)
 
 
-def _assign_membership(client: TestClient, headers: dict[str, str], client_id: int, plan_id: int) -> dict:
+def _assign_membership(
+    client: TestClient,
+    headers: dict[str, str],
+    client_id: int,
+    plan_id: int,
+    end_date_override: date | None = None,
+) -> dict:
     today = date.today()
     response = client.post(
         f"{API}/memberships",
@@ -111,7 +128,7 @@ def _assign_membership(client: TestClient, headers: dict[str, str], client_id: i
             "client_id": client_id,
             "plan_id": plan_id,
             "start_date": today.isoformat(),
-            "end_date": (today + timedelta(days=30)).isoformat(),
+            "end_date": (end_date_override or (today + timedelta(days=30))).isoformat(),
             "status": "activa",
         },
         headers=headers,
@@ -507,21 +524,46 @@ def test_tablero_filtra_por_plan_y_por_nombre_sin_afectar_indicadores(client: Te
     assert by_name["items"][0]["client_id"] == client_a_id
 
 
-def test_renovar_membresia_extiende_la_vigencia(client: TestClient) -> None:
+def _force_membership_end_date(membership_id: int, new_end_date: date, new_status: str = "activa") -> None:
+    """Pone `end_date`/`status` directo en la base (sin pasar por la API,
+    mismo patron que `_seed_user`) -- usado SOLO para simular "paso el
+    tiempo" en pruebas de BUG-12 (ej. que ya haya una renovacion
+    posterior), sin tener que esperar dias reales."""
+    session: Session = SessionLocal()
+    try:
+        session.execute(
+            text("UPDATE memberships SET end_date = :end_date, status = :status WHERE id = :id"),
+            {"end_date": new_end_date, "status": new_status, "id": membership_id},
+        )
+        session.commit()
+    finally:
+        session.close()
+
+
+def test_renovar_membresia_extiende_la_vigencia_y_cobra(client: TestClient) -> None:
     admin = _seed_user("smartgym.qa.admin.renovar1@gmail.com", "AdminPass123", "admin")
     headers = _auth_headers(client, admin.email, "AdminPass123")
 
     plan = _create_plan(client, headers, "Basica Renovar1").json()
     client_id = _register_client(client, headers, "smartgym.qa.cliente.renovar1@gmail.com").json()["client"]["id"]
-    membership = _assign_membership(client, headers, client_id, plan["id"])
+    today = date.today()
+    membership = _assign_membership(client, headers, client_id, plan["id"], end_date_override=today + timedelta(days=3))
 
-    response = client.post(f"{API}/memberships/{membership['id']}/renew", headers=headers)
+    response = client.post(
+        f"{API}/memberships/{membership['id']}/renew", json={"method": "efectivo"}, headers=headers
+    )
 
     assert response.status_code == 200
     body = response.json()
     expected_end = date.fromisoformat(membership["end_date"]) + timedelta(days=plan["duration_days"])
-    assert body["end_date"] == expected_end.isoformat()
-    assert body["status"] == "activa"
+    assert body["membership"]["end_date"] == expected_end.isoformat()
+    assert body["membership"]["status"] == "activa"
+    assert Decimal(body["payment"]["amount"]) == Decimal(plan["price"])
+    assert body["payment"]["method"] == "efectivo"
+    assert body["payment"]["status"] == "completado"
+    assert body["renewal"]["previous_end_date"] == membership["end_date"]
+    assert body["renewal"]["new_end_date"] == expected_end.isoformat()
+    assert body["renewal"]["reversed_at"] is None
 
 
 def test_renovar_membresia_vencida_la_reactiva_desde_hoy(client: TestClient) -> None:
@@ -544,12 +586,56 @@ def test_renovar_membresia_vencida_la_reactiva_desde_hoy(client: TestClient) -> 
         headers=headers,
     ).json()
 
-    response = client.post(f"{API}/memberships/{membership['id']}/renew", headers=headers)
+    response = client.post(
+        f"{API}/memberships/{membership['id']}/renew", json={"method": "tarjeta"}, headers=headers
+    )
 
     assert response.status_code == 200
     body = response.json()
-    assert body["status"] == "activa"
-    assert body["end_date"] == (today + timedelta(days=plan["duration_days"])).isoformat()
+    assert body["membership"]["status"] == "activa"
+    assert body["membership"]["end_date"] == (today + timedelta(days=plan["duration_days"])).isoformat()
+    assert body["renewal"]["previous_status"] == "vencida"
+
+
+def test_renovar_fuera_de_la_ventana_devuelve_409_y_no_cambia_nada(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.renovar5@gmail.com", "AdminPass123", "admin")
+    headers = _auth_headers(client, admin.email, "AdminPass123")
+
+    plan = _create_plan(client, headers, "Basica Renovar5").json()
+    client_id = _register_client(client, headers, "smartgym.qa.cliente.renovar5@gmail.com").json()["client"]["id"]
+    # `_assign_membership` por defecto vence en 30 dias -- fuera de la ventana de 7.
+    membership = _assign_membership(client, headers, client_id, plan["id"])
+
+    response = client.post(
+        f"{API}/memberships/{membership['id']}/renew", json={"method": "efectivo"}, headers=headers
+    )
+
+    assert response.status_code == 409
+    assert "vence en" in response.json()["detail"].lower() or "7" in response.json()["detail"]
+
+    sin_cambios = client.get(f"{API}/memberships/{membership['id']}", headers=headers).json()
+    assert sin_cambios["end_date"] == membership["end_date"]
+    pagos = client.get(f"{API}/payments?membership_id={membership['id']}", headers=headers).json()
+    assert pagos == []
+
+
+def test_renovar_dos_veces_seguidas_la_segunda_falla(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.renovar6@gmail.com", "AdminPass123", "admin")
+    headers = _auth_headers(client, admin.email, "AdminPass123")
+
+    plan = _create_plan(client, headers, "Basica Renovar6").json()
+    client_id = _register_client(client, headers, "smartgym.qa.cliente.renovar6@gmail.com").json()["client"]["id"]
+    today = date.today()
+    membership = _assign_membership(client, headers, client_id, plan["id"], end_date_override=today + timedelta(days=2))
+
+    first = client.post(f"{API}/memberships/{membership['id']}/renew", json={"method": "efectivo"}, headers=headers)
+    assert first.status_code == 200
+
+    second = client.post(f"{API}/memberships/{membership['id']}/renew", json={"method": "efectivo"}, headers=headers)
+    assert second.status_code == 409
+
+    pagos = client.get(f"{API}/payments?membership_id={membership['id']}", headers=headers).json()
+    assert len(pagos) == 1
 
 
 def test_renovar_membresia_como_no_admin_devuelve_403(client: TestClient) -> None:
@@ -562,7 +648,9 @@ def test_renovar_membresia_como_no_admin_devuelve_403(client: TestClient) -> Non
     membership = _assign_membership(client, admin_headers, client_id, plan_id)
 
     trainer_headers = _auth_headers(client, trainer.email, "ClaveEntrenador123")
-    response = client.post(f"{API}/memberships/{membership['id']}/renew", headers=trainer_headers)
+    response = client.post(
+        f"{API}/memberships/{membership['id']}/renew", json={"method": "efectivo"}, headers=trainer_headers
+    )
 
     assert response.status_code == 403
 
@@ -571,6 +659,152 @@ def test_renovar_membresia_inexistente_falla(client: TestClient) -> None:
     admin = _seed_user("smartgym.qa.admin.renovar4@gmail.com", "AdminPass123", "admin")
     headers = _auth_headers(client, admin.email, "AdminPass123")
 
-    response = client.post(f"{API}/memberships/999999/renew", headers=headers)
+    response = client.post(f"{API}/memberships/999999/renew", json={"method": "efectivo"}, headers=headers)
 
     assert response.status_code == 404
+
+
+def test_deshacer_renovacion_restaura_fecha_y_anula_pago(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.deshacer1@gmail.com", "AdminPass123", "admin")
+    headers = _auth_headers(client, admin.email, "AdminPass123")
+
+    plan = _create_plan(client, headers, "Basica Deshacer1").json()
+    client_id = _register_client(client, headers, "smartgym.qa.cliente.deshacer1@gmail.com").json()["client"]["id"]
+    today = date.today()
+    membership = _assign_membership(client, headers, client_id, plan["id"], end_date_override=today + timedelta(days=3))
+    original_end_date = membership["end_date"]
+
+    renewed = client.post(
+        f"{API}/memberships/{membership['id']}/renew", json={"method": "efectivo"}, headers=headers
+    ).json()
+    renewal_id = renewed["renewal"]["id"]
+    payment_id = renewed["payment"]["id"]
+
+    response = client.post(
+        f"{API}/memberships/renewals/{renewal_id}/undo",
+        json={"reason": "Click equivocado, el cliente no pidio renovar"},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["membership"]["end_date"] == original_end_date
+    assert body["membership"]["status"] == "activa"
+    assert body["payment"]["id"] == payment_id
+    assert body["payment"]["status"] == "anulado"
+    assert body["renewal"]["reversed_at"] is not None
+    assert body["renewal"]["reversed_reason"] == "Click equivocado, el cliente no pidio renovar"
+
+    sin_cambios = client.get(f"{API}/memberships/{membership['id']}", headers=headers).json()
+    assert sin_cambios["end_date"] == original_end_date
+
+    bitacora = client.get(f"{API}/audit-logs", headers=headers).json()
+    acciones = [e["action"] for e in bitacora]
+    assert "renovar_membresia" in acciones
+    assert "deshacer_renovacion_membresia" in acciones
+
+
+def test_deshacer_renovacion_ya_deshecha_devuelve_409(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.deshacer2@gmail.com", "AdminPass123", "admin")
+    headers = _auth_headers(client, admin.email, "AdminPass123")
+
+    plan = _create_plan(client, headers, "Basica Deshacer2").json()
+    client_id = _register_client(client, headers, "smartgym.qa.cliente.deshacer2@gmail.com").json()["client"]["id"]
+    today = date.today()
+    membership = _assign_membership(client, headers, client_id, plan["id"], end_date_override=today + timedelta(days=3))
+
+    renewed = client.post(
+        f"{API}/memberships/{membership['id']}/renew", json={"method": "efectivo"}, headers=headers
+    ).json()
+    renewal_id = renewed["renewal"]["id"]
+
+    primero = client.post(
+        f"{API}/memberships/renewals/{renewal_id}/undo", json={"reason": "primer intento"}, headers=headers
+    )
+    assert primero.status_code == 200
+
+    segundo = client.post(
+        f"{API}/memberships/renewals/{renewal_id}/undo", json={"reason": "segundo intento"}, headers=headers
+    )
+    assert segundo.status_code == 409
+
+
+def test_deshacer_renovacion_con_renovacion_posterior_devuelve_409(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.deshacer3@gmail.com", "AdminPass123", "admin")
+    headers = _auth_headers(client, admin.email, "AdminPass123")
+
+    plan = _create_plan(client, headers, "Basica Deshacer3").json()
+    client_id = _register_client(client, headers, "smartgym.qa.cliente.deshacer3@gmail.com").json()["client"]["id"]
+    today = date.today()
+    membership = _assign_membership(client, headers, client_id, plan["id"], end_date_override=today + timedelta(days=3))
+
+    primera_renovacion = client.post(
+        f"{API}/memberships/{membership['id']}/renew", json={"method": "efectivo"}, headers=headers
+    ).json()
+    primer_renewal_id = primera_renovacion["renewal"]["id"]
+
+    # Simula que paso el tiempo (la membresia vuelve a estar en ventana) para
+    # poder renovar una segunda vez sin esperar dias reales.
+    _force_membership_end_date(membership["id"], today + timedelta(days=2))
+    segunda_renovacion = client.post(
+        f"{API}/memberships/{membership['id']}/renew", json={"method": "efectivo"}, headers=headers
+    )
+    assert segunda_renovacion.status_code == 200
+
+    response = client.post(
+        f"{API}/memberships/renewals/{primer_renewal_id}/undo",
+        json={"reason": "intenta deshacer la vieja"},
+        headers=headers,
+    )
+
+    assert response.status_code == 409
+
+
+def test_deshacer_renovacion_como_no_admin_devuelve_403(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.deshacer4@gmail.com", "AdminPass123", "admin")
+    admin_headers = _auth_headers(client, admin.email, "AdminPass123")
+    trainer = _seed_user("smartgym.qa.entrenador.deshacer4@gmail.com", "ClaveEntrenador123", "entrenador")
+
+    plan = _create_plan(client, admin_headers, "Basica Deshacer4").json()
+    client_id = _register_client(client, admin_headers, "smartgym.qa.cliente.deshacer4@gmail.com").json()["client"]["id"]
+    today = date.today()
+    membership = _assign_membership(
+        client, admin_headers, client_id, plan["id"], end_date_override=today + timedelta(days=3)
+    )
+    renewed = client.post(
+        f"{API}/memberships/{membership['id']}/renew", json={"method": "efectivo"}, headers=admin_headers
+    ).json()
+    renewal_id = renewed["renewal"]["id"]
+
+    trainer_headers = _auth_headers(client, trainer.email, "ClaveEntrenador123")
+    response = client.post(
+        f"{API}/memberships/renewals/{renewal_id}/undo", json={"reason": "no deberia poder"}, headers=trainer_headers
+    )
+
+    assert response.status_code == 403
+
+
+def test_pago_anulado_no_cuenta_en_ingresos_del_mes(client: TestClient) -> None:
+    admin = _seed_user("smartgym.qa.admin.deshacer5@gmail.com", "AdminPass123", "admin")
+    headers = _auth_headers(client, admin.email, "AdminPass123")
+
+    plan = _create_plan(client, headers, "Basica Deshacer5").json()
+    client_id = _register_client(client, headers, "smartgym.qa.cliente.deshacer5@gmail.com").json()["client"]["id"]
+    today = date.today()
+    membership = _assign_membership(client, headers, client_id, plan["id"], end_date_override=today + timedelta(days=3))
+
+    renewed = client.post(
+        f"{API}/memberships/{membership['id']}/renew", json={"method": "efectivo"}, headers=headers
+    ).json()
+
+    before_undo = client.get(f"{API}/memberships/board", headers=headers).json()
+    assert Decimal(before_undo["indicators"]["monthly_revenue"]) == Decimal(plan["price"])
+
+    client.post(
+        f"{API}/memberships/renewals/{renewed['renewal']['id']}/undo",
+        json={"reason": "no debe contar en ingresos"},
+        headers=headers,
+    )
+
+    after_undo = client.get(f"{API}/memberships/board", headers=headers).json()
+    assert Decimal(after_undo["indicators"]["monthly_revenue"]) == Decimal("0")

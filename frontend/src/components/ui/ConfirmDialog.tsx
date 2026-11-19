@@ -1,15 +1,23 @@
 import { useEffect, useRef } from 'react'
+import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import './ConfirmDialog.css'
 
 interface ConfirmDialogProps {
   open: boolean
   title: string
-  description?: string
+  /** Normalmente texto; admite JSX (ej. un <select> de método de pago o un
+   * <textarea> de motivo) para diálogos que necesitan un dato más antes de
+   * confirmar -- ver "Renovar"/"Deshacer renovación" en MembershipsPage y
+   * ClientDetailPage (BUG-12, ver DECISIONES.md). */
+  description?: ReactNode
   confirmLabel?: string
   cancelLabel?: string
   /** 'danger' para acciones destructivas (eliminar) — tono por defecto. */
   tone?: 'danger' | 'neutral'
+  /** Deshabilita el botón de confirmar -- ej. mientras el dato adicional
+   * (motivo, método) sigue vacío. */
+  confirmDisabled?: boolean
   onConfirm: () => void
   onCancel: () => void
 }
@@ -34,6 +42,7 @@ export function ConfirmDialog({
   confirmLabel = 'Eliminar',
   cancelLabel = 'Cancelar',
   tone = 'danger',
+  confirmDisabled = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -59,7 +68,7 @@ export function ConfirmDialog({
         <h2 id="confirm-dialog-title" className="confirm-dialog__title">
           {title}
         </h2>
-        {description && <p className="confirm-dialog__description">{description}</p>}
+        {description && <div className="confirm-dialog__description">{description}</div>}
         <div className="confirm-dialog__actions">
           <button type="button" className="btn btn-ghost" onClick={onCancel}>
             {cancelLabel}
@@ -70,6 +79,7 @@ export function ConfirmDialog({
             className="btn confirm-dialog__confirm"
             data-tone={tone}
             onClick={onConfirm}
+            disabled={confirmDisabled}
           >
             {confirmLabel}
           </button>

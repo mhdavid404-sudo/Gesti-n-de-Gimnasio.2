@@ -7,6 +7,7 @@ from src.infrastructure.db.models.diets import DietAssignmentModel, DietPlanMode
 from src.infrastructure.db.models.memberships import (
     MembershipModel,
     MembershipPlanModel,
+    MembershipRenewalModel,
     MembershipServiceModel,
     PlanServiceModel,
     ServiceModel,
@@ -30,6 +31,7 @@ __all__ = [
     "ServiceModel",
     "PlanServiceModel",
     "MembershipServiceModel",
+    "MembershipRenewalModel",
     "PaymentModel",
     "PaymentItemModel",
     "ExerciseModel",

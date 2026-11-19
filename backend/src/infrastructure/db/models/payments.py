@@ -23,7 +23,10 @@ class PaymentModel(Base):
             name="ck_payments_method",
         ),
         CheckConstraint(
-            "status IN ('completado', 'pendiente', 'rechazado')",
+            # "anulado" agregado por BUG-12 (ver DECISIONES.md) -- un pago
+            # de una renovacion deshecha se conserva marcado asi, nunca se
+            # borra. Ver migracion 0005.
+            "status IN ('completado', 'pendiente', 'rechazado', 'anulado')",
             name="ck_payments_status",
         ),
     )

@@ -8,6 +8,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from src.api.v1.schemas.payments import PaymentMethod, PaymentRead
+
 MembershipStatus = Literal["activa", "vencida", "cancelada", "pendiente"]
 
 
@@ -221,3 +223,50 @@ class PlanChangePreview(BaseModel):
     cancelled_extras_total: Decimal
     kept_extras: list[PlanChangeExtraRow]
     newly_contractable_services: list[PlanChangeContractableRow]
+
+
+# ---------------------------------------------------------------------------
+# Renovar + cobrar, y deshacer (BUG-12, ver DECISIONES.md). "Renovar" dejo de
+# ser una accion separada de "cobrar" -- ver `RenewAndChargeMembershipUseCase`
+# y `UndoMembershipRenewalUseCase` en `application/memberships/use_cases.py`.
+# ---------------------------------------------------------------------------
+
+
+class MembershipRenewRequest(BaseModel):
+    method: PaymentMethod
+    # Ninguna pantalla lo manda hoy -- por defecto "ahora mismo" (mismo
+    # criterio que `PaymentCreate.payment_date`, aqui opcional porque el
+    # momento del cobro de una renovacion siempre es "en este instante").
+    payment_date: datetime | None = None
+
+
+class MembershipRenewalRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    membership_id: int
+    payment_id: int
+    previous_end_date: date
+    new_end_date: date
+    previous_status: MembershipStatus
+    performed_by: int
+    reversed_at: datetime | None
+    reversed_reason: str | None
+    reversed_by: int | None
+    created_at: datetime
+
+
+class MembershipRenewResult(BaseModel):
+    membership: MembershipRead
+    payment: PaymentRead
+    renewal: MembershipRenewalRead
+
+
+class MembershipRenewalUndoRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class MembershipRenewalUndoResult(BaseModel):
+    membership: MembershipRead
+    payment: PaymentRead
+    renewal: MembershipRenewalRead

@@ -44,8 +44,10 @@ export type MembershipStatus = 'activa' | 'vencida' | 'cancelada' | 'pendiente'
 /** Método de pago registrado en RF005. */
 export type PaymentMethod = 'efectivo' | 'tarjeta' | 'transferencia'
 
-/** Estado de un pago (RF005). */
-export type PaymentStatus = 'completado' | 'pendiente' | 'rechazado'
+/** Estado de un pago (RF005). "anulado" agregado por BUG-12 (ver
+ * DECISIONES.md): pago de una renovación deshecha -- se conserva, nunca
+ * se borra, y se excluye de ingresos/totales. */
+export type PaymentStatus = 'completado' | 'pendiente' | 'rechazado' | 'anulado'
 
 /** Estado de una asignación de rutina o dieta a un cliente (RF007-RF009). */
 export type AssignmentStatus = 'activa' | 'completada' | 'cancelada'

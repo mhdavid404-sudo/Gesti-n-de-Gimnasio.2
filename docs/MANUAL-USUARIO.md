@@ -399,6 +399,54 @@ mes), una tabla con cada cliente y su plan/extras/vigencia, y un botón
 
 ![Tablero de membresías activas](capturas/manual/20-admin-membresias-activas.jpg)
 
+#### Renovar una membresía (y deshacer un error)
+
+El botón **"Renovar"** solo aparece habilitado cuando la membresía vence
+en **7 días o menos, o ya venció** — fuera de esa ventana aparece
+deshabilitado, con una explicación (en la tabla, al pasar el mouse; en
+la ficha del cliente, como texto). Esto evita renovar "por si acaso" con
+meses de anticipación.
+
+![Botón "Renovar" en la tabla — ya no existe un botón "Cobrar" aparte](capturas/manual/49-admin-membresias-renovar-sin-cobrar.jpg)
+
+Al hacer clic se abre una confirmación con el plan, el monto que se va
+a cobrar, la nueva fecha de vencimiento y un selector de método de
+pago — **"Renovar" cobra el pago en la misma operación**, ya no son dos
+pasos separados.
+
+![Confirmación de renovar: plan, monto, nueva fecha y método de pago](capturas/manual/50-admin-renovar-confirmacion.jpg)
+
+Al confirmar, la membresía queda renovada y el pago registrado al mismo
+tiempo; el botón "Renovar" vuelve a quedar deshabilitado (la nueva fecha
+de vencimiento ya está fuera de la ventana de 7 días).
+
+![Resultado: toast de confirmación, vigencia extendida, ingresos actualizados](capturas/manual/51-admin-membresia-renovada-resultado.jpg)
+
+La misma acción, y el historial de renovaciones, también están
+disponibles desde la pestaña **Membresía** de la ficha del cliente
+(útil para una membresía ya vencida, que no aparece en el tablero).
+Mientras la última renovación siga vigente, aparece el botón
+**"Deshacer renovación"** — pensado para un clic equivocado, no para
+"arrepentirse" de un cobro ya conciliado:
+
+![Pestaña Membresía de la ficha: Renovar y Deshacer renovación](capturas/manual/52-admin-ficha-membresia-renovar-deshacer.jpg)
+
+Deshacer pide un **motivo obligatorio**, restaura la fecha de
+vencimiento anterior y anula el pago de esa renovación (no lo borra —
+queda en el historial marcado como "Anulado", y deja de contar en los
+ingresos del mes). Solo se puede deshacer la **última** renovación; si
+ya hubo otra después, o si esa renovación ya se había deshecho antes, el
+sistema lo rechaza.
+
+![La membresía vuelve a su vencimiento anterior tras deshacer](capturas/manual/53-admin-renovacion-deshecha.jpg)
+
+![El pago de la renovación queda "Anulado" en el historial de Pagos, no borrado](capturas/manual/54-admin-pago-anulado.jpg)
+
+Ambas acciones (renovar y deshacer) quedan registradas en la Bitácora,
+con quién las hizo y cuándo:
+
+![Bitácora: renovar_membresia y deshacer_renovacion_membresia](capturas/manual/55-admin-bitacora-renovar-deshacer.jpg)
+
 #### Bitácora
 
 Entra a **Bitácora** en el menú lateral (solo Administrador). Aquí

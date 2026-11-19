@@ -24,6 +24,9 @@ const LABELS: Record<Status, string> = {
   completada: 'Completada',
   completado: 'Completado',
   rechazado: 'Rechazado',
+  // BUG-12 (ver DECISIONES.md): pago de una renovación deshecha -- se
+  // conserva en el historial, nunca se borra.
+  anulado: 'Anulado',
   sin_membresia: 'Sin membresía',
   // Entrega 3 (Fase 2): un plan/servicio "eliminado" con contrataciones
   // vigentes se desactiva en vez de borrarse -- ver PlanesServiciosPage.
@@ -43,6 +46,7 @@ const TONES: Record<Status, 'success' | 'warning' | 'danger' | 'neutral'> = {
   completada: 'success',
   completado: 'success',
   rechazado: 'danger',
+  anulado: 'neutral',
   sin_membresia: 'neutral',
   inactivo: 'neutral',
   cancelado_por_cambio_de_plan: 'neutral',

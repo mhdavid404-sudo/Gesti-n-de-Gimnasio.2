@@ -19,6 +19,7 @@ from src.domain.memberships.entities import (
     ESTADOS_MEMBRESIA_VALIDOS,
     Membership,
     MembershipPlan,
+    MembershipRenewal,
     MembershipService,
     PlanService,
     Service,
@@ -30,6 +31,10 @@ from src.domain.memberships.exceptions import (
     InvalidMembershipStatusError,
     MembershipNotFoundError,
     MembershipPlanNotFoundError,
+    MembershipRenewalNotFoundError,
+    MembershipRenewalWindowError,
+    RenewalAlreadyReversedError,
+    RenewalSupersededError,
     SamePlanChangeError,
     ServiceAlreadyIncludedInPlanError,
     ServiceIncludedInPlanError,
@@ -37,6 +42,7 @@ from src.domain.memberships.exceptions import (
 )
 from src.domain.memberships.repositories import (
     MembershipPlanRepository,
+    MembershipRenewalRepository,
     MembershipRepository,
     MembershipServiceRepository,
     PlanServiceRepository,
@@ -44,6 +50,9 @@ from src.domain.memberships.repositories import (
 )
 from src.domain.notifications.entities import AuditLog, Notification
 from src.domain.notifications.repositories import AuditLogRepository
+from src.domain.payments.entities import METODOS_PAGO_VALIDOS, Payment, PaymentItem
+from src.domain.payments.exceptions import InvalidPaymentMethodError
+from src.domain.payments.repositories import PaymentItemRepository, PaymentRepository
 
 
 @dataclass
@@ -213,27 +222,55 @@ class DetectExpiringMembershipsUseCase:
 # --- Entrega 3, Fase 2: Planes y servicios extra (amplia RF004/RF005) ------
 
 
+# Misma ventana que "por vencer" (ver `frontend/src/utils/membership.ts`,
+# `EXPIRING_SOON_WINDOW_DAYS`, y `_VENTANA_TABLERO_DIAS` del router) -- una
+# sola renovacion solo tiene sentido cerca del vencimiento real, nunca "por
+# si acaso" con meses de anticipacion.
+_VENTANA_RENOVACION_DIAS = 7
+
+
 @dataclass
-class RenewMembershipUseCase:
-    """Renovar una membresia desde el tablero de membresias activas
-    (Entrega 3, ajuste de UX de la pantalla "Membresias").
+class RenewAndChargeMembershipUseCase:
+    """BUG-12 (ver DECISIONES.md): reemplaza al viejo `RenewMembershipUseCase`,
+    que extendia `end_date` SIN ningun limite de ventana y SIN pago
+    asociado -- cualquier clic de mas sumaba otro periodo gratis y no
+    quedaba rastro de cobro ni forma de deshacerlo. Ahora "renovar" y
+    "cobrar" son una sola operacion atomica:
 
-    Extiende `end_date` por la duracion del PROPIO plan
-    (`MembershipPlan.duration_days`), a partir de la fecha de fin vigente
-    si todavia no paso, o de hoy si ya vencio -- nunca deja huecos sin
-    cobertura ni acumula sobre una fecha ya pasada. Si la membresia
-    estaba `"vencida"`, vuelve a `"activa"`.
-
-    Decision explicita (ver DECISIONES.md): NO crea una `Membership`
-    nueva ni un `Payment` automatico -- "renovar" (extender vigencia) y
-    "cobrar" (registrar el pago) son dos acciones separadas en la UI a
-    proposito, para no asumir metodo de pago ni monto cobrado.
+    1. Valida que la membresia este DENTRO de la ventana de renovacion
+       (vence en `_VENTANA_RENOVACION_DIAS` dias o menos, o ya vencio) --
+       `MembershipRenewalWindowError` si no. Esto tambien es lo que evita
+       que un doble clic renueve dos veces: tras la primera renovacion,
+       `end_date` ya quedo lejos de hoy y una segunda llamada vuelve a
+       fallar esta misma validacion.
+    2. Calcula el nuevo `end_date` (mismo criterio que el use case
+       anterior: extiende desde `end_date` si sigue vigente, o desde hoy
+       si ya vencio -- nunca acumula mas de un periodo).
+    3. Crea el `Payment` (monto = precio del plan, con un `PaymentItem`
+       concepto `'plan'`) y actualiza la `Membership` en la MISMA sesion
+       -- si el metodo de pago es invalido, nada de esto llega a
+       persistirse (atomicidad por sesion compartida, mismo patron que
+       `ChangeMembershipPlanUseCase`: el router hace un unico
+       `db.commit()` al final).
+    4. Dejar una fila en `MembershipRenewal` (fecha/estado anteriores +
+       el pago creado) es lo que permite deshacer esta renovacion despues
+       (`UndoMembershipRenewalUseCase`) y lo que registra la bitacora.
     """
 
     membership_repository: MembershipRepository
     plan_repository: MembershipPlanRepository
+    payment_repository: PaymentRepository
+    payment_item_repository: PaymentItemRepository
+    renewal_repository: MembershipRenewalRepository
+    audit_log_repository: AuditLogRepository
 
-    def execute(self, membership_id: int) -> Membership:
+    def execute(
+        self,
+        membership_id: int,
+        method: str,
+        performed_by_user_id: int,
+        payment_date: datetime | None = None,
+    ) -> MembershipRenewal:
         membership = self.membership_repository.get_by_id(membership_id)
         if membership is None:
             raise MembershipNotFoundError(membership_id)
@@ -242,11 +279,140 @@ class RenewMembershipUseCase:
         if plan is None:
             raise MembershipPlanNotFoundError(membership.plan_id)
 
+        if method not in METODOS_PAGO_VALIDOS:
+            raise InvalidPaymentMethodError(method)
+
         today = date.today()
+        days_remaining = (membership.end_date - today).days
+        if days_remaining > _VENTANA_RENOVACION_DIAS:
+            raise MembershipRenewalWindowError(membership_id, days_remaining, _VENTANA_RENOVACION_DIAS)
+
+        previous_end_date = membership.end_date
+        previous_status = membership.status
+
         base_date = membership.end_date if membership.end_date >= today else today
-        membership.end_date = base_date + timedelta(days=plan.duration_days)
+        new_end_date = base_date + timedelta(days=plan.duration_days)
+
+        payment = self.payment_repository.add(
+            Payment(
+                id=None,
+                membership_id=membership_id,
+                amount=plan.price,
+                payment_date=payment_date or datetime.now(timezone.utc),
+                method=method,
+                status="completado",
+                registered_by=performed_by_user_id,
+                notes=f"Renovacion de membresia ({plan.name}).",
+            )
+        )
+        self.payment_item_repository.add(
+            PaymentItem(
+                id=None,
+                payment_id=payment.id,  # type: ignore[arg-type]
+                concept="plan",
+                amount=plan.price,
+                service_id=None,
+            )
+        )
+
+        membership.end_date = new_end_date
         membership.status = "activa"
-        return self.membership_repository.update(membership)
+        self.membership_repository.update(membership)
+
+        renewal = self.renewal_repository.add(
+            MembershipRenewal(
+                id=None,
+                membership_id=membership_id,
+                payment_id=payment.id,  # type: ignore[arg-type]
+                previous_end_date=previous_end_date,
+                new_end_date=new_end_date,
+                previous_status=previous_status,
+                performed_by=performed_by_user_id,
+            )
+        )
+
+        self.audit_log_repository.add(
+            AuditLog(
+                id=None,
+                user_id=performed_by_user_id,
+                action="renovar_membresia",
+                entity_type="membership",
+                entity_id=str(membership_id),
+                details=(
+                    f"Vencimiento '{previous_end_date.isoformat()}' -> '{new_end_date.isoformat()}'. "
+                    f"Pago #{payment.id} por ${plan.price} ({method})."
+                ),
+            )
+        )
+
+        return renewal
+
+
+@dataclass
+class UndoMembershipRenewalUseCase:
+    """BUG-12 (ver DECISIONES.md): deshace un "error de dedo" al renovar.
+
+    Solo se puede deshacer la renovacion que sea, en este momento, la MAS
+    RECIENTE de su membresia (`RenewalSupersededError` si ya hubo otra
+    renovacion despues) y que no haya sido deshecha ya
+    (`RenewalAlreadyReversedError`). Restaura `end_date`/`status` al valor
+    que tenia la membresia ANTES de esa renovacion, marca el `Payment`
+    asociado como `'anulado'` (se conserva, nunca se borra -- asi el
+    historial de pagos sigue completo) y dejar `reversed_at`/
+    `reversed_reason`/`reversed_by` en la propia fila de `MembershipRenewal`
+    es lo que impide deshacerla una segunda vez.
+    """
+
+    membership_repository: MembershipRepository
+    payment_repository: PaymentRepository
+    renewal_repository: MembershipRenewalRepository
+    audit_log_repository: AuditLogRepository
+
+    def execute(self, renewal_id: int, reason: str, performed_by_user_id: int) -> MembershipRenewal:
+        renewal = self.renewal_repository.get_by_id(renewal_id)
+        if renewal is None:
+            raise MembershipRenewalNotFoundError(renewal_id)
+
+        if renewal.reversed_at is not None:
+            raise RenewalAlreadyReversedError(renewal_id)
+
+        latest = self.renewal_repository.get_latest_for_membership(renewal.membership_id)
+        if latest is None or latest.id != renewal.id:
+            raise RenewalSupersededError(renewal_id)
+
+        membership = self.membership_repository.get_by_id(renewal.membership_id)
+        if membership is None:
+            raise MembershipNotFoundError(renewal.membership_id)
+
+        membership.end_date = renewal.previous_end_date
+        membership.status = renewal.previous_status
+        self.membership_repository.update(membership)
+
+        payment = self.payment_repository.get_by_id(renewal.payment_id)
+        if payment is not None:
+            payment.status = "anulado"
+            self.payment_repository.update(payment)
+
+        renewal.reversed_at = datetime.now(timezone.utc)
+        renewal.reversed_reason = reason
+        renewal.reversed_by = performed_by_user_id
+        updated_renewal = self.renewal_repository.update(renewal)
+
+        self.audit_log_repository.add(
+            AuditLog(
+                id=None,
+                user_id=performed_by_user_id,
+                action="deshacer_renovacion_membresia",
+                entity_type="membership",
+                entity_id=str(renewal.membership_id),
+                details=(
+                    f"Vencimiento restaurado a '{renewal.previous_end_date.isoformat()}'. "
+                    f"Pago #{renewal.payment_id} marcado como anulado. Motivo: {reason}"
+                ),
+            )
+        )
+
+        return updated_renewal
 
 
 @dataclass

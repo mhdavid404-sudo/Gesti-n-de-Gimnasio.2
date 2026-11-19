@@ -79,3 +79,30 @@ export function addDaysIso(dateIso: string, days: number): string {
   date.setDate(date.getDate() + days)
   return date.toISOString().slice(0, 10)
 }
+
+/**
+ * BUG-12 (ver DECISIONES.md): una membresía solo se puede renovar si está
+ * `vencida`, o `activa` y dentro de la ventana de aviso (mismo umbral que
+ * "por vencer") -- el backend (`RenewAndChargeMembershipUseCase`) es quien
+ * valida esto de verdad; esta función solo sirve para decidir si el botón
+ * "Renovar" se muestra habilitado o deshabilitado-con-explicación.
+ */
+export function canRenewMembership(
+  membership: Pick<Membership, 'status' | 'end_date'>,
+  referenceDate: Date = new Date(),
+): boolean {
+  if (membership.status === 'vencida') return true
+  return isMembershipExpiringSoon(membership, referenceDate)
+}
+
+/**
+ * Previsualiza el `end_date` que resultaría de renovar AHORA (mismo cálculo
+ * que el backend: extiende desde `end_date` si sigue vigente, o desde
+ * `todayIso` si ya venció -- nunca acumula sobre una fecha ya pasada). Solo
+ * para la vista previa del diálogo de confirmación de "Renovar"; el cálculo
+ * real y autoritativo ocurre en el backend.
+ */
+export function previewRenewedEndDate(endDateIso: string, durationDays: number, todayIso: string): string {
+  const base = endDateIso >= todayIso ? endDateIso : todayIso
+  return addDaysIso(base, durationDays)
+}

@@ -9,7 +9,9 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 PaymentMethod = Literal["efectivo", "tarjeta", "transferencia"]
-PaymentStatus = Literal["completado", "pendiente", "rechazado"]
+# "anulado" agregado por BUG-12 (ver DECISIONES.md): pago de una
+# renovacion deshecha -- se conserva, nunca se borra.
+PaymentStatus = Literal["completado", "pendiente", "rechazado", "anulado"]
 PaymentItemConcept = Literal["plan", "servicio"]
 
 

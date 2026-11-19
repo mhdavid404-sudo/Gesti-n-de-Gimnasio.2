@@ -1,15 +1,32 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiFetch, ApiError } from '../api/client'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { EmptyState } from '../components/ui/EmptyState'
 import { ErrorMessage } from '../components/ui/ErrorMessage'
 import { LoadingState } from '../components/ui/LoadingState'
 import { StatusPill } from '../components/ui/StatusPill'
 import { Toast } from '../components/ui/Toast'
 import { useAuth } from '../hooks/useAuth'
-import type { ApiActiveMembershipsBoard, ApiMembership, ApiMembershipPlan } from '../types/api'
-import { getMembershipDisplayStatus } from '../utils/membership'
+import type {
+  ApiActiveMembershipRow,
+  ApiActiveMembershipsBoard,
+  ApiMembership,
+  ApiMembershipPlan,
+  ApiMembershipRenewResult,
+  ApiPaymentMethod,
+  MembershipRenewPayload,
+} from '../types/api'
+import { getMembershipDisplayStatus, previewRenewedEndDate } from '../utils/membership'
 import './MembershipsPage.css'
+
+const todayIso = () => new Date().toISOString().slice(0, 10)
+
+const PAYMENT_METHODS: { value: ApiPaymentMethod; label: string }[] = [
+  { value: 'efectivo', label: 'Efectivo' },
+  { value: 'tarjeta', label: 'Tarjeta' },
+  { value: 'transferencia', label: 'Transferencia' },
+]
 
 function formatCurrency(value: string | number): string {
   return `$${Number(value).toLocaleString('es-MX')}`
@@ -85,8 +102,14 @@ export function MembershipsPage() {
   const [planFilter, setPlanFilter] = useState('')
   const [toast, setToast] = useState<string | null>(null)
   const [errorToast, setErrorToast] = useState<string | null>(null)
-  const [renewingId, setRenewingId] = useState<number | null>(null)
   const [isDetecting, setIsDetecting] = useState(false)
+
+  // BUG-12 (ver DECISIONES.md): "Renovar" ya no es un clic directo -- abre
+  // una confirmación con el plan, el monto, la nueva fecha de vencimiento y
+  // el método de pago, y renueva + cobra en una sola operación atómica.
+  const [renewTarget, setRenewTarget] = useState<ApiActiveMembershipRow | null>(null)
+  const [renewMethod, setRenewMethod] = useState<ApiPaymentMethod>('efectivo')
+  const [isRenewing, setIsRenewing] = useState(false)
 
   const loadBoard = (q: string, planId: string) => {
     setBoardLoading(true)
@@ -146,11 +169,26 @@ export function MembershipsPage() {
     }
   }
 
-  const handleRenew = async (membershipId: number) => {
-    setRenewingId(membershipId)
+  const renewTargetPlan = renewTarget ? plans.find((p) => p.id === renewTarget.plan_id) : undefined
+
+  const openRenewDialog = (row: ApiActiveMembershipRow) => {
+    setRenewMethod('efectivo')
+    setRenewTarget(row)
+  }
+
+  const handleConfirmRenew = async () => {
+    if (!renewTarget) return
+    setIsRenewing(true)
     try {
-      await apiFetch(`/memberships/${membershipId}/renew`, { method: 'POST' })
-      setToast('Membresía renovada.')
+      const payload: MembershipRenewPayload = { method: renewMethod }
+      const result = await apiFetch<ApiMembershipRenewResult>(`/memberships/${renewTarget.membership_id}/renew`, {
+        method: 'POST',
+        body: payload,
+      })
+      setToast(
+        `Membresía renovada hasta el ${result.membership.end_date} -- pago de ${formatCurrency(result.payment.amount)} registrado.`,
+      )
+      setRenewTarget(null)
       loadBoard(search, planFilter)
     } catch (err) {
       if (err instanceof ApiError && err.isUnauthorized) {
@@ -160,7 +198,7 @@ export function MembershipsPage() {
       }
       setErrorToast(err instanceof ApiError ? err.message : 'Ocurrió un error inesperado. Intenta de nuevo.')
     } finally {
-      setRenewingId(null)
+      setIsRenewing(false)
     }
   }
 
@@ -331,19 +369,19 @@ export function MembershipsPage() {
                           Ver ficha
                         </Link>
                         {isAdmin && (
-                          <>
-                            <button
-                              type="button"
-                              className="btn btn-ghost"
-                              onClick={() => handleRenew(row.membership_id)}
-                              disabled={renewingId === row.membership_id}
-                            >
-                              {renewingId === row.membership_id ? 'Renovando…' : 'Renovar'}
-                            </button>
-                            <Link to={`/clientes/${row.client_id}?tab=pagos`} className="btn btn-primary">
-                              Cobrar
-                            </Link>
-                          </>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            onClick={() => openRenewDialog(row)}
+                            disabled={!row.expiring_soon}
+                            title={
+                              row.expiring_soon
+                                ? undefined
+                                : 'Solo se puede renovar si la membresía vence en 7 días o menos, o si ya venció.'
+                            }
+                          >
+                            Renovar
+                          </button>
                         )}
                       </div>
                     </td>
@@ -354,6 +392,57 @@ export function MembershipsPage() {
           </div>
         )}
       </section>
+
+      <ConfirmDialog
+        open={renewTarget !== null}
+        title={renewTarget ? `¿Renovar la membresía de ${renewTarget.client_name}?` : ''}
+        tone="neutral"
+        confirmLabel={isRenewing ? 'Renovando…' : 'Renovar y cobrar'}
+        confirmDisabled={isRenewing}
+        onConfirm={() => void handleConfirmRenew()}
+        onCancel={() => setRenewTarget(null)}
+        description={
+          renewTarget && (
+            <div className="memberships-page__renew-summary">
+              <dl className="client-detail__grid">
+                <div>
+                  <dt>Plan</dt>
+                  <dd>{renewTarget.plan_name}</dd>
+                </div>
+                <div>
+                  <dt>Monto a cobrar</dt>
+                  <dd>{renewTargetPlan ? formatCurrency(renewTargetPlan.price) : '—'}</dd>
+                </div>
+                <div>
+                  <dt>Nueva fecha de vencimiento</dt>
+                  <dd>
+                    {renewTargetPlan
+                      ? previewRenewedEndDate(renewTarget.end_date, renewTargetPlan.duration_days, todayIso())
+                      : '—'}
+                  </dd>
+                </div>
+              </dl>
+              <div className="client-detail__field">
+                <label className="field-label" htmlFor="renewMethodSelect">
+                  Método de pago
+                </label>
+                <select
+                  id="renewMethodSelect"
+                  className="input"
+                  value={renewMethod}
+                  onChange={(e) => setRenewMethod(e.target.value as ApiPaymentMethod)}
+                >
+                  {PAYMENT_METHODS.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )
+        }
+      />
     </div>
   )
 }

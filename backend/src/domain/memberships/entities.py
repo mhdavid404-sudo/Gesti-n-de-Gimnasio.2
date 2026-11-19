@@ -106,3 +106,33 @@ class MembershipService:
     end_date: date
     status: str  # uno de ESTADOS_MEMBERSHIP_SERVICE_VALIDOS
     created_at: datetime | None = None
+
+
+@dataclass
+class MembershipRenewal:
+    """Historial de renovaciones de una `Membership` (BUG-12, ver
+    DECISIONES.md): antes, "Renovar" extendia `end_date` sin dejar ningun
+    rastro de que paso ni de cuanto se cobro, asi que un clic de mas no se
+    podia deshacer. Cada fila es UNA renovacion real (vigencia extendida +
+    pago cobrado en la misma operacion, ver `RenewAndChargeMembershipUseCase`)
+    y guarda lo necesario para deshacerla despues:
+    `previous_end_date`/`previous_status` son el estado de la membresia
+    ANTES de esta renovacion (lo que se restaura al deshacer).
+
+    `reversed_at`/`reversed_reason`/`reversed_by` quedan en `None` mientras
+    la renovacion siga vigente; se llenan los tres juntos al deshacerla
+    (`UndoMembershipRenewalUseCase`) y nunca se borran despues -- la fila
+    se conserva como historial igual que el `Payment` que marca.
+    """
+
+    id: int | None
+    membership_id: int
+    payment_id: int
+    previous_end_date: date
+    new_end_date: date
+    previous_status: str
+    performed_by: int
+    reversed_at: datetime | None = None
+    reversed_reason: str | None = None
+    reversed_by: int | None = None
+    created_at: datetime | None = None

@@ -116,3 +116,52 @@ class InactiveMembershipPlanError(Exception):
     def __init__(self, plan_id: int) -> None:
         self.plan_id = plan_id
         super().__init__(f"El plan {plan_id} esta desactivado, no se puede asignar")
+
+
+# --- BUG-12: renovar + cobrar en una sola operacion, con ventana y deshacer -
+# (ver DECISIONES.md, entrada BUG-12).
+
+
+class MembershipRenewalWindowError(Exception):
+    """No se puede renovar todavia: la membresia no esta vencida ni dentro
+    de la ventana de aviso (mismo umbral que "por vencer"). Antes de
+    BUG-12 no existia ninguna validacion de ventana -- cualquier clic en
+    "Renovar" sumaba un periodo sin limite."""
+
+    def __init__(self, membership_id: int, days_remaining: int, window_days: int) -> None:
+        self.membership_id = membership_id
+        self.days_remaining = days_remaining
+        self.window_days = window_days
+        super().__init__(
+            f"La membresia {membership_id} vence en {days_remaining} dias; solo se puede "
+            f"renovar si vence en {window_days} dias o menos, o si ya vencio."
+        )
+
+
+class MembershipRenewalNotFoundError(Exception):
+    """No existe una `MembershipRenewal` con el id solicitado."""
+
+    def __init__(self, renewal_id: int) -> None:
+        self.renewal_id = renewal_id
+        super().__init__(f"La renovacion {renewal_id} no existe")
+
+
+class RenewalAlreadyReversedError(Exception):
+    """La renovacion que se intenta deshacer ya fue deshecha antes -- un
+    doble clic en "Deshacer" no debe deshacerla dos veces."""
+
+    def __init__(self, renewal_id: int) -> None:
+        self.renewal_id = renewal_id
+        super().__init__(f"La renovacion {renewal_id} ya fue deshecha anteriormente")
+
+
+class RenewalSupersededError(Exception):
+    """Ya hubo una renovacion posterior sobre la misma membresia -- solo se
+    puede deshacer la ULTIMA renovacion (regla explicita del encargo)."""
+
+    def __init__(self, renewal_id: int) -> None:
+        self.renewal_id = renewal_id
+        super().__init__(
+            f"Ya hubo una renovacion posterior sobre esta membresia; no se puede deshacer "
+            f"la renovacion {renewal_id}"
+        )

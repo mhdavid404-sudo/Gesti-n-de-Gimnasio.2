@@ -10,6 +10,7 @@ from abc import ABC, abstractmethod
 from src.domain.memberships.entities import (
     Membership,
     MembershipPlan,
+    MembershipRenewal,
     MembershipService,
     PlanService,
     Service,
@@ -117,3 +118,26 @@ class MembershipServiceRepository(ABC):
 
     @abstractmethod
     def update(self, membership_service: MembershipService) -> MembershipService: ...
+
+
+class MembershipRenewalRepository(ABC):
+    """Puerto de `membership_renewals` -- historial de renovaciones,
+    usado para "deshacer la ultima renovacion" (BUG-12)."""
+
+    @abstractmethod
+    def get_by_id(self, renewal_id: int) -> MembershipRenewal | None: ...
+
+    @abstractmethod
+    def list_by_membership(self, membership_id: int) -> list[MembershipRenewal]:
+        """Orden mas reciente primero -- el llamador toma el primero como
+        "la ultima renovacion" cuando lo necesita."""
+        ...
+
+    @abstractmethod
+    def get_latest_for_membership(self, membership_id: int) -> MembershipRenewal | None: ...
+
+    @abstractmethod
+    def add(self, renewal: MembershipRenewal) -> MembershipRenewal: ...
+
+    @abstractmethod
+    def update(self, renewal: MembershipRenewal) -> MembershipRenewal: ...

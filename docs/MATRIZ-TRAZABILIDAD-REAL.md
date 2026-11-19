@@ -9,9 +9,9 @@ Resultado real en `docs/RESULTADOS-FINALES.md`.
 | RF001 | HU01 | CU01 | `api/v1/routers/auth.py` | `pages/LoginPage.tsx` | CP01, CP02 (+ `test_auth.py`) | Pasó |
 | RF002 | HU02 | CU02 | `api/v1/dependencies.py::require_role` | `components/layout/Sidebar.tsx` | CP03 | Pasó |
 | RF003 | HU03 | CU03, CU04 | `api/v1/routers/clients.py`, `application/clients/use_cases.py` | `pages/ClientsListPage.tsx`, `ClientFormPage.tsx`, `ClientDetailPage.tsx` | CP04, CP05, CP06 (+ `test_clients.py`) | Pasó |
-| RF004 | HU04 | CU05 | `api/v1/routers/memberships.py`, `application/memberships/use_cases.py` | `pages/ClientDetailPage.tsx` (asignar/renovar/cambiar plan), `MembershipsPage.tsx` (tablero) | CP07 (+ `test_memberships.py`, CP29-36, CP37-46) | Pasó |
-| RF005 | HU05 | CU06 | `api/v1/routers/payments.py`, `application/payments/use_cases.py` | `pages/ClientDetailPage.tsx` (pestaña Pagos) | CP08 (+ `test_payments.py`, CP27-28) | Pasó |
-| RF006 | HU06 | CU07 | `application/memberships/use_cases.py::DetectExpiringMembershipsUseCase`, `infrastructure/scheduler.py` | `pages/MembershipsPage.tsx` ("Revisar vencimientos ahora"), alertas del Dashboard | CP09 (+ `test_notifications.py`, `test_scheduler.py`) | Pasó |
+| RF004 | HU04 | CU05 | `api/v1/routers/memberships.py`, `application/memberships/use_cases.py` | `pages/ClientDetailPage.tsx` (asignar/renovar/cambiar plan), `MembershipsPage.tsx` (tablero) | CP07 (+ `test_memberships.py`, CP29-36, CP37-46, CP53-59 de BUG-12) | Pasó |
+| RF005 | HU05 | CU06 | `api/v1/routers/payments.py`, `application/payments/use_cases.py` | `pages/ClientDetailPage.tsx` (pestaña Pagos) | CP08 (+ `test_payments.py`, CP27-28, CP55/CP59 de BUG-12) | Pasó |
+| RF006 | HU06 | CU07 | `application/memberships/use_cases.py::DetectExpiringMembershipsUseCase`, `infrastructure/scheduler.py` | `pages/MembershipsPage.tsx` ("Revisar vencimientos ahora"), alertas del Dashboard | CP09 (+ `test_notifications.py`, `test_scheduler.py`; BUG-12 reusa el mismo umbral de 7 días de "por vencer" para la ventana de renovación) | Pasó |
 | RF007 | HU07 | CU08 | `api/v1/routers/routines.py::create_routine` | `pages/RoutinesPage.tsx` | CP10 (+ `test_routines.py`) | Pasó |
 | RF008 | HU08 | CU09 | `application/routines/use_cases.py::GetClientRoutineHistoryUseCase` | `pages/ClientDetailPage.tsx` (pestaña Rutina) | CP11 | Pasó |
 | RF009 | HU09 | CU10 | `api/v1/routers/diets.py` | `pages/DietsPage.tsx` | CP13 (+ `test_diets.py`) | Pasó |
@@ -46,7 +46,16 @@ Resultado real en `docs/RESULTADOS-FINALES.md`.
 | Activar/desactivar una cuenta, con autodesactivación bloqueada | `api/v1/routers/users.py::update_user` (`PATCH /users/{id}` ya existía; el chequeo de autodesactivación y el registro en `AuditLog` son nuevos) | `pages/UsersPage.tsx` (botón "Activar"/"Desactivar" por fila) | CP51, CP52 (`test_users.py`) | Pasó |
 | Protección de ruta de "Usuarios" (solo admin, `entrenador`/`cliente` bloqueados incluso por URL directa) | chequeo de rol en el cliente, no en `GET /users` (ver `DECISIONES.md` para por qué no se angostó ese endpoint compartido) | `pages/UsersPage.tsx` | — (verificado en navegador, sin CP de pytest -- es un chequeo puramente de frontend) | Pasó |
 
-## Modelo de datos (18 tablas)
+## BUG-12 — renovar + cobrar atómico, ventana de 7 días, deshacer (2026-11-18 — sin ID formal en el documento)
+
+| Elemento | Archivo de código (backend) | Archivo de código (frontend) | CP | Resultado |
+|---|---|---|---|---|
+| "Renovar" cobra el pago en la misma operación atómica (antes eran dos acciones separadas) | `application/memberships/use_cases.py::RenewAndChargeMembershipUseCase`, `api/v1/routers/memberships.py::renew_membership` | `pages/MembershipsPage.tsx`, `pages/ClientDetailPage.tsx` (pestaña Membresía) | CP53 (+ CP15-18 ampliados) | Pasó |
+| Ventana de 7 días (o ya vencida) para poder renovar; doble clic rechazado | `application/memberships/exceptions.py::MembershipRenewalWindowError` | botón "Renovar" deshabilitado con explicación en ambas pantallas | CP53, CP54 | Pasó |
+| Deshacer la última renovación (anula el pago, restaura la fecha, pide motivo) | `application/memberships/use_cases.py::UndoMembershipRenewalUseCase`, tabla nueva `membership_renewals` (migración `0005`) | `pages/ClientDetailPage.tsx` (botón "Deshacer renovación") | CP55-58 | Pasó |
+| Un pago anulado no cuenta en ingresos/totales | `api/v1/routers/memberships.py::get_active_memberships_board` (excluye `status == 'anulado'`) | `pages/DashboardPage.tsx` (`monthIncome`) | CP59 | Pasó |
+
+## Modelo de datos (18 tablas → 19 con `membership_renewals`, BUG-12)
 
 Ver `docs/diagrama-entidad-relacion.svg` y `backend/MODELO-DATOS.md` para el
 detalle completo de columnas/constraints de cada una de las 18 tablas.

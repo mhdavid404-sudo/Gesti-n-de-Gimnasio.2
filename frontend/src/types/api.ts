@@ -170,6 +170,40 @@ export interface ApiActiveMembershipsBoard {
 }
 
 // ---------------------------------------------------------------------------
+// Renovar + cobrar, y deshacer (BUG-12, ver DECISIONES.md) -- ver
+// `POST /memberships/{id}/renew`, `POST /memberships/renewals/{id}/undo` y
+// `GET /memberships/{id}/renewals` en backend/src/api/v1/routers/memberships.py.
+// ---------------------------------------------------------------------------
+
+export interface MembershipRenewPayload {
+  method: ApiPaymentMethod
+}
+
+export interface ApiMembershipRenewal {
+  id: number
+  membership_id: number
+  payment_id: number
+  previous_end_date: string
+  new_end_date: string
+  previous_status: ApiMembershipStatus
+  performed_by: number
+  reversed_at: string | null
+  reversed_reason: string | null
+  reversed_by: number | null
+  created_at: string
+}
+
+export interface ApiMembershipRenewResult {
+  membership: ApiMembership
+  payment: ApiPayment
+  renewal: ApiMembershipRenewal
+}
+
+export interface MembershipRenewalUndoPayload {
+  reason: string
+}
+
+// ---------------------------------------------------------------------------
 // Planes y servicios extra (Entrega 3, Fase 2 -- amplía RF004/RF005) --
 // ver backend/src/api/v1/routers/memberships.py (`services_router`,
 // endpoints `/membership-plans/{id}/services`, `/memberships/{id}/services`).
@@ -288,7 +322,9 @@ export interface ApiPlanChangePreview {
 // ---------------------------------------------------------------------------
 
 export type ApiPaymentMethod = 'efectivo' | 'tarjeta' | 'transferencia'
-export type ApiPaymentStatus = 'completado' | 'pendiente' | 'rechazado'
+/** "anulado" agregado por BUG-12 (ver DECISIONES.md): pago de una
+ * renovación deshecha -- se conserva, nunca se borra. */
+export type ApiPaymentStatus = 'completado' | 'pendiente' | 'rechazado' | 'anulado'
 export type ApiPaymentItemConcept = 'plan' | 'servicio'
 
 export interface ApiPaymentItem {

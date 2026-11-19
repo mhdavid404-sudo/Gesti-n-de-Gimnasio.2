@@ -12,7 +12,11 @@ from decimal import Decimal
 
 # Persistidos como VARCHAR + CHECK (DECISIONES.md, correccion #1).
 METODOS_PAGO_VALIDOS = ("efectivo", "tarjeta", "transferencia")
-ESTADOS_PAGO_VALIDOS = ("completado", "pendiente", "rechazado")
+# "anulado" agregado por BUG-12 (ver DECISIONES.md): un pago de una
+# renovacion deshecha no se borra (se conserva el historial) -- se marca
+# con este status, que lo excluye de ingresos/totales en vez de inventar
+# una columna nueva para lo mismo.
+ESTADOS_PAGO_VALIDOS = ("completado", "pendiente", "rechazado", "anulado")
 
 # Entrega 3 (Fase 2): desglose de un pago por concepto.
 CONCEPTOS_PAYMENT_ITEM_VALIDOS = ("plan", "servicio")

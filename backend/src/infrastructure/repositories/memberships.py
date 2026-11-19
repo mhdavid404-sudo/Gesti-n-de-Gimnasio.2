@@ -10,12 +10,14 @@ from sqlalchemy.orm import Session
 from src.domain.memberships.entities import (
     Membership,
     MembershipPlan,
+    MembershipRenewal,
     MembershipService,
     PlanService,
     Service,
 )
 from src.domain.memberships.repositories import (
     MembershipPlanRepository,
+    MembershipRenewalRepository,
     MembershipRepository,
     MembershipServiceRepository,
     PlanServiceRepository,
@@ -24,6 +26,7 @@ from src.domain.memberships.repositories import (
 from src.infrastructure.db.models.memberships import (
     MembershipModel,
     MembershipPlanModel,
+    MembershipRenewalModel,
     MembershipServiceModel,
     PlanServiceModel,
     ServiceModel,
@@ -80,6 +83,22 @@ def _membership_to_entity(model: MembershipModel) -> Membership:
         start_date=model.start_date,
         end_date=model.end_date,
         status=model.status,
+        created_at=model.created_at,
+    )
+
+
+def _renewal_to_entity(model: MembershipRenewalModel) -> MembershipRenewal:
+    return MembershipRenewal(
+        id=model.id,
+        membership_id=model.membership_id,
+        payment_id=model.payment_id,
+        previous_end_date=model.previous_end_date,
+        new_end_date=model.new_end_date,
+        previous_status=model.previous_status,
+        performed_by=model.performed_by,
+        reversed_at=model.reversed_at,
+        reversed_reason=model.reversed_reason,
+        reversed_by=model.reversed_by,
         created_at=model.created_at,
     )
 
@@ -306,3 +325,55 @@ class SqlAlchemyMembershipServiceRepository(MembershipServiceRepository):
         model.end_date = membership_service.end_date
         self._session.flush()
         return _membership_service_to_entity(model)
+
+
+class SqlAlchemyMembershipRenewalRepository(MembershipRenewalRepository):
+    def __init__(self, session: Session) -> None:
+        self._session = session
+
+    def get_by_id(self, renewal_id: int) -> MembershipRenewal | None:
+        model = self._session.get(MembershipRenewalModel, renewal_id)
+        return _renewal_to_entity(model) if model else None
+
+    def list_by_membership(self, membership_id: int) -> list[MembershipRenewal]:
+        models = self._session.execute(
+            select(MembershipRenewalModel)
+            .where(MembershipRenewalModel.membership_id == membership_id)
+            .order_by(MembershipRenewalModel.id.desc())
+        ).scalars()
+        return [_renewal_to_entity(m) for m in models]
+
+    def get_latest_for_membership(self, membership_id: int) -> MembershipRenewal | None:
+        model = self._session.execute(
+            select(MembershipRenewalModel)
+            .where(MembershipRenewalModel.membership_id == membership_id)
+            .order_by(MembershipRenewalModel.id.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        return _renewal_to_entity(model) if model else None
+
+    def add(self, renewal: MembershipRenewal) -> MembershipRenewal:
+        model = MembershipRenewalModel(
+            membership_id=renewal.membership_id,
+            payment_id=renewal.payment_id,
+            previous_end_date=renewal.previous_end_date,
+            new_end_date=renewal.new_end_date,
+            previous_status=renewal.previous_status,
+            performed_by=renewal.performed_by,
+            reversed_at=renewal.reversed_at,
+            reversed_reason=renewal.reversed_reason,
+            reversed_by=renewal.reversed_by,
+        )
+        self._session.add(model)
+        self._session.flush()
+        return _renewal_to_entity(model)
+
+    def update(self, renewal: MembershipRenewal) -> MembershipRenewal:
+        model = self._session.get(MembershipRenewalModel, renewal.id)
+        if model is None:
+            raise ValueError(f"MembershipRenewal {renewal.id} no existe")
+        model.reversed_at = renewal.reversed_at
+        model.reversed_reason = renewal.reversed_reason
+        model.reversed_by = renewal.reversed_by
+        self._session.flush()
+        return _renewal_to_entity(model)
