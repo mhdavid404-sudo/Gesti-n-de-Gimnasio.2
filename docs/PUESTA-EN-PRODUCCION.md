@@ -158,3 +158,57 @@ desarrollo original (`docker compose up -d` desde
 intacto, nunca tocado por esta verificación). La carpeta del clon se
 conserva en `C:\Users\User\Desktop\dev\SmartGym-v2-clon-limpio` como
 evidencia reproducible.
+
+## Publicar con túnel para demo
+
+Para mostrar el sistema a alguien fuera de esta máquina (sin desplegarlo
+de verdad) alcanza con **un solo túnel** apuntando al frontend
+(`localhost:5173`) -- no hace falta un segundo túnel para el backend.
+
+El frontend llama a la API por ruta relativa (`/api/v1/...`, ver
+`frontend/src/api/client.ts`) en vez de una URL absoluta con su propio
+puerto, y `frontend/vite.config.ts` reenvía `/api` al servicio `backend`
+del lado del servidor (dentro del contenedor, nunca algo que el navegador
+tenga que resolver). Como la llamada queda en el MISMO origen que la
+página, el navegador nunca hace una petición entre orígenes distintos --
+no hace falta tocar `CORSMiddleware` en `backend/src/api/main.py` ni
+agregar el dominio del túnel a ninguna lista (que además cambia cada vez
+que se abre un túnel rápido de Cloudflare).
+
+### 1. Levantar el sistema normal
+
+```powershell
+docker compose up -d
+```
+
+### 2. Instalar `cloudflared` (una sola vez)
+
+```powershell
+winget install Cloudflare.cloudflared
+```
+
+### 3. Abrir el túnel apuntando al frontend
+
+```powershell
+cloudflared tunnel --url http://localhost:5173
+```
+
+La terminal imprime una URL pública tipo
+`https://palabras-al-azar.trycloudflare.com` -- compártela para la demo.
+Es un **túnel rápido** (sin cuenta de Cloudflare, sin configuración
+previa): vive mientras la terminal siga abierta y la URL cambia cada vez
+que se vuelve a correr el comando.
+
+### Notas
+
+- Quien entre por esa URL ve exactamente lo mismo que `localhost:5173` en
+  esta máquina, incluida la pantalla de login real (los 3 roles/cuentas
+  demo siguen aplicando) -- no es una copia de datos ni un ambiente
+  aislado, es la misma base de datos de desarrollo.
+- Para cerrar la demo: `Ctrl+C` en la terminal del túnel. El sistema
+  sigue corriendo en local (`docker compose down` lo apaga, si hace falta).
+- Si el contenedor del frontend ya estaba corriendo desde antes de que
+  existiera el proxy de `vite.config.ts`, hace falta un
+  `docker compose restart frontend` una vez para que tome la configuración
+  nueva (un `docker compose up -d` normal, en una máquina que recién
+  clona el repo, ya la incluye).

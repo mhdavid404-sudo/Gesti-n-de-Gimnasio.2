@@ -126,6 +126,13 @@ async def audited_validation_exception_handler(request: Request, exc: RequestVal
 # El frontend (Vite, puerto 5173) consume esta API en serio desde la
 # Entrega 2 -- sin este origen habilitado, cada fetch del panel falla por
 # CORS antes de llegar a ningun router.
+#
+# Publicar con tunel para demo (ver docs/PUESTA-EN-PRODUCCION.md): el
+# navegador llama a la API por ruta relativa (/api/v1/...), nunca cruza
+# origenes (ver `frontend/src/api/client.ts` y el proxy de
+# `vite.config.ts`) -- CORS no entra en juego para ese camino, asi que
+# esta lista no necesita el dominio del tunel (que ademas cambia cada vez
+# que se abre uno rapido).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],

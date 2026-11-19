@@ -1,8 +1,18 @@
 /**
  * Wrapper de `fetch` para la API real de SmartGym v2 (backend FastAPI).
  *
- * - Base URL desde `import.meta.env.VITE_API_URL` (ver `.env.example`, raíz
- *   del repo) + el prefijo fijo `/api/v1` que monta `backend/src/api/main.py`.
+ * - Base URL relativa por defecto (`''`): las llamadas quedan como
+ *   `/api/v1/...`, al MISMO origen desde el que se sirvió la página --
+ *   `vite.config.ts` (`server.proxy`) reenvía `/api` al servicio `backend`
+ *   del lado del servidor (Node adentro del contenedor, nunca el
+ *   navegador). Esto es lo que permite publicar el sistema detrás de un
+ *   solo túnel apuntando a `localhost:5173` (ver docs/PUESTA-EN-PRODUCCION.md,
+ *   "Publicar con túnel para demo") sin que el navegador necesite resolver
+ *   `localhost:8000` por su cuenta -- si el túnel lo abre otra persona en
+ *   otra red, ESE `localhost:8000` sería el suyo, no el del servidor real.
+ *   `import.meta.env.VITE_API_URL` sigue disponible para forzar una URL
+ *   absoluta si algún día hiciera falta (ver `.env.example`), pero no se
+ *   usa por defecto.
  * - Agrega el header `Authorization: Bearer <token>` automáticamente si hay
  *   una sesión guardada (ver `authStorage.ts`), salvo que se pida lo
  *   contrario (`auth: false`, usado por el propio login).
@@ -18,7 +28,7 @@
  */
 import { clearStoredAuth, readStoredAuth } from './authStorage'
 
-const BASE_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
+const BASE_URL: string = import.meta.env.VITE_API_URL ?? ''
 const API_PREFIX = '/api/v1'
 
 export class ApiError extends Error {
