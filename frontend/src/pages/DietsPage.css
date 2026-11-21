@@ -5,6 +5,13 @@
   align-items: start;
 }
 
+/* Los Toast son hermanos de ambas <section> dentro de este grid de 2
+   columnas; sin esto, cada aviso cae en una sola celda y su fila se
+   estira hasta la altura de la columna vecina, dejando un hueco debajo. */
+.diets-page > .toast {
+  grid-column: 1 / -1;
+}
+
 .diets-page__section-header {
   display: flex;
   align-items: baseline;
