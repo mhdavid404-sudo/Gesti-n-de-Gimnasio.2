@@ -21,6 +21,12 @@
   font-family: var(--font-body);
 }
 
+.progress-chart__axis-label-y {
+  font-size: 10px;
+  fill: var(--color-text-dim);
+  font-family: var(--font-body);
+}
+
 .progress-chart__empty {
   color: var(--color-text-muted);
   font-size: 14px;
