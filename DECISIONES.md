@@ -1228,3 +1228,37 @@ Registro de decisiones de arquitectura tomadas por Isai (revisor de diseño) dur
   - **Verificación de cierre:** suite completa de `pytest` **139/139 en verde** (122 previas + 17 nuevas), corrida tanto en este entorno de desarrollo como con `docker compose exec backend pytest` (el entorno real, con las versiones pineadas de `requirements.txt` -- la que delató el bug de `response_model=None`). `npx tsc -b`/`npm run build` limpios. Verificación en navegador con las 3 cuentas demo; detalle completo en `docs/RESULTADOS-FINALES.md`.
 
 ---
+
+### 2026-11-22 — Separación de contacto de emergencia en nombre/teléfono
+
+- **Contexto: reversión directa del arbitraje de 2026-09-12** ("Arbitraje de desalineación de modelo backend↔frontend", ver entrada de arriba), que había colapsado `emergency_contact_name`/`emergency_contact_phone` (frontend) en un solo campo de texto libre `emergency_contact` (backend), con el criterio de "consistencia de normalización" frente a `address`. El dueño del proyecto pidió deshacer esa decisión: en el panel real, un solo campo de texto libre ("papa-56616119958", "papa - 8659742358") no permite, por ejemplo, llamar al número directo desde un enlace `tel:` ni validar/filtrar por teléfono sin antes parsear el string.
+
+- **Decisión: volver a dos columnas,** `emergency_contact_name VARCHAR(255)` y `emergency_contact_phone VARCHAR(30)` (mismo largo que el `phone` del propio cliente), ambas nullable -- mismo criterio de "ninguno de los dos es obligatorio" que ya tenía el campo único.
+
+- **Migración `0007_contacto_emergencia_separado`:** aditiva + migración de datos, no solo un `ADD COLUMN`. Se agregan las dos columnas nuevas, se parte el valor existente de `emergency_contact` por el primer `-` (lo de antes del guion es el nombre, lo de después el teléfono, con `TRIM` para limpiar los espacios del patrón `"Nombre - Teléfono"`) y, si no tiene ningún guion, todo el texto se trata como nombre (no hay forma confiable de adivinar un teléfono suelto sin separador). Se elimina la columna vieja al final. Verificado a mano contra los 3 perfiles reales de la base de desarrollo tras aplicar la migración: `"María Demo - 55 0000 0001"` → `("María Demo", "55 0000 0001")`, `"papa-56616119958"` → `("papa", "56616119958")`, `"papa - 8659742358"` → `("papa", "8659742358")` -- los 3 casos reales que existían quedaron bien partidos. `downgrade()` reconstruye el campo único concatenando `nombre || ' - ' || teléfono` (mejor esfuerzo, no es perfectamente simétrico si alguno de los dos queda `NULL`).
+
+- **Alcance:** solo `ClientProfile` (módulo Clientes) -- no toca ningún otro módulo. `None`/`null` en cualquiera de los dos campos sigue significando "no cambiar" en `PATCH /clients/{id}` (mismo criterio que el resto de `ClientProfileUpdate`), aplicado de forma independiente a cada uno (se puede actualizar el nombre sin tocar el teléfono y viceversa).
+
+- **Alternativa aplicada:**
+  - `backend/src/domain/clients/entities.py`: `ClientProfile.emergency_contact_name`/`emergency_contact_phone` (reemplaza `emergency_contact`).
+  - `backend/src/infrastructure/db/models/clients.py`: columnas nuevas.
+  - `backend/src/infrastructure/migrations/versions/0007_contacto_emergencia_separado.py` (nueva).
+  - `backend/src/infrastructure/repositories/clients.py`: `_to_entity`/`add`/`update` tocan ambos campos.
+  - `backend/src/api/v1/schemas/clients.py`: `ClientProfileCreate`/`ClientProfileUpdate`/`ClientProfileRead` amplían con los dos campos.
+  - `backend/src/api/v1/routers/clients.py`: `_enrich`, `register_client`, `update_client`.
+  - `backend/src/application/clients/use_cases.py`: `RegisterClientUseCase.execute`, `UpdateClientProfileUseCase.execute` (merge independiente por campo).
+  - `backend/seed.py`: dato demo de `Cliente Demo` partido en `"María Demo"` / `"55 0000 0001"`.
+  - `backend/tests/{test_clients,test_change_plan,test_diets,test_memberships,test_notifications,test_payments,test_progress,test_routines,test_scheduler,test_services}.py`: el fixture `_register_client` de cada archivo cambia `"emergency_contact": "Alguien - 555-0000"` por los dos campos nuevos (sin agregar casos de prueba nuevos -- ninguno de ellos aserta sobre el valor exacto de este campo, solo lo usaban como dato de relleno del alta).
+  - `frontend/src/types/{api,models}.ts`: `ApiClientProfile`/`ClientProfile`, `ClientRegisterPayload`, `ClientProfileUpdatePayload` amplían con los dos campos.
+  - `frontend/src/pages/ClientFormPage.tsx` (alta): el campo único "Contacto de emergencia" se reemplaza por una fila de dos campos, "Nombre de contacto de emergencia" / "Teléfono de contacto de emergencia" (mismo patrón `.client-form__row` que fecha de nacimiento/entrenador).
+  - `frontend/src/pages/ClientDetailPage.tsx` (edición + vista de perfil): mismo split en el formulario de "Editar datos" y en la vista de solo lectura de la pestaña Perfil.
+  - **Verificación de cierre:** migración aplicada en la base de desarrollo real (`docker compose exec backend alembic upgrade head`) y datos existentes verificados a mano (ver arriba). Suite completa de `pytest` corrida contra el contenedor real tras el cambio. `npx tsc -b` limpio. Sin casos de prueba nuevos (ninguno de los 139 existentes dependía del valor textual exacto del campo).
+
+---
+
+### 2026-11-22 — Botón "Generar contraseña" en la ficha del cliente
+
+- **Decisión:** a pedido explícito, el botón de `ClientDetailPage.tsx` (pestaña Perfil) que dispara el restablecimiento de contraseña de un cliente cambia su texto de "Restablecer contraseña" a **"Generar contraseña"**. Cambio puramente cosmético (solo la etiqueta del botón) -- el diálogo de confirmación que abre sigue preguntando `"¿Restablecer la contraseña de {nombre}?"`, su botón de confirmar sigue diciendo "Restablecer"/"Restableciendo…", el toast de éxito sigue diciendo `Contraseña restablecida para "{nombre}"...`, y el endpoint/caso de uso/acción de bitácora (`restablecer_password`) no cambian de nombre. El botón equivalente en `pages/UsersPage.tsx` (para restablecer la contraseña de un entrenador/admin) NO se tocó -- sigue diciendo "Restablecer contraseña": las dos pantallas ya no usan el mismo texto para la misma acción, inconsistencia conocida y documentada (ver `docs/RESULTADOS-PRUEBAS-COMPLETO.md`, sección de verificación cruzada), no corregida porque no se pidió.
+- **Alcance:** 1 archivo (`frontend/src/pages/ClientDetailPage.tsx`), 1 línea. Sin pruebas nuevas, sin migración.
+
+---

@@ -44,6 +44,18 @@ y quitarla sin perder la bitácora). 17 casos nuevos (9 en
 nuevo, **139/139 en verde**. Los totales de abajo ya reflejan esta
 corrida.
 
+**Actualización 2026-11-22 (separación de contacto de emergencia; reporte
+completo):** migración `0007` revierte el arbitraje de 2026-09-12 —
+`ClientProfile.emergency_contact` vuelve a ser dos campos
+(`emergency_contact_name`/`emergency_contact_phone`). Sin casos de prueba
+nuevos (ninguno de los 139 aserta sobre el valor de ese campo), suite
+completa corrida de nuevo, sigue en **139/139**. Ver
+`docs/RESULTADOS-PRUEBAS-COMPLETO.md` para el mapeo 1:1 de las 139
+pruebas reales contra un número de CP (incluidas las 63 que nunca habían
+tenido uno asignado: CP77–CP129), la lista completa de migraciones
+`0001-0007`, los 14 bugs registrados y los cambios de API desde el 16 de
+noviembre.
+
 ## Totales reales
 
 ```

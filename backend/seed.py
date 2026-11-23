@@ -156,7 +156,8 @@ def run() -> None:
                 phone="5512345678",
                 birth_date=date(1995, 5, 20),
                 address="Calle Falsa 123, Aragón, CDMX",
-                emergency_contact="María Demo - 55 0000 0001",
+                emergency_contact_name="María Demo",
+                emergency_contact_phone="55 0000 0001",
             )
         )
         session.commit()

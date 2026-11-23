@@ -35,8 +35,8 @@ Resultado real en `docs/RESULTADOS-FINALES.md`.
 
 | Elemento | Archivo de código (backend) | Archivo de código (frontend) | CP | Resultado |
 |---|---|---|---|---|
-| Restablecer contraseña (admin, sin pedir la anterior) | `api/v1/routers/users.py::reset_user_password`, `application/users/use_cases.py::ResetUserPasswordUseCase` | `pages/ClientDetailPage.tsx` (botón "Restablecer contraseña", pestaña Perfil) | CP47-49 (`test_users.py`) | Pasó |
-| Editar datos de cliente desde la ficha (teléfono, dirección, fecha de nacimiento, contacto de emergencia, entrenador) | `api/v1/routers/clients.py::update_client` (endpoint ya existía desde Entrega 2; solo faltaba la pantalla) | `pages/ClientDetailPage.tsx` (botón "Editar datos", pestaña Perfil) | CP05 (+ `test_editar_cliente_como_no_admin_devuelve_403`) | Pasó |
+| Restablecer contraseña (admin, sin pedir la anterior) | `api/v1/routers/users.py::reset_user_password`, `application/users/use_cases.py::ResetUserPasswordUseCase` | `pages/ClientDetailPage.tsx` (botón "Generar contraseña" desde 2026-11-22, antes "Restablecer contraseña"; el mismo botón en `pages/UsersPage.tsx` conserva el nombre "Restablecer contraseña"), pestaña Perfil | CP47-49 (`test_users.py`) | Pasó |
+| Editar datos de cliente desde la ficha (teléfono, dirección, fecha de nacimiento, nombre de contacto de emergencia, teléfono de contacto de emergencia, entrenador) | `api/v1/routers/clients.py::update_client` (endpoint ya existía desde Entrega 2; solo faltaba la pantalla) | `pages/ClientDetailPage.tsx` (botón "Editar datos", pestaña Perfil) | CP05 (+ `test_editar_cliente_como_no_admin_devuelve_403`) | Pasó |
 
 ## Ampliación de RF001 (pantalla "Usuarios": alta, activar/desactivar admin/entrenador, 2026-11-18 — sin ID formal en el documento)
 
@@ -45,6 +45,28 @@ Resultado real en `docs/RESULTADOS-FINALES.md`.
 | Alta de admin/entrenador con registro en Bitácora | `api/v1/routers/users.py::register_user`, `application/users/use_cases.py::RegisterUserUseCase` (`POST /users` ya existía desde Entrega 2; el registro en `AuditLog` es nuevo) | `pages/UsersPage.tsx` (botón "+ Nuevo usuario") | CP50 (`test_users.py`) | Pasó |
 | Activar/desactivar una cuenta, con autodesactivación bloqueada | `api/v1/routers/users.py::update_user` (`PATCH /users/{id}` ya existía; el chequeo de autodesactivación y el registro en `AuditLog` son nuevos) | `pages/UsersPage.tsx` (botón "Activar"/"Desactivar" por fila) | CP51, CP52 (`test_users.py`) | Pasó |
 | Protección de ruta de "Usuarios" (solo admin, `entrenador`/`cliente` bloqueados incluso por URL directa) | chequeo de rol en el cliente, no en `GET /users` (ver `DECISIONES.md` para por qué no se angostó ese endpoint compartido) | `pages/UsersPage.tsx` | — (verificado en navegador, sin CP de pytest -- es un chequeo puramente de frontend) | Pasó |
+
+## Editar/eliminar rutinas y dietas (amplía RF007/RF009/RF012, 2026-11-18 — sin ID formal en el documento)
+
+| Elemento | Archivo de código (backend) | Archivo de código (frontend) | CP | Resultado |
+|---|---|---|---|---|
+| Editar/eliminar rutina (se desactiva en vez de borrar si tiene asignaciones) | `api/v1/routers/routines.py` (`PATCH`/`DELETE /routines/{id}`), `application/routines/use_cases.py::UpdateRoutineUseCase`/`DeleteOrDeactivateRoutineUseCase` | `pages/RoutinesPage.tsx` (botones "Editar"/"Eliminar") | CP60-64 (`test_routines.py`) | Pasó |
+| Editar/eliminar plan de dieta (mismo criterio) | `api/v1/routers/diets.py` (`PATCH`/`DELETE /diets/plans/{id}`), `application/diets/use_cases.py::UpdateDietPlanUseCase`/`DeleteOrDeactivateDietPlanUseCase` | `pages/DietsPage.tsx` (botones "Editar"/"Eliminar") | CP69-73 (`test_diets.py`) | Pasó |
+| Corregir/quitar una asignación de rutina o dieta sin perder la bitácora | `api/v1/routers/{routines,diets}.py` (`PATCH` ampliado + `DELETE` nuevo de asignación) | `pages/{RoutinesPage,DietsPage}.tsx`, `pages/ClientDetailPage.tsx` (botones "Corregir"/"Quitar") | CP65-68, CP74-76 (`test_routines.py`, `test_diets.py`) | Pasó |
+
+Migración `0006_editar_eliminar_rutinas_dietas`: agrega `is_active` a
+`routines` y `diet_plans` (mismo patrón que `0003` en `membership_plans`/
+`services`). Ver `DECISIONES.md`, entrada "Editar/eliminar rutinas y
+dietas", y BUG-13/BUG-14 (corregidos durante esta ampliación).
+
+## Separación de contacto de emergencia en nombre/teléfono (migración 0007, 2026-11-22 — sin ID formal en el documento)
+
+| Elemento | Archivo de código (backend) | Archivo de código (frontend) | CP | Resultado |
+|---|---|---|---|---|
+| `ClientProfile.emergency_contact` (texto libre) se divide en `emergency_contact_name`/`emergency_contact_phone` | `domain/clients/entities.py`, `infrastructure/db/models/clients.py`, `api/v1/schemas/clients.py`, `application/clients/use_cases.py`, migración `0007_contacto_emergencia_separado` (migra los datos existentes partiendo por el primer "-") | `pages/ClientFormPage.tsx` (alta) y `pages/ClientDetailPage.tsx` (editar/ver perfil): dos campos en vez de uno | Reversión del arbitraje de 2026-09-12 — sin CP propio: ningún caso existente asertaba sobre el valor de este campo, solo se actualizaron los 10 fixtures que lo usaban como dato de relleno (`test_clients.py`, `test_change_plan.py`, `test_diets.py`, `test_memberships.py`, `test_notifications.py`, `test_payments.py`, `test_progress.py`, `test_routines.py`, `test_scheduler.py`, `test_services.py`) | Pasó (139/139, sin cambio en el número de casos) |
+
+Ver `DECISIONES.md`, entrada "Separación de contacto de emergencia en
+nombre/teléfono".
 
 ## BUG-12 — renovar + cobrar atómico, ventana de 7 días, deshacer (2026-11-18 — sin ID formal en el documento)
 
@@ -55,7 +77,10 @@ Resultado real en `docs/RESULTADOS-FINALES.md`.
 | Deshacer la última renovación (anula el pago, restaura la fecha, pide motivo) | `application/memberships/use_cases.py::UndoMembershipRenewalUseCase`, tabla nueva `membership_renewals` (migración `0005`) | `pages/ClientDetailPage.tsx` (botón "Deshacer renovación") | CP55-58 | Pasó |
 | Un pago anulado no cuenta en ingresos/totales | `api/v1/routers/memberships.py::get_active_memberships_board` (excluye `status == 'anulado'`) | `pages/DashboardPage.tsx` (`monthIncome`) | CP59 | Pasó |
 
-## Modelo de datos (18 tablas → 19 con `membership_renewals`, BUG-12)
+## Modelo de datos (19 tablas: 14 de la migración `0001` + 4 de `0003` + `membership_renewals` de `0005`/BUG-12)
 
-Ver `docs/diagrama-entidad-relacion.svg` y `backend/MODELO-DATOS.md` para el
-detalle completo de columnas/constraints de cada una de las 18 tablas.
+Ver `docs/diagrama-entidad-relacion.svg` (desactualizado: sigue en 18
+tablas y migraciones `0001-0004`, pendiente de regenerar) y
+`backend/MODELO-DATOS.md` para el detalle completo de columnas/
+constraints. Migraciones aplicadas: `0001` a `0007` (ver
+`docs/RESULTADOS-PRUEBAS-COMPLETO.md` para el detalle de cada una).

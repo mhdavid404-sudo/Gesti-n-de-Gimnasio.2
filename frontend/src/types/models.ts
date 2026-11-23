@@ -92,8 +92,10 @@ export interface ClientProfile {
   phone: string | null
   birth_date: string | null // ISO date (YYYY-MM-DD)
   address: string | null
-  /** Texto libre, ej. "María López - 555-1234" (ver DECISIONES.md, 2026-09-12). */
-  emergency_contact: string | null
+  /** Separado en nombre/teléfono (ver DECISIONES.md, 2026-11-22 — reversión
+   * del campo único de texto libre de 2026-09-12). */
+  emergency_contact_name: string | null
+  emergency_contact_phone: string | null
   created_at: string
   updated_at: string
 }

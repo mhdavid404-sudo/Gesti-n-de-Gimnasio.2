@@ -31,8 +31,11 @@ class ClientProfile:
     phone: str | None
     birth_date: date | None
     address: str | None
-    # Arbitraje de la revision de arquitectura, 2026-09-12 (DECISIONES.md): campo unico de texto
-    # libre, igual que `address` -- no separado en nombre/telefono.
-    emergency_contact: str | None = None
+    # Reversion del arbitraje de 2026-09-12 (DECISIONES.md, entrada
+    # "Separacion de contacto de emergencia en nombre/telefono"): vuelve a
+    # dividirse en dos campos -- el cliente real pidio poder filtrar/llamar
+    # por telefono sin tener que parsear texto libre.
+    emergency_contact_name: str | None = None
+    emergency_contact_phone: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None

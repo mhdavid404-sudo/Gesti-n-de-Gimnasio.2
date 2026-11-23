@@ -30,9 +30,10 @@ class ClientProfileModel(Base):
     phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
     birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     address: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    # Arbitraje de la revision de arquitectura, 2026-09-12 (DECISIONES.md): campo unico de texto
-    # libre, igual que `address` -- no separado en nombre/telefono.
-    emergency_contact: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # Reversion del arbitraje de 2026-09-12 -- ver domain/clients/entities.py
+    # y la migracion 0007.
+    emergency_contact_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    emergency_contact_phone: Mapped[str | None] = mapped_column(String(30), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

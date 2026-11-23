@@ -29,7 +29,8 @@ export interface ApiClientProfile {
   phone: string | null
   birth_date: string | null
   address: string | null
-  emergency_contact: string | null
+  emergency_contact_name: string | null
+  emergency_contact_phone: string | null
   created_at: string
   updated_at: string
   email: string
@@ -44,7 +45,8 @@ export interface ClientRegisterPayload {
   phone?: string | null
   birth_date?: string | null
   address?: string | null
-  emergency_contact?: string | null
+  emergency_contact_name?: string | null
+  emergency_contact_phone?: string | null
 }
 
 export interface ClientRegisterResponse {
@@ -65,7 +67,8 @@ export interface ClientProfileUpdatePayload {
   phone?: string | null
   birth_date?: string | null
   address?: string | null
-  emergency_contact?: string | null
+  emergency_contact_name?: string | null
+  emergency_contact_phone?: string | null
 }
 
 /** Respuesta de `POST /users/{id}/reset-password` -- la temporal en texto

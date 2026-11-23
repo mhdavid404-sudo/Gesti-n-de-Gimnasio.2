@@ -180,7 +180,8 @@ export function ClientDetailPage() {
   const [editPhone, setEditPhone] = useState('')
   const [editBirthDate, setEditBirthDate] = useState('')
   const [editAddress, setEditAddress] = useState('')
-  const [editEmergencyContact, setEditEmergencyContact] = useState('')
+  const [editEmergencyContactName, setEditEmergencyContactName] = useState('')
+  const [editEmergencyContactPhone, setEditEmergencyContactPhone] = useState('')
   const [editTrainerId, setEditTrainerId] = useState('')
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
@@ -206,7 +207,8 @@ export function ClientDetailPage() {
     setEditPhone(profile.phone ?? '')
     setEditBirthDate(profile.birth_date ?? '')
     setEditAddress(profile.address ?? '')
-    setEditEmergencyContact(profile.emergency_contact ?? '')
+    setEditEmergencyContactName(profile.emergency_contact_name ?? '')
+    setEditEmergencyContactPhone(profile.emergency_contact_phone ?? '')
     setEditTrainerId(profile.trainer_id != null ? String(profile.trainer_id) : '')
     setEditError(null)
     setShowEditForm(true)
@@ -223,7 +225,8 @@ export function ClientDetailPage() {
       phone: editPhone.trim() || null,
       birth_date: editBirthDate || null,
       address: editAddress.trim() || null,
-      emergency_contact: editEmergencyContact.trim() || null,
+      emergency_contact_name: editEmergencyContactName.trim() || null,
+      emergency_contact_phone: editEmergencyContactPhone.trim() || null,
     }
 
     setIsSavingEdit(true)
@@ -1579,7 +1582,7 @@ export function ClientDetailPage() {
                     className="btn btn-ghost"
                     onClick={() => setShowResetConfirm(true)}
                   >
-                    Restablecer contraseña
+                    Generar contraseña
                   </button>
                   <button
                     type="button"
@@ -1655,14 +1658,26 @@ export function ClientDetailPage() {
                       />
                     </div>
                     <div className="client-detail__field">
-                      <label className="field-label" htmlFor="editEmergencyContact">
-                        Contacto de emergencia
+                      <label className="field-label" htmlFor="editEmergencyContactName">
+                        Nombre de contacto de emergencia
                       </label>
                       <input
-                        id="editEmergencyContact"
+                        id="editEmergencyContactName"
                         className="input"
-                        value={editEmergencyContact}
-                        onChange={(e) => setEditEmergencyContact(e.target.value)}
+                        value={editEmergencyContactName}
+                        onChange={(e) => setEditEmergencyContactName(e.target.value)}
+                      />
+                    </div>
+                    <div className="client-detail__field">
+                      <label className="field-label" htmlFor="editEmergencyContactPhone">
+                        Teléfono de contacto de emergencia
+                      </label>
+                      <input
+                        id="editEmergencyContactPhone"
+                        type="tel"
+                        className="input"
+                        value={editEmergencyContactPhone}
+                        onChange={(e) => setEditEmergencyContactPhone(e.target.value)}
                       />
                     </div>
                     <div className="client-detail__field">
@@ -1705,8 +1720,12 @@ export function ClientDetailPage() {
                     <dd>{profile.address ?? '—'}</dd>
                   </div>
                   <div>
-                    <dt>Contacto de emergencia</dt>
-                    <dd>{profile.emergency_contact ?? '—'}</dd>
+                    <dt>Nombre de contacto de emergencia</dt>
+                    <dd>{profile.emergency_contact_name ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt>Teléfono de contacto de emergencia</dt>
+                    <dd>{profile.emergency_contact_phone ?? '—'}</dd>
                   </div>
                   <div>
                     <dt>Cliente desde</dt>

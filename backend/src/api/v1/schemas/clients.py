@@ -21,7 +21,8 @@ class ClientProfileCreate(BaseModel):
     phone: str | None = Field(default=None, max_length=30)
     birth_date: date | None = None
     address: str | None = Field(default=None, max_length=255)
-    emergency_contact: str | None = Field(default=None, max_length=255)
+    emergency_contact_name: str | None = Field(default=None, max_length=255)
+    emergency_contact_phone: str | None = Field(default=None, max_length=30)
 
 
 class ClientProfileUpdate(BaseModel):
@@ -34,7 +35,8 @@ class ClientProfileUpdate(BaseModel):
     phone: str | None = Field(default=None, max_length=30)
     birth_date: date | None = None
     address: str | None = Field(default=None, max_length=255)
-    emergency_contact: str | None = Field(default=None, max_length=255)
+    emergency_contact_name: str | None = Field(default=None, max_length=255)
+    emergency_contact_phone: str | None = Field(default=None, max_length=30)
 
 
 class ClientProfileRead(BaseModel):
@@ -59,7 +61,8 @@ class ClientProfileRead(BaseModel):
     phone: str | None
     birth_date: date | None
     address: str | None
-    emergency_contact: str | None
+    emergency_contact_name: str | None
+    emergency_contact_phone: str | None
     created_at: datetime
     updated_at: datetime
     email: str

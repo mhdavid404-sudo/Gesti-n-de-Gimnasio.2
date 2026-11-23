@@ -50,7 +50,8 @@ tipo es `VARCHAR` + `CHECK constraint`, nunca `ENUM` nativo de PostgreSQL
 | phone | VARCHAR(30) | NULLABLE |
 | birth_date | DATE | NULLABLE |
 | address | VARCHAR(255) | NULLABLE |
-| emergency_contact | VARCHAR(255) | NULLABLE (campo unico de texto libre, igual que `address`; no separado en nombre/telefono) |
+| emergency_contact_name | VARCHAR(255) | NULLABLE |
+| emergency_contact_phone | VARCHAR(30) | NULLABLE |
 | created_at | TIMESTAMPTZ | NOT NULL, DEFAULT now() |
 | updated_at | TIMESTAMPTZ | NOT NULL, DEFAULT now(), se actualiza en cada UPDATE |
 
@@ -58,10 +59,11 @@ tipo es `VARCHAR` + `CHECK constraint`, nunca `ENUM` nativo de PostgreSQL
 `application/clients`):** `trainer_id` debe apuntar a un `User` con
 `role = 'entrenador'`.
 
-**Arbitraje de la revision de arquitectura (DECISIONES.md, 2026-09-12 —
-Arbitraje de desalineacion backend↔frontend):** `emergency_contact` no
-existia en el backend (no implementado, no divergente). Se agrego como
-campo unico, no como par `emergency_contact_name`/`emergency_contact_phone`.
+**Historial:** el arbitraje de 2026-09-12 (DECISIONES.md, "Arbitraje de
+desalineacion backend↔frontend") lo habia agregado como un campo unico de
+texto libre. Revertido en la entrada de DECISIONES.md del 2026-11-22
+("Separacion de contacto de emergencia en nombre/telefono", migracion
+`0007`): vuelve a ser el par `emergency_contact_name`/`emergency_contact_phone`.
 
 ## membership_plans
 

@@ -149,10 +149,16 @@
 
   --color-bg: var(--color-primario);
   --color-bg-elevated: var(--color-primario);
-  --color-surface: #181a13;
-  --color-surface-2: #21241a;
-  --color-border: #2e3224;
-  --color-border-soft: #1f2217;
+  /* --color-surface/-2 y --color-border/-soft (2026-11-22): antes eran hex
+     sueltos (#181a13, #21241a...) heredados de la paleta negra de antes del
+     ajuste 2026-11-19 -- casi sin tinte, por eso .card y las .data-table se
+     veían "negras" en vez de verdes. Ahora se DERIVAN de los dos tokens de
+     marca con color-mix(), igual que el resto del archivo, para que las
+     superficies elevadas (tarjetas, tablas) lean inconfundiblemente verdes. */
+  --color-surface: color-mix(in srgb, var(--color-primario) 62%, black);
+  --color-surface-2: color-mix(in srgb, var(--color-secundario) 48%, black);
+  --color-border: color-mix(in srgb, var(--color-secundario) 55%, black);
+  --color-border-soft: color-mix(in srgb, var(--color-primario) 70%, black);
 
   /* Texto claro: ambos verdes de marca son oscuros (L relativa ≈0.043 y
      ≈0.099), así que el texto vuelve a ser tinta clara en todo el sistema

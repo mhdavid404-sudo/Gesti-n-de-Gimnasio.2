@@ -98,7 +98,8 @@ def _register_client(
         "phone": "5512345678",
         "birth_date": "1995-05-20",
         "address": "Calle Falsa 123",
-        "emergency_contact": "Alguien - 555-0000",
+        "emergency_contact_name": "Alguien",
+        "emergency_contact_phone": "555-0000",
     }
     return client.post(f"{API}/clients", json=payload, headers=headers)
 

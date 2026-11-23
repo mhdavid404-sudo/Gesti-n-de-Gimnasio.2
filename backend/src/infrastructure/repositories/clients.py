@@ -21,7 +21,8 @@ def _to_entity(model: ClientProfileModel) -> ClientProfile:
         phone=model.phone,
         birth_date=model.birth_date,
         address=model.address,
-        emergency_contact=model.emergency_contact,
+        emergency_contact_name=model.emergency_contact_name,
+        emergency_contact_phone=model.emergency_contact_phone,
         created_at=model.created_at,
         updated_at=model.updated_at,
     )
@@ -60,7 +61,8 @@ class SqlAlchemyClientProfileRepository(ClientProfileRepository):
             phone=client.phone,
             birth_date=client.birth_date,
             address=client.address,
-            emergency_contact=client.emergency_contact,
+            emergency_contact_name=client.emergency_contact_name,
+            emergency_contact_phone=client.emergency_contact_phone,
         )
         self._session.add(model)
         self._session.flush()
@@ -74,7 +76,8 @@ class SqlAlchemyClientProfileRepository(ClientProfileRepository):
         model.phone = client.phone
         model.birth_date = client.birth_date
         model.address = client.address
-        model.emergency_contact = client.emergency_contact
+        model.emergency_contact_name = client.emergency_contact_name
+        model.emergency_contact_phone = client.emergency_contact_phone
         self._session.flush()
         return _to_entity(model)
 

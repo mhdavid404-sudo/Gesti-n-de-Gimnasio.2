@@ -76,7 +76,8 @@ class RegisterClientUseCase:
         phone: str | None,
         birth_date: date | None,
         address: str | None,
-        emergency_contact: str | None,
+        emergency_contact_name: str | None,
+        emergency_contact_phone: str | None,
     ) -> RegisterClientResult:
         if self.user_repository.get_by_email(email) is not None:
             raise EmailAlreadyExistsError(email)
@@ -105,7 +106,8 @@ class RegisterClientUseCase:
                 phone=phone,
                 birth_date=birth_date,
                 address=address,
-                emergency_contact=emergency_contact,
+                emergency_contact_name=emergency_contact_name,
+                emergency_contact_phone=emergency_contact_phone,
             )
         )
 
@@ -229,10 +231,15 @@ class UpdateClientProfileUseCase:
             phone=updates.phone if updates.phone is not None else existing.phone,
             birth_date=updates.birth_date if updates.birth_date is not None else existing.birth_date,
             address=updates.address if updates.address is not None else existing.address,
-            emergency_contact=(
-                updates.emergency_contact
-                if updates.emergency_contact is not None
-                else existing.emergency_contact
+            emergency_contact_name=(
+                updates.emergency_contact_name
+                if updates.emergency_contact_name is not None
+                else existing.emergency_contact_name
+            ),
+            emergency_contact_phone=(
+                updates.emergency_contact_phone
+                if updates.emergency_contact_phone is not None
+                else existing.emergency_contact_phone
             ),
         )
         return self.client_repository.update(merged)

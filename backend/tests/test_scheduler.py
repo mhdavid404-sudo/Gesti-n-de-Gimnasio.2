@@ -93,7 +93,8 @@ def test_run_daily_expiring_detection_transiciona_y_notifica(client) -> None:
         "phone": "5512345678",
         "birth_date": "1995-05-20",
         "address": "Calle Falsa 123",
-        "emergency_contact": "Alguien - 555-0000",
+        "emergency_contact_name": "Alguien",
+        "emergency_contact_phone": "555-0000",
     }
     created_client = client.post(f"{API}/clients", json=client_payload, headers=admin_headers).json()
     client_id = created_client["client"]["id"]

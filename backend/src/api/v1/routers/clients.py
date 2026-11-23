@@ -80,7 +80,8 @@ def _enrich(
         phone=profile.phone,
         birth_date=profile.birth_date,
         address=profile.address,
-        emergency_contact=profile.emergency_contact,
+        emergency_contact_name=profile.emergency_contact_name,
+        emergency_contact_phone=profile.emergency_contact_phone,
         created_at=profile.created_at,  # type: ignore[arg-type]
         updated_at=profile.updated_at,  # type: ignore[arg-type]
         email=owner.email if owner else "",
@@ -109,7 +110,8 @@ def register_client(payload: ClientProfileCreate, db: Session = Depends(get_db))
             phone=payload.phone,
             birth_date=payload.birth_date,
             address=payload.address,
-            emergency_contact=payload.emergency_contact,
+            emergency_contact_name=payload.emergency_contact_name,
+            emergency_contact_phone=payload.emergency_contact_phone,
         )
     except EmailAlreadyExistsError as exc:
         raise HTTPException(
@@ -229,7 +231,8 @@ def update_client(
         phone=payload.phone,
         birth_date=payload.birth_date,
         address=payload.address,
-        emergency_contact=payload.emergency_contact,
+        emergency_contact_name=payload.emergency_contact_name,
+        emergency_contact_phone=payload.emergency_contact_phone,
     )
 
     try:

@@ -66,7 +66,8 @@ export function ClientFormPage() {
   const [phone, setPhone] = useState('')
   const [birthDate, setBirthDate] = useState('')
   const [address, setAddress] = useState('')
-  const [emergencyContact, setEmergencyContact] = useState('')
+  const [emergencyContactName, setEmergencyContactName] = useState('')
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState('')
   const [trainerId, setTrainerId] = useState('')
 
   const [trainers, setTrainers] = useState<AuthUser[]>([])
@@ -153,7 +154,8 @@ export function ClientFormPage() {
       phone: phone.trim(),
       birth_date: birthDate,
       address: address.trim(),
-      emergency_contact: emergencyContact.trim() || null,
+      emergency_contact_name: emergencyContactName.trim() || null,
+      emergency_contact_phone: emergencyContactPhone.trim() || null,
     }
 
     const apiErrorText = (err: unknown): string =>
@@ -376,17 +378,32 @@ export function ClientFormPage() {
             )}
           </div>
 
-          <div className="client-form__field">
-            <label className="field-label" htmlFor="emergencyContact">
-              Contacto de emergencia
-            </label>
-            <input
-              id="emergencyContact"
-              className="input"
-              value={emergencyContact}
-              onChange={(e) => setEmergencyContact(e.target.value)}
-              placeholder="Nombre y teléfono"
-            />
+          <div className="client-form__row">
+            <div className="client-form__field">
+              <label className="field-label" htmlFor="emergencyContactName">
+                Nombre de contacto de emergencia
+              </label>
+              <input
+                id="emergencyContactName"
+                className="input"
+                value={emergencyContactName}
+                onChange={(e) => setEmergencyContactName(e.target.value)}
+                placeholder="Ej. María López"
+              />
+            </div>
+            <div className="client-form__field">
+              <label className="field-label" htmlFor="emergencyContactPhone">
+                Teléfono de contacto de emergencia
+              </label>
+              <input
+                id="emergencyContactPhone"
+                type="tel"
+                className="input"
+                value={emergencyContactPhone}
+                onChange={(e) => setEmergencyContactPhone(e.target.value)}
+                placeholder="55 1234 5678"
+              />
+            </div>
           </div>
         </section>
 

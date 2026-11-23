@@ -153,8 +153,8 @@ empiezas de cero):
 docker compose exec backend alembic upgrade head
 ```
 
-**Qué debes ver:** 4 líneas que empiezan con `INFO [alembic...] Running
-upgrade`, terminando en la migración `0004`. Ningún `Traceback` ni
+**Qué debes ver:** 7 líneas que empiezan con `INFO [alembic...] Running
+upgrade`, terminando en la migración `0007`. Ningún `Traceback` ni
 `Error`.
 
 ### 2.5 Cargar datos de ejemplo (opcional pero recomendado)
@@ -214,9 +214,11 @@ Ningún usuario puede cambiar su propia contraseña desde su sesión — eso
 sigue sin existir. Pero **el Administrador sí puede restablecer la
 contraseña de cualquier usuario** (cliente, entrenador u otro
 administrador) desde la ficha del cliente, pestaña **Perfil**, botón
-**"Restablecer contraseña"** — ver sección 4.1 para el paso a paso. No
-hace falta conocer ni escribir la contraseña anterior: el sistema genera
-una temporal nueva y la anterior deja de funcionar de inmediato.
+**"Generar contraseña"** (en la pantalla **Usuarios** el botón que hace
+lo mismo todavía se llama **"Restablecer contraseña"**) — ver sección 4.1
+para el paso a paso. No hace falta conocer ni escribir la contraseña
+anterior: el sistema genera una temporal nueva y la anterior deja de
+funcionar de inmediato.
 
 ---
 
@@ -243,8 +245,9 @@ servicios, Rutinas, Dietas, Progreso, Bitácora, Usuarios** y, al final,
 
 2. Llena los datos del cliente. **Nombre completo, correo, teléfono,
    fecha de nacimiento y dirección son obligatorios** — si falta alguno,
-   el sistema lo marca en rojo y no deja continuar. El teléfono de
-   emergencia es opcional.
+   el sistema lo marca en rojo y no deja continuar. El nombre y el
+   teléfono de contacto de emergencia (dos campos separados) son
+   opcionales.
 3. En la columna derecha ("Membresía y pago inicial") puedes:
    - Dejarlo en **"Sin membresía por ahora"** y asignársela después
      (ver más abajo), o
@@ -269,11 +272,11 @@ pidiéndole a soporte técnico que genere una nueva).
 
 Dentro de la ficha del cliente, pestaña **Perfil**, botón **"Editar
 datos"**. Abre un formulario ya prellenado con los datos actuales
-(teléfono, fecha de nacimiento, dirección, contacto de emergencia y
-entrenador asignado) — cambia solo lo que necesites y haz clic en
-**"Guardar cambios"**.
+(teléfono, fecha de nacimiento, dirección, nombre de contacto de
+emergencia, teléfono de contacto de emergencia y entrenador asignado) —
+cambia solo lo que necesites y haz clic en **"Guardar cambios"**.
 
-![Botones "Restablecer contraseña" y "Editar datos" en la ficha del cliente](capturas/manual/36-admin-cliente-perfil-botones.jpg)
+![Botones "Generar contraseña" y "Editar datos" en la ficha del cliente](capturas/manual/36-admin-cliente-perfil-botones.jpg)
 
 ![Formulario de edición, ya prellenado](capturas/manual/37-admin-editar-datos-form.jpg)
 
@@ -284,9 +287,10 @@ correctamente" y los datos nuevos reflejados de inmediato en la pantalla.
 
 #### Restablecer la contraseña de un cliente (o de cualquier usuario)
 
-Mismo lugar (ficha del cliente, pestaña Perfil), botón **"Restablecer
-contraseña"**. El sistema te pide confirmar — te advierte que la
-contraseña anterior deja de funcionar de inmediato.
+Mismo lugar (ficha del cliente, pestaña Perfil), botón **"Generar
+contraseña"**. El sistema te pide confirmar (el diálogo de confirmación
+sigue preguntando "¿Restablecer la contraseña de...?") — te advierte que
+la contraseña anterior deja de funcionar de inmediato.
 
 ![Confirmación antes de restablecer](capturas/manual/39-admin-restablecer-confirmacion.jpg)
 
@@ -297,9 +301,11 @@ persona de inmediato.
 
 ![Contraseña restablecida](capturas/manual/40-admin-password-restablecida.jpg)
 
-Este mismo botón también existe en la pantalla **Usuarios** (ver más
-abajo) para restablecer la contraseña de un entrenador o de otro
-administrador — no hace falta pasar por la ficha de un cliente para eso.
+La misma función también existe en la pantalla **Usuarios** (ver más
+abajo), con el botón **"Restablecer contraseña"** (ahí conserva el
+nombre anterior) para restablecer la contraseña de un entrenador o de
+otro administrador — no hace falta pasar por la ficha de un cliente
+para eso.
 
 ![Ficha de un cliente — pestaña Perfil](capturas/manual/06-admin-cliente-detalle-perfil.jpg)
 
@@ -484,9 +490,10 @@ los clientes NO aparecen aquí, esos se dan de alta y se gestionan desde
 
   ![Usuario creado](capturas/manual/44-admin-usuario-creado.jpg)
 
-- **Restablecer contraseña:** mismo botón y mismo comportamiento que en
-  la ficha de un cliente (ver más arriba) — contraseña temporal nueva,
-  mostrada una sola vez.
+- **Restablecer contraseña:** mismo comportamiento que el botón
+  "Generar contraseña" de la ficha de un cliente (ver más arriba, aquí
+  conserva el nombre "Restablecer contraseña") — contraseña temporal
+  nueva, mostrada una sola vez.
 - **Activar / Desactivar:** botón en la fila de cada usuario. Desactivar
   a alguien le impide iniciar sesión de inmediato (sin borrar su cuenta
   ni su historial); "Activar" se lo devuelve. **Un administrador no
